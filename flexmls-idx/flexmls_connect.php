@@ -5,7 +5,7 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.14.22
+Version: 3.14.23
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
 Tested up to: 6.7
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.14.22';
+const FMC_PLUGIN_VERSION = '3.14.23';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -190,6 +190,7 @@ class FlexMLS_IDX {
 	public static function plugin_deactivate(){
 		$SparkAPI = new \SparkAPI\Core();
 		$SparkAPI->clear_cache( true );
+		flush_rewrite_rules();
 	}
 
 	public static function plugin_uninstall(){
@@ -215,6 +216,7 @@ class FlexMLS_IDX {
 		add_rewrite_rule( 'portal/([^/]+)?', 'index.php?plugin=flexmls-idx&fmc_vow_tag=$matches[1]&page_id=' . $fmc_settings[ 'destlink' ], 'top' );
 		add_rewrite_tag( '%fmc_tag%', '([^&]+)' );
 		add_rewrite_tag( '%fmc_vow_tag%', '([^&]+)' );
+		flush_rewrite_rules();
 	}
 
 	function session_start(){

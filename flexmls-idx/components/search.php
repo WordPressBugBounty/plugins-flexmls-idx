@@ -58,7 +58,7 @@ class fmcSearch_v1 extends fmcWidget {
 
     foreach ($all_location_fields as $location_field) {
       if(array_key_exists($location_field, $_GET)){
-        $location_fields[$location_field] = $_GET[$location_field];
+        $location_fields[$location_field] = sanitize_text_field($_GET[$location_field]);
       }
     }
 
@@ -728,6 +728,14 @@ class fmcSearch_v1 extends fmcWidget {
     return $color;
   }
 
+  static function min_max_verify($get, $get_param) {
+
+    $return = ( array_key_exists($get_param, $get) && is_numeric($get[$get_param]) ) ? $get[$get_param] : '';
+
+    return $return;
+
+  }
+
 	static function create_min_max_row($field) {
 
     $rand = mt_rand();
@@ -737,12 +745,12 @@ class fmcSearch_v1 extends fmcWidget {
         'data_connect_field' => 'Price',
         'field_for' => 'MinPrice',
         'field_label' => 'Price Range',
-        'min_input_value' => array_key_exists("MinPrice", $_GET) ? $_GET["MinPrice"] : "",
+        'min_input_value' => fmcSearch::min_max_verify($_GET, "MinPrice"),
         'min_input_name' => 'MinPrice',
         'min_input_id' => $rand . "-MinPrice",
         'min_data_connect_default' => 'Min',
         'min_input_js' => "onChange=\"this.value =  this.value.replace(/,/g,'').replace(/\\\$/g,'')\"",
-        'max_input_value' => array_key_exists("MaxPrice", $_GET) ? $_GET["MaxPrice"] : "",
+        'max_input_value' => fmcSearch::min_max_verify($_GET, "MaxPrice"),
         'max_input_name' => 'MaxPrice',
         'max_input_id' => $rand . "-MaxPrice",
         'max_data_connect_default' => 'Max',
@@ -754,12 +762,12 @@ class fmcSearch_v1 extends fmcWidget {
         'data_connect_field' => 'Beds',
         'field_for' => 'MinBeds',
         'field_label' => 'Bedrooms',
-        'min_input_value' => array_key_exists("MinBeds", $_GET) ? $_GET["MinBeds"] : "",
+        'min_input_value' => fmcSearch::min_max_verify($_GET, "MinBeds"),
         'min_input_name' => 'MinBeds',
         'min_input_id' => $rand . "-MinBeds",
         'min_data_connect_default' => 'Min',
         'min_input_js' => "",
-        'max_input_value' => array_key_exists("MaxBeds", $_GET) ? $_GET["MaxBeds"] : "",
+        'max_input_value' => fmcSearch::min_max_verify($_GET, "MaxBeds"),
         'max_input_name' => 'MaxBeds',
         'max_input_id' => $rand . "-MaxBeds",
         'max_data_connect_default' => 'Max',
@@ -771,12 +779,12 @@ class fmcSearch_v1 extends fmcWidget {
         'data_connect_field' => 'Baths',
         'field_for' => 'MinBaths',
         'field_label' => 'Bathrooms',
-        'min_input_value' => array_key_exists("MinBaths", $_GET) ? $_GET["MinBaths"] : "",
+        'min_input_value' => fmcSearch::min_max_verify($_GET, "MinBaths"),
         'min_input_name' => 'MinBaths',
         'min_input_id' => $rand . "-MinBaths",
         'min_data_connect_default' => 'Min',
         'min_input_js' => "",
-        'max_input_value' => array_key_exists("MaxBaths", $_GET) ? $_GET["MaxBaths"] : "",
+        'max_input_value' => fmcSearch::min_max_verify($_GET, "MaxBaths"),
         'max_input_name' => 'MaxBaths',
         'max_input_id' => $rand . "-MaxBaths",
         'max_data_connect_default' => 'Max',
@@ -788,12 +796,12 @@ class fmcSearch_v1 extends fmcWidget {
         'data_connect_field' => 'Sqft',
         'field_for' => 'MinSqFt',
         'field_label' => 'Square Feet',
-        'min_input_value' => array_key_exists("MinSqFt", $_GET) ? $_GET["MinSqFt"] : "",
+        'min_input_value' => fmcSearch::min_max_verify($_GET, "MinSqFt"),
         'min_input_name' => 'MinSqFt',
         'min_input_id' => $rand . "-MinSqFt",
         'min_data_connect_default' => 'Min',
         'min_input_js' => "",
-        'max_input_value' => array_key_exists("MaxSqFt", $_GET) ? $_GET["MaxSqFt"] : "",
+        'max_input_value' => fmcSearch::min_max_verify($_GET, "MaxSqFt"),
         'max_input_name' => 'MaxSqFt',
         'max_input_id' => $rand . "-MaxSqFt",
         'max_data_connect_default' => 'Max',
@@ -805,12 +813,12 @@ class fmcSearch_v1 extends fmcWidget {
         'data_connect_field' => 'Year',
         'field_for' => 'MinYear',
         'field_label' => 'Year Built',
-        'min_input_value' => array_key_exists("MinYear", $_GET) ? $_GET["MinYear"] : "",
+        'min_input_value' => fmcSearch::min_max_verify($_GET, "MinYear"),
         'min_input_name' => 'MinYear',
         'min_input_id' => $rand . "-MinYear",
         'min_data_connect_default' => 'Min',
         'min_input_js' => "",
-        'max_input_value' => array_key_exists("MaxYear", $_GET) ? $_GET["MaxYear"] : "",
+        'max_input_value' => fmcSearch::min_max_verify($_GET, "MaxYear"),
         'max_input_name' => 'MaxYear',
         'max_input_id' => $rand . "-MaxYear",
         'max_data_connect_default' => 'Max',

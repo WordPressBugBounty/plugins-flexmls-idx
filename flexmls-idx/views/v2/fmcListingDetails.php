@@ -77,8 +77,16 @@
 						<?php if ( $count_tours > 0 ) : ?>
 							<?php foreach ( $sf['VirtualTours'] as $vtour ) : ?>
 								<?php if ( $vtour['Privacy'] == "Public" ) : ?>
-									<div class="listing-image listing-vtour">
-										<?php echo $this->iframe_from_html_or_url( $vtour['Uri'] ); ?>
+									<?php $vt_bg_photo = $index - 1; ?>
+									<div class="listing-image listing-vtour" style="background-image: url('<?php echo $sf['Photos'][$vt_bg_photo]['UriLarge']; ?>');">
+										<div class="listing-vtour-card">
+											<h3>Virtual Tour</h3>
+										<a href="<?php echo $vtour['Uri']; ?>" target="_blank">
+											<div class="listing-vtour-card-link"><?php echo $vtour['Uri']; ?>
+											</div>							
+											<button class="flexmls-btn flexmls-btn-primary flexmls-primary-color-background">View Tour</button>
+										</a>
+										</div>
 									</div>
 								<?php endif; ?>
 							<?php endforeach; ?>
