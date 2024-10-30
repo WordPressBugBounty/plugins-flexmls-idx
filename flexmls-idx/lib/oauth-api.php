@@ -367,7 +367,7 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 			}
 			if( array_key_exists( 'D', $json ) ){
 				if( true == $json[ 'D' ][ 'Success' ] && 'GET' == strtoupper( $method ) && $service != 'oauth2/grant' ){
-					set_transient( 'flexmls_query_' . $request[ 'transient_name' ], $json, $seconds_to_cache );
+					//set_transient( 'flexmls_query_' . $request[ 'transient_name' ], $json, $seconds_to_cache );
 				} elseif( isset( $json[ 'D' ][ 'Code' ] ) && 1020 == $json[ 'D' ][ 'Code' ] ){
 					delete_transient( 'flexmls_auth_token' );
 					if( method_exists( $this, 'generate_auth_token' ) && $this->generate_auth_token() ){

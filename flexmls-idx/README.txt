@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 3.14.23
+Stable tag: 3.14.24
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -85,6 +85,10 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.14.24 =
+Efficiency Update
+* Fixed Log-In Widget Caching Issue
+
 = 3.14.23 =
 Efficiency Update
 * Added New Window/Tab Button For Virtual Tours in Listing Detail Pages 
