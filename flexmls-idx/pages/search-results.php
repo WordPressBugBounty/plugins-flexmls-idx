@@ -516,6 +516,9 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
 					'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
 					'listingId': '<?php echo addslashes($sf['ListingId']); ?>'
+					<?php if( isset($options['contact_disclaimer']) ) : ?>
+					,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'
+					<?php endif; ?>
 					});">
 					Ask Question
 				</button>

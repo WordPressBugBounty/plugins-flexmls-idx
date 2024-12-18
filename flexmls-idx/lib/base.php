@@ -255,7 +255,7 @@ class flexmlsConnect {
 	 *
 	 * @var array $query_url_parse
 	 */
-    $query_url_parse = parse_url( $query_url );
+  $query_url_parse = ( isset($query_url) ) ? parse_url( $query_url ) : '';
    
   
   /**
@@ -727,18 +727,18 @@ class flexmlsConnect {
   static function format_listing_street_address($data) {
 
     $listing = $data['StandardFields'] ?? [];
-    $first_line_address = (flexmlsConnect::is_not_blank_or_restricted($listing['UnparsedFirstLineAddress'])) ? $listing['UnparsedFirstLineAddress'] : "";
+    $first_line_address = ( isset($listing['UnparsedFirstLineAddress']) && flexmlsConnect::is_not_blank_or_restricted($listing['UnparsedFirstLineAddress'])) ? $listing['UnparsedFirstLineAddress'] : "";
     $second_line_address = "";
 
-    if ( flexmlsConnect::is_not_blank_or_restricted($listing['City']) ) {
+    if ( isset($listing['City']) && flexmlsConnect::is_not_blank_or_restricted($listing['City']) ) {
       $second_line_address .= "{$listing['City']}, ";
     }
 
-    if ( flexmlsConnect::is_not_blank_or_restricted($listing['StateOrProvince']) ) {
+    if ( isset($listing['StateOrProvince']) && flexmlsConnect::is_not_blank_or_restricted($listing['StateOrProvince']) ) {
       $second_line_address .= "{$listing['StateOrProvince']} ";
     }
 
-    if ( flexmlsConnect::is_not_blank_or_restricted($listing['StateOrProvince']) ) {
+    if ( isset($listing['PostalCode']) && flexmlsConnect::is_not_blank_or_restricted($listing['PostalCode']) ) {
       $second_line_address .= "{$listing['PostalCode']}";
     }
 
@@ -794,9 +794,10 @@ class flexmlsConnect {
   }
 
   static function make_nice_address_url($data, $params = array(), $type='fmc_tag') {
-    $address = flexmlsConnect::format_listing_street_address($data);
+    
+    $address = ( isset($data) ) ? flexmlsConnect::format_listing_street_address($data) : '';
 
-    $return = $address[0] .'-'. $address[1] .'-mls_'. $data['StandardFields']['ListingId'];
+    $return = ( !empty($address) ) ? $address[0] .'-'. $address[1] .'-mls_'. $data['StandardFields']['ListingId'] : '';
     $return = preg_replace('/[^\w]/', '-', $return);
 
     while (preg_match('/\-\-/', $return)) {
@@ -826,9 +827,10 @@ class flexmlsConnect {
   }
 
   static function make_nice_address_title($data) {
-    $address = flexmlsConnect::format_listing_street_address($data);
+    
+    $address = ( isset($data) ) ? flexmlsConnect::format_listing_street_address($data) : '';
 
-    $return = $address[0] .', '. $address[1] .' (MLS# '. $data['StandardFields']['ListingId'] .')';
+    $return = ( !empty($address) ) ? $address[0] .', '. $address[1] .' (MLS# '. $data['StandardFields']['ListingId'] .')' : '';
     $return = flexmlsConnect::clean_spaces_and_trim($return);
 
     return $return;
@@ -1345,6 +1347,14 @@ class flexmlsConnect {
     }
 
     return $portal_slug;
+  }
+
+  public static function get_contact_disclaimer() {
+
+    $options = get_option('fmc_settings');
+      
+    return $options['contact_disclaimer'];
+
   }
 
 }

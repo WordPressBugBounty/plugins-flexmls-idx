@@ -142,7 +142,7 @@ class fmcSearchResults_v1 extends fmcWidget {
 
     if ($link) {
       $link_details = $fmc_api->GetIDXLinkFromTinyId($link);
-      if ($link_details['LinkType'] == "SavedSearch") {
+      if ( isset($link_details['LinkType']) && $link_details['LinkType'] == "SavedSearch" ) {
           $pure_conditions['SavedSearch'] = $link_details['SearchId'];
         }
     }

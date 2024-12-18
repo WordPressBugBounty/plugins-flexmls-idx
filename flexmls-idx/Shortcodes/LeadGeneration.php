@@ -100,6 +100,8 @@ class LeadGeneration {
 			$html .= '	<div class="flexmls_connect__form_row">
 							<textarea class="flexmls_connect__form_textarea" name="message_body" id="' . $label_id_prefix . 'message" rows="5" placeholder="Your Message"></textarea>
 						</div>';
+			$FlexmlsConnectBase = new \flexmlsConnect();
+			$html .= (isset($fmc_settings['contact_disclaimer'])) ? "<small class='flexmls-text-small'>" . $FlexmlsConnectBase::get_contact_disclaimer() . "</small>" : '';
 			$html .= '	<div class="flexmls_connect__form_row flexmls_connect__form_row_color">
 							<label for="' . $random_string . '">' . $random_string . '</label>
 							<input type="text" name="color" id="' . $random_string . '" tabindex="-1">

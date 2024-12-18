@@ -128,6 +128,26 @@ $fmc_settings[ 'portal_force' ] = ( isset( $fmc_settings[ 'portal_force' ] ) && 
 					?>
 				</td>
 			</tr>
+			<tr>
+                <th scope="row">
+                    <h3>Contact Settings:</h3>
+                    Contact Disclaimer (Optional):
+                </th>
+                 <td>
+                        <label>If your Contact Manager requires your website to apply a disclaimer to your forms, you can apply it in the text field below. The applied text will be wrapped in <code> &lt;small&gt;</code> HTML tag</label></p>
+                    <?php
+					
+					$fmc_settings[ 'contact_disclaimer' ] = (isset($fmc_settings[ 'contact_disclaimer' ])) ? $fmc_settings[ 'contact_disclaimer' ] : '';
+
+                    remove_filter( 'mce_buttons', array('flexmlsConnect', 'filter_mce_button' ) );
+                    remove_filter( 'mce_external_plugins', array('flexmlsConnect', 'filter_mce_plugin' ) );
+                    wp_editor( $fmc_settings[ 'contact_disclaimer' ], 'fmc_contact_disclaimer_field', array(
+                        'media_buttons' => false,
+                        'textarea_name' => 'fmc_settings[contact_disclaimer]'
+                    ) );
+                    ?>
+                    </td>
+            </tr>
 		</tbody>
 	</table>
 	<p><?php wp_nonce_field( 'update_fmc_portal_action', 'update_fmc_portal_nonce' ); ?><button type="submit" class="button-primary">Save Portal Settings</button></p>

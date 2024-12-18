@@ -413,6 +413,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
           'agentName': '<?php echo addslashes($api_my_account['Name'])?>',
           'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
           'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>'
+          <?php if( isset($options['contact_disclaimer']) ) : ?>
+			  ,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'
+		      <?php endif; ?>
         })">
           <img src='<?php echo $fmc_plugin_url ?>/assets/images/showing.png' align='absmiddle' alt='Schedule a Showing' title='Schedule a Showing' /> Schedule a Showing
         </button>
@@ -423,6 +426,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
         'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
         'id': '<?php echo addslashes($sf['ListingId']); ?>'
+        <?php if( isset($options['contact_disclaimer']) ) : ?>
+			  ,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'
+		    <?php endif; ?>
       });">
         <img src='<?php echo $fmc_plugin_url ?>/assets/images/admin_16.png' align='absmiddle' alt='Ask a Question' title='Ask a Question' />
         Ask a Question
@@ -836,8 +842,8 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   function open_graph_tags() {
     $site_name = get_bloginfo('name');
     $title = flexmlsConnect::make_nice_address_title($this->listing_data);
-    $thumbnail = $this->listing_data['StandardFields']['Photos'][0]['Uri1280'];
-    $description = substr($this->listing_data['StandardFields']['PublicRemarks'], 0, 140);
+    $thumbnail = ( isset($this->listing_data['StandardFields']['Photos']) ) ? $this->listing_data['StandardFields']['Photos'][0]['Uri1280'] : '';
+    $description = ( isset($this->listing_data['StandardFields']['PublicRemarks']) ) ? substr($this->listing_data['StandardFields']['PublicRemarks'], 0, 140) : '';
     $url = flexmlsConnect::make_nice_address_url($this->listing_data);
 
     echo "<!-- Flexmls® IDX WordPress Plugin - OpenGraph Tags for Listing Detail pages -->" . PHP_EOL;
