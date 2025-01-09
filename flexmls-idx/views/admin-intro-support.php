@@ -24,7 +24,7 @@ $known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-confli
 		</tr>
 		<tr>
 			<td>Online:</td>
-			<td><a href="https://fbsdata.zendesk.com/hc/en-us" target="_blank">fbsidx.com/help</a></td>
+			<td><a href="https://fbsidx.com/help" target="_blank">fbsidx.com/help</a></td>
 		</tr>
 		<tr>
 			<td>Phone:</td>

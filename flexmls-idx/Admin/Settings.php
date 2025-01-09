@@ -8,9 +8,7 @@ class Settings {
 	public static function admin_menu_cb_intro(){
 		$tab = isset( $_GET[ 'tab' ] ) ? sanitize_title( $_GET[ 'tab' ] ) : 'api';
 		$fmc_plugin_dir = FMC_PLUGIN_DIR;
-		if( !file_exists( $fmc_plugin_dir . 'views/admin-intro-' . $tab . '.php' ) ){
-			$tab = '404';
-		}
+
 		?>
 			<div class="wrap about-wrap about-flexmls">
 
@@ -27,7 +25,25 @@ class Settings {
 					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=features' ); ?>" class="nav-tab<?php echo ( 'features' == $tab ? ' nav-tab-active' : '' ); ?>">Features</a>
 				</h2>
 				<div class="intro-wrap-content">
-					<?php include_once( $fmc_plugin_dir . 'views/admin-intro-' . $tab . '.php' ); ?>
+				<?php switch ($tab) {
+
+				case 'api':
+					include_once( $fmc_plugin_dir . 'views/admin-intro-api.php' ); 
+				break;
+
+				case 'support':
+					include_once( $fmc_plugin_dir . 'views/admin-intro-support.php' ); 
+				break;
+
+				case 'features':
+					include_once( $fmc_plugin_dir . 'views/admin-intro-features.php' ); 
+				break;
+
+				default:
+					include_once( $fmc_plugin_dir . 'views/admin-intro-404.php' ); 
+
+				}
+?>
 				</div>
 			</div>
 		<?php
@@ -97,7 +113,7 @@ class Settings {
 		}
 		?>
 		<div class="notice notice-warning">
-		    <p>We will be deprecating the Neighborhood widget in a future update. We recommend using the <a href="https://fbsdata.zendesk.com/hc/en-us/articles/232021727-IDX-Slideshow">IDX Slideshow</a> and/or <a href="https://fbsdata.zendesk.com/hc/en-us/articles/232280088--IDX-Listing-Summary">IDX Listing Summary</a> widgets to display listings. <a href="https://fbsdata.zendesk.com/hc/en-us/articles/232023247--Neighborhood-or-Location-Based-Pages">Click here</a> more details.</p>
+		    <p>We will be deprecating the Neighborhood widget in a future update. We recommend using the <a href="https://fbsidx.com/help/plugin/slideshow">IDX Slideshow</a> and/or <a href="https://fbsidx.com/help/plugin/listing-summary">IDX Listing Summary</a> widgets to display listings.
 		</div>
 			<div class="wrap">
 				<h1><?php echo get_admin_page_title(); ?></h1>
@@ -181,9 +197,7 @@ class Settings {
 	public static function admin_menu_cb_settings(){
 		$tab = isset( $_GET[ 'tab' ] ) ? sanitize_title( $_GET[ 'tab' ] ) : 'behavior';
 		$fmc_plugin_dir = FMC_PLUGIN_DIR;
-		if( !file_exists( $fmc_plugin_dir . 'views/admin-settings-' . $tab . '.php' ) ){
-			$tab = '404';
-		}
+		
 		$SparkAPI = new \SparkAPI\Core();
 		$auth_token = $SparkAPI->generate_auth_token();
 		?>
@@ -196,8 +210,35 @@ class Settings {
 					<?php if( $auth_token ): ?><a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=gmaps' ); ?>" class="nav-tab<?php echo ( 'gmaps' == $tab ? ' nav-tab-active' : '' ); ?>">Google Maps</a><?php endif; ?>
 					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=cache' ); ?>" class="nav-tab<?php echo ( 'cache' == $tab ? ' nav-tab-active' : '' ); ?>">Clear Cache</a>
 				</h2>
-				<?php include_once( $fmc_plugin_dir . 'views/admin-settings-' . $tab . '.php' ); ?>
 			</div>
+			<?php
+				switch ($tab) {
+
+					case 'behavior':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-behavior.php' ); 
+					break;
+
+					case 'cache':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-cache.php' ); 
+					break;
+
+					case 'gmaps':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-gmaps.php' ); 
+					break;
+
+					case 'portal':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-portal.php' ); 
+					break;
+
+					case 'style':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-style.php' ); 
+					break;
+
+					default:
+						include_once( $fmc_plugin_dir . 'views/admin-settings-404.php' ); 
+
+				}
+		?>
 		<?php
 	}
 
