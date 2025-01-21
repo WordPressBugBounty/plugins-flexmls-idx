@@ -266,8 +266,8 @@ class Settings {
 			$old_api_key = $fmc_settings[ 'api_key' ];
 			$old_api_secret = $fmc_settings[ 'api_secret' ];
 
-			$new_api_key = esc_html( sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_key' ] ) );
-			$new_api_secret = esc_html( sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_secret' ] ) );
+			$new_api_key = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_key' ] );
+			$new_api_secret = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_secret' ] );
 
 			$fmc_settings[ 'api_key' ] = $new_api_key;
 			$fmc_settings[ 'api_secret' ] = $new_api_secret;

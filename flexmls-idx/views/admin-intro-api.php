@@ -19,7 +19,7 @@ updateUserOptions($auth_token);
 					<label for="api_key">Key</label>
 				</th>
 				<td>
-					<input type="text" class="regular-text" name="fmc_settings[api_key]" id="api_key" value="<?php echo $fmc_settings[ 'api_key' ]; ?>" autocomplete="off" required>
+					<input type="text" class="regular-text" name="fmc_settings[api_key]" id="api_key" value="<?php echo esc_attr($fmc_settings[ 'api_key' ]); ?>" autocomplete="off" required>
 				</td>
 			</tr>
 			<tr>
@@ -27,7 +27,7 @@ updateUserOptions($auth_token);
 					<label for="api_secret">Secret</label>
 				</th>
 				<td>
-					<input type="<?php if( $auth_token ): ?>password<?php else: ?>text<?php endif; ?>" class="regular-text" name="fmc_settings[api_secret]" id="api_secret" value="<?php echo $fmc_settings[ 'api_secret' ]; ?>" autocomplete="off" required>
+					<input type="<?php if( $auth_token ): ?>password<?php else: ?>text<?php endif; ?>" class="regular-text" name="fmc_settings[api_secret]" id="api_secret" value="<?php echo esc_attr($fmc_settings[ 'api_secret' ]); ?>" autocomplete="off" required>
 				</td>
 			</tr>
 		</tbody>
