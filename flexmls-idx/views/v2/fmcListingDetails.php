@@ -1,4 +1,7 @@
-<?php flexmlsPortalPopup::popup_portal('detail_page'); ?>
+<?php flexmlsPortalPopup::popup_portal('detail_page');
+      $api_prefs = $fmc_api->GetPreferences(); 
+      $phone_req  = in_array('phone', $api_prefs['RequiredFields']);
+?>
 <div class="flexmls-listing-details flexmls-v2-widget flexmls-widthchange-wrapper flexmls-body-font">
 	<?php $has_search_return = ! empty( $_GET['search_referral_url'] ); ?>
 	<div class="flexmls-actions-wrapper listing-section <?php echo $has_search_return ? 'has-return-button' : ''; ?>">
@@ -21,6 +24,7 @@
 			'subject': '<?php echo $one_line_address_add_slashes; ?> - MLS# <?php echo addslashes($sf['ListingId'])?> ',
 			'agentEmail': '<?php echo $this->contact_form_agent_email( $sf ); ?>',
 			'officeEmail': '<?php echo $this->contact_form_office_email( $sf ); ?>',
+			'phoneRequired': <?php echo $phone_req ? 'true' : 'false'; ?>,
 			'id': '<?php echo addslashes( $sf['ListingId'] ); ?>'
 		<?php if( isset($options['contact_disclaimer']) ) : ?>
 			,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'

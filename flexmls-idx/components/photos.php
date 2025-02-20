@@ -54,7 +54,7 @@ class fmcPhotos extends fmcWidget {
       $title = "Listings";
     }
 
-    $encoded_settings = urlencode( serialize($arg_settings) );
+    $encoded_settings = urlencode( json_encode($arg_settings) );
 
     $return = '';
 
@@ -1373,11 +1373,11 @@ class fmcPhotos extends fmcWidget {
     // no arguments need to be passed for prepping the AJAX response
     $args = array();
 
-    $settings_string = flexmlsConnect::wp_input_get_post('settings');
+    $settings_string = sanitize_text_field(flexmlsConnect::wp_input_get_post('settings'));
+    $listings_from = is_numeric(flexmlsConnect::wp_input_get_post('page')) ? flexmlsConnect::wp_input_get_post('page') : null;
 
     // these get parsed from the sent AJAX response
-    $settings = unserialize($settings_string);
-    $listings_from = flexmlsConnect::wp_input_get_post('page');
+    $settings = json_decode($settings_string, true);
 
     $horizontal = $settings['horizontal'];
     $vertical = $settings['vertical'];
