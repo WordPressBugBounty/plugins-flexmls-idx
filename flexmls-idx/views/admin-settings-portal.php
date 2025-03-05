@@ -22,7 +22,7 @@ $fmc_settings[ 'portal_force' ] = ( isset( $fmc_settings[ 'portal_force' ] ) && 
 				</th>
 				<td>
 					<p>
-						<input type="text" class="regular-text" name="fmc_settings[oauth_key]" id="oauth_key" autocomplete="off" value="<?php echo ( isset( $fmc_settings[ 'oauth_key' ] ) ? $fmc_settings[ 'oauth_key' ] : '' ); ?>">
+						<input type="text" class="regular-text" name="fmc_settings[oauth_key]" id="oauth_key" autocomplete="off" value="<?php echo ( isset( $fmc_settings[ 'oauth_key' ] ) ? esc_attr($fmc_settings[ 'oauth_key' ]) : '' ); ?>">
 					</p>
 				</td>
 			</tr>
@@ -31,7 +31,7 @@ $fmc_settings[ 'portal_force' ] = ( isset( $fmc_settings[ 'portal_force' ] ) && 
 					<label for="oauth_secret">OAuth Client Secret</label>
 				</th>
 				<td>
-					<p><input type="<?php if( isset( $fmc_settings[ 'oauth_secret' ] ) ): ?>password<?php else: ?>text<?php endif; ?>" class="regular-text" name="fmc_settings[oauth_secret]" id="oauth_secret" autocomplete="off" value="<?php echo ( isset( $fmc_settings[ 'oauth_secret' ] ) ? $fmc_settings[ 'oauth_secret' ] : '' ); ?>"></p>
+					<p><input type="<?php if( isset( $fmc_settings[ 'oauth_secret' ] ) ): ?>password<?php else: ?>text<?php endif; ?>" class="regular-text" name="fmc_settings[oauth_secret]" id="oauth_secret" autocomplete="off" value="<?php echo ( isset( $fmc_settings[ 'oauth_secret' ] ) ? esc_attr($fmc_settings[ 'oauth_secret' ]) : '' ); ?>"></p>
 				</td>
 			</tr>
 			<tr>

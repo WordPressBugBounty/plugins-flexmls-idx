@@ -270,7 +270,19 @@ class flexmlsConnect {
        $show_link = str_replace('StreetAddress', 'streetaddress', $show_link);
     }
 
-    return "<iframe src='{$show_link}' width='{$attr['width']}' height='{$attr['height']}' frameborder='0'></iframe>";
+    $flexmls_iframe = "<iframe src='{$show_link}' width='{$attr['width']}' height='{$attr['height']}' frameborder='0'></iframe>";
+
+    $allowed_tags = array(
+        'iframe' => array(
+          'src'    => true, // Allow src attribute
+          'width'  => true, // Allow width
+          'height' => true, // Allow height
+          'frameborder' => true
+        ),
+    );
+
+    return wp_kses($flexmls_iframe, $allowed_tags);
+    
   }
 
 
