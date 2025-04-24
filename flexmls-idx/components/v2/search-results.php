@@ -324,8 +324,13 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 		if ($status) {
 			$pure_conditions["StandardStatus"] = $status;
 		}
-		if(isset($settings['default_view']))
-				$pure_conditions['default_view'] = $settings['default_view'];
+		if(isset($settings['default_view'])) {
+			$pure_conditions['default_view'] = $settings['default_view'];
+		}
+
+		if(isset($settings['listings_per_page'])) {
+			$pure_conditions['Limit'] = $listings_per_page;
+		}
 
 		return $pure_conditions;
 	}
@@ -481,6 +486,17 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 							[ 'value' => 15, 'display_text' => 15 ]
 						]
 					]
+				]
+			],
+			'listings_per_page' => [
+				'type' => 'select',
+				'label' => 'Listings Per Page',
+				'collection' => [
+					[ 'value' => 5, 'display_text' => 5 ],
+					[ 'value' => 10, 'display_text' => 10 ],
+					[ 'value' => 15, 'display_text' => 15 ],
+					[ 'value' => 20, 'display_text' => 20 ],
+					[ 'value' => 25, 'display_text' => 25 ]
 				]
 			],
 			'widget_version' => [
