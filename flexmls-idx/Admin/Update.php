@@ -28,6 +28,7 @@ class Update {
 			$fmc_settings[ 'autocreatedpage' ] = $new_page_id;
 			$fmc_settings[ 'destlink' ] = $new_page_id;
 			$fmc_settings[ 'search_listing_template_version' ] = 'v2';
+			$fmc_settings['market_stat_version'] = 'v2';
 		} else {
 			$SparkAPI = new \SparkAPI\Core();
 			$SparkAPI->clear_cache( true );

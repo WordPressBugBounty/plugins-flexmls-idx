@@ -313,6 +313,7 @@ class Settings {
 					case 'default_link':
 					case 'destwindow':
                     case 'select2_turn_off':
+					case 'chartkick_turn_off':
 					case 'destpref':
 					case 'listpref':
 					case 'permabase':
@@ -343,6 +344,9 @@ class Settings {
             if( !isset( $_POST[ 'fmc_settings' ][ 'select2_turn_off' ] ) ){
                 $fmc_settings[ 'select2_turn_off' ] = 0;
             }
+			if( !isset( $_POST[ 'fmc_settings' ][ 'chartkick_turn_off' ] ) ){
+                $fmc_settings[ 'chartkick_turn_off' ] = 0;
+            }
 			if( !isset( $_POST[ 'fmc_settings' ][ 'destwindow' ] ) ){
 				$fmc_settings[ 'destwindow' ] = '';
 			}
@@ -361,6 +365,7 @@ class Settings {
 			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
 				switch( $key ){
 					case 'search_listing_template_version':
+					case 'market_stat_version':
 					case 'search_listing_template_primary_color':
 					case 'search_listing_template_heading_font':
 					case 'search_listing_template_body_font':

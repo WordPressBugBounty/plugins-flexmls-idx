@@ -1,8 +1,10 @@
 <?php
-    class EL_fmcMarketStats extends EL_FMC_shortcode{ 
+    class EL_fmcMarketStats extends EL_FMC_shortcode{
+
+
         
         protected function integrationWithElementor(){
-            $this->settings_fmc = ['title', 'width_', 'height_', 'type', 'display', 'property_type', 'location'];
+            $this->settings_fmc = ['title', 'width_', 'height_', 'chart_type', 'type', 'display', 'property_type', 'location'];
             $types = $this->module_info['vars']['type_options'];
             foreach ($types as $val => $label) {
                 $this->settings_fmc[] = 'display_'.$val;
@@ -10,6 +12,7 @@
         }
 
         protected $stat_types;
+        protected $chart_type;
         protected $type_options;
         protected $display_options;
         
@@ -36,11 +39,25 @@
 
             return $return;
         }
+
+
+        protected function get_market_stat_version(){
+
+            $fmc_settings = get_option( 'fmc_settings' );
+
+            $market_stat_version = isset( $fmc_settings['market_stat_version'] ) ? $fmc_settings['market_stat_version'] : 'v1';
+
+            return $market_stat_version;
+        }
   
         protected function setControlls() {
+
+
+           $market_stat_version = $this->get_market_stat_version();
+
             extract($this->module_info['vars']);
 
-            
+            $this->chart_type = $chart_type;
             $this->stat_types = $stat_types;
             $this->type_options = $type_options;
             $this->display_options = array();
@@ -51,7 +68,7 @@
             $this->add_control(
                 'title',
                     [
-                        'label' => __( 'Title', 'plugin-name' ),
+                        'label' => __( 'Title', 'flexmls-idx' ),
                         'type' => \Elementor\Controls_Manager::TEXT,
                         'input_type' => 'text',
                     ]
@@ -59,7 +76,7 @@
             $this->add_control(
                 'width_',
                     [
-                        'label' => __( 'Width', 'plugin-name' ),
+                        'label' => __( 'Width', 'flexmls-idx' ),
                         'type' => \Elementor\Controls_Manager::SLIDER,
                         'size_units' => [ 'px' ],
                         'range' => [
@@ -78,7 +95,7 @@
             $this->add_control(
                 'height_',
                     [
-                        'label' => __( 'Height', 'plugin-name' ),
+                        'label' => __( 'Height', 'flexmls-idx' ),
                         'type' => \Elementor\Controls_Manager::SLIDER,
                         'size_units' => [ 'px' ],
                         'range' => [
@@ -95,13 +112,27 @@
                     ]
             );
 
+            if( $market_stat_version == 'v2' ) {
+                $this->add_control(
+                    'chart_type',
+                    [
+                        'label' => __('Chart Type', 'flexmls-idx'),
+                        'type' => \Elementor\Controls_Manager::SELECT,
+                        'options' => $chart_type,
+                        'description' => 'Which type of chart to display',
+                        'default' => 'LineChart',
+                    ]
+                );
+            }
+
             $this->add_control(
                 'type',
                 [
-                    'label' => __( 'Type', 'plugin-name' ),
+                    'label' => __( 'Type', 'flexmls-idx' ),
                     'type' => \Elementor\Controls_Manager::SELECT,
                     'options' => $type_options,
-                    'description' => 'Which type of chart to display',
+                    //added - changed the word chart to data
+                    'description' => 'Which type of data to display',
                     'default' => 'absorption',
                 ]
             );
@@ -111,7 +142,7 @@
             $this->add_control(
                 'property_type',
                 [
-                    'label' => __( 'Property Type', 'plugin-name' ),
+                    'label' => __( 'Property Type', 'flexmls-idx' ),
                     'type' => \Elementor\Controls_Manager::SELECT,
                     'options' => $property_type_options,
                     'default' => '',
@@ -121,7 +152,7 @@
             $this->add_control(
                 'location',
                 [
-                    'label' => __( 'Location', 'plugin-name' ),
+                    'label' => __( 'Location', 'flexmls-idx' ),
                     'type' => 'location_control',
                     'multiple' => false,
                     'field_slug' => $location_slug,                    
@@ -142,7 +173,7 @@
                 $this->add_control(
                     $param.'_'.$val,
                     [
-                        'label'           => __( 'Display', 'plugin-name' ),
+                        'label'           => __( 'Display', 'flexmls-idx' ),
                         'type' => \Elementor\Controls_Manager::SELECT2,
                         'options' => $types_array['options'],
                         'multiple' => true,

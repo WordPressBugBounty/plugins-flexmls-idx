@@ -4,6 +4,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 $fmc_settings = get_option( 'fmc_settings' );
 $search_listing_template_version = $fmc_settings['search_listing_template_version'];
+$market_stat_version = isset($fmc_settings['market_stat_version']) ? $fmc_settings['market_stat_version'] : 'v1';
 $search_listing_template_primary_color = $fmc_settings['search_listing_template_primary_color'];
 $search_listing_template_heading_font = $fmc_settings['search_listing_template_heading_font'];
 $search_listing_template_body_font = $fmc_settings['search_listing_template_body_font'];
@@ -28,6 +29,21 @@ add_thickbox();
 					</p>
 				</td>
 			</tr>
+
+			<tr>
+                <th scope="row">
+                    <label for="market-stat-version">Which version of market statistics chart?</label>
+                </th>
+                <td>
+                    <p>
+                        <select id="market-stat-version" name="fmc_settings[market_stat_version]">
+                            <option value="v1" <?php selected( $market_stat_version, 'v1' ); ?>>Version 1</option>
+                            <option value="v2" <?php selected( $market_stat_version, 'v2' ); ?>>Version 2</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+
 		</tbody>
 	</table>
 

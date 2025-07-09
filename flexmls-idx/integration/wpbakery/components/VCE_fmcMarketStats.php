@@ -1,4 +1,4 @@
-<?php 
+<?php
 if (!defined('ABSPATH')) die('-1');
 
 class VCE_fmcMarketStats extends VCE_component {
@@ -8,11 +8,20 @@ class VCE_fmcMarketStats extends VCE_component {
         parent::__construct();
 
         add_action( 'init', array( $this, 'integrateWithVC' ) );
-        //add_action('vc_edit_form_fields_after_render', array($this, 'initLocationSearch'));
+
+    }
+
+    protected function get_market_stat_version(){
+
+        $fmc_settings = get_option( 'fmc_settings' );
         
+        $market_stat_version = isset( $options['market_stat_version'] ) ? $options['market_stat_version'] : 'v1';
+
+        return $market_stat_version;
     }
 
     protected function setParams(){
+
         if (!is_null($this->vars)){
                 extract($this->vars);
         }
@@ -43,17 +52,33 @@ class VCE_fmcMarketStats extends VCE_component {
               "value" => $height,
               'class' => 'width100',
               'points' => 'px',
-            ),
-            array(
+                ),
+            );
+
+            if ($this->get_market_stat_version() == 'v2') {
+
+                $fmc_params[] = array(
+                    'type' => 'dropdown_tag',
+                    'heading' => 'Chart Type',
+                    'value' => $this->modify_array($chart_type),
+                    'param_name' => 'chart_type',
+                    'class' => 'flexmls_connect__stat_chart_type',
+                    'description' => 'Which type of chart to display',
+                    'admin_label' => true,
+                );
+
+            }
+
+         $fmc_params[] = array(
               'type' => 'dropdown_tag',
               'heading' => 'Type',
               'value' => $this->modify_array($type_options),
               'param_name' => 'type',
               'class' => 'flexmls_connect__stat_type',
-              'description' => 'Which type of chart to display',
+              'description' => 'Which type of data to display',
               'admin_label' => true,
-            ),
-            array(
+            );
+        $fmc_params[] = array(
               'type' => 'dropdown_tag',
               'heading' => 'Display',
               'value' => '',
@@ -63,23 +88,22 @@ class VCE_fmcMarketStats extends VCE_component {
               'class' => 'flexmls_connect__stat_display',
               'uniqid' => $this->dataId,
               'script' => script_path('display_options.js'),
-            ),
-            array(
+            );
+             $fmc_params[] = array(
               'type' => 'dropdown',
               'heading' => 'Property Type',
               'value' => $this->modify_array($property_type_options),
               'param_name' => 'property_type',
               'admin_label' => true,
-            ),
-            array(
+            );
+        $fmc_params[] = array(
               'type' => 'location_tag',
               'heading' => 'Location',
               'value' => '',
               'param_name' => 'location',
               'field_slug' => $location_slug,
-            ),
-            
-        );
+            );
+
         return $fmc_params;
     }
 

@@ -41,12 +41,12 @@ class Enqueue {
 			array( 'jquery', 'wp-color-picker' ), $version );
 
 		$color_picker_strings = array(
-			'clear'            => __( 'Clear', 'fmcdomain' ),
-			'clearAriaLabel'   => __( 'Clear color', 'fmcdomain' ),
-			'defaultString'    => __( 'Default', 'fmcdomain' ),
-			'defaultAriaLabel' => __( 'Select default color', 'fmcdomain' ),
-			'pick'             => __( 'Select Color', 'fmcdomain' ),
-			'defaultLabel'     => __( 'Color value', 'fmcdomain' ),
+			'clear'            => __( 'Clear', 'flexmls-idx' ),
+			'clearAriaLabel'   => __( 'Clear color', 'flexmls-idx' ),
+			'defaultString'    => __( 'Default', 'flexmls-idx' ),
+			'defaultAriaLabel' => __( 'Select default color', 'flexmls-idx' ),
+			'pick'             => __( 'Select Color', 'flexmls-idx' ),
+			'defaultLabel'     => __( 'Color value', 'flexmls-idx' ),
 		);
 		wp_localize_script( 'flexmls_admin_script', 'wpColorPickerL10n', $color_picker_strings );
 
@@ -71,12 +71,12 @@ class Enqueue {
 		?>
 		<script type="text/javascript">
 			var wpColorPickerL10n = {
-				"clear": <?php echo json_encode( __( 'Clear', 'fmcdomain' ) ); ?>,
-				"clearAriaLabel": <?php echo json_encode( __( 'Clear color', 'fmcdomain' ) ); ?>,
-				"defaultString": <?php echo json_encode( __( 'Default', 'fmcdomain' ) ); ?>,
-				"defaultAriaLabel": <?php echo json_encode( __( 'Select default color', 'fmcdomain' ) ); ?>,
-				"pick": <?php echo json_encode( __( 'Select Color', 'fmcdomain' ) ); ?>,
-				"defaultLabel": <?php echo json_encode( __( 'Color value', 'fmcdomain' ) ); ?>
+				"clear": <?php echo json_encode( __( 'Clear', 'flexmls-idx' ) ); ?>,
+				"clearAriaLabel": <?php echo json_encode( __( 'Clear color', 'flexmls-idx' ) ); ?>,
+				"defaultString": <?php echo json_encode( __( 'Default', 'flexmls-idx' ) ); ?>,
+				"defaultAriaLabel": <?php echo json_encode( __( 'Select default color', 'flexmls-idx' ) ); ?>,
+				"pick": <?php echo json_encode( __( 'Select Color', 'flexmls-idx' ) ); ?>,
+				"defaultLabel": <?php echo json_encode( __( 'Color value', 'flexmls-idx' ) ); ?>
 			};
 		</script>
 		<?php
@@ -86,6 +86,36 @@ class Enqueue {
 		wp_enqueue_script( 'jquery' );
 		wp_enqueue_script( 'jquery-ui-dialog' );
 		$options = get_option( 'fmc_settings' );
+
+        $chartkickTurnOff = isset($options['chartkick_turn_off']) ? $options['chartkick_turn_off'] : false;
+
+        if( ! $chartkickTurnOff ) {
+
+            wp_enqueue_script(
+                'chart-umd-js',
+                plugins_url('assets/js/chart.umd.js', dirname(__FILE__)),
+                array(),
+                FMC_PLUGIN_VERSION,
+                false
+            );
+
+            wp_enqueue_script(
+                'chartjs-adapter-date-fns-bundle',
+                plugins_url('assets/js/chartjs-adapter-date-fns.bundle.js', dirname(__FILE__)),
+                array('chart-umd-js'),
+                FMC_PLUGIN_VERSION,
+                false
+            );
+
+            wp_enqueue_script(
+                'chartkick-js',
+                plugins_url('assets/js/chartkick.js', dirname(__FILE__)),
+                array('chart-umd-js', 'chartjs-adapter-date-fns-bundle'),
+                FMC_PLUGIN_VERSION,
+                false
+            );
+        }
+
 		$google_maps_no_enqueue = 0;
 		if( isset( $options[ 'google_maps_no_enqueue' ] ) && 1 == $options[ 'google_maps_no_enqueue' ] ){
 			$google_maps_no_enqueue = 1;

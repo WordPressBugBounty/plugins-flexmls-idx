@@ -10,6 +10,9 @@ $fmc_settings[ 'allow_sold_searching' ] = ( 1 == $fmc_settings[ 'allow_sold_sear
 $fmc_settings[ 'neigh_template' ] = isset( $fmc_settings[ 'neigh_template' ] ) ? $fmc_settings[ 'neigh_template' ] : '';
 $fmc_settings[ 'destwindow' ] = isset( $fmc_settings[ 'destwindow' ] ) ? $fmc_settings[ 'destwindow' ] : '';
 $fmc_settings[ 'select2_turn_off' ] = isset( $fmc_settings[ 'select2_turn_off' ] ) ? $fmc_settings[ 'select2_turn_off' ] : 0;
+//added
+$fmc_settings[ 'chartkick_turn_off' ] = isset( $fmc_settings[ 'chartkick_turn_off' ] ) ? $fmc_settings[ 'chartkick_turn_off' ] : 0;
+
 
 
 
@@ -280,7 +283,17 @@ add_thickbox();
             </td>
         </tr>
     </table>
-
-
+<?php if ( isset( $fmc_settings[ 'market_stat_version' ] ) && $fmc_settings[ 'market_stat_version' ] == 'v2' ) : ?>
+    <h3>Chartkick Scripts</h3>
+    <p>Using Version 2 of the market stats widget, Flexmls plugin loads Chartkick JS scripts. If there are conflicts with other plugins or themes, turn off loading it.</p>
+    <table class="form-table">
+        <tr><th>Turn off loading Chartkick JS</th>
+            <td>
+                <p><label for="chartkick_turn_off_none"><input type="radio" name="fmc_settings[chartkick_turn_off]" id="chartkick_turn_off_none" value="0" <?php checked( $fmc_settings[ 'chartkick_turn_off' ], '0' ); ?>> Do not turn off loading Chartkick scripts</label></p>
+                <p><label for="chartkick_turn_off_all"><input type="radio" name="fmc_settings[chartkick_turn_off]" id="chartkick_turn_off_all" value="1" <?php checked( $fmc_settings[ 'chartkick_turn_off' ], '1' ); ?>> Turn off loading Chartkick scripts</label></p>
+            </td>
+        </tr>
+    </table>
+    <?php endif; ?>
     <p><?php wp_nonce_field( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
 </form>
