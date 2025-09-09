@@ -35,7 +35,8 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
     add_action( 'wp_head', array( $this, 'wp_head' ) );
 
-    // parse passed parameters for browsing capability
+
+    
     list($params, $cleaned_raw_criteria, $context) = $this->parse_search_parameters_into_api_request();
 
     $this->search_criteria = $cleaned_raw_criteria;
@@ -53,7 +54,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     $params = array(
         '_filter' => $filterstr,
         '_limit' => 1,
-        '_expand' => 'Photos,Videos,OpenHouses,VirtualTours,Documents,Rooms,CustomFields,Supplement,FloPlans'
+        '_expand' => 'Photos,Videos,OpenHouses,VirtualTours,Documents,Rooms,CustomFields,Supplement'
     );
     $result = $this->api->GetListings($params);
 
@@ -121,7 +122,6 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
     $compList = flexmlsConnect::mls_required_fields_and_values("Detail",$record);
 
-    //Organize Custom Fields ["Main"] and ["Details"] if they exist
     $custom_fields = array();
     if (is_array($record["CustomFields"][0]["Main"])) {
       foreach ($record["CustomFields"][0]["Main"] as $data) {
@@ -331,14 +331,6 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     if ( $this->has_next_listing() )
       echo "<button class='flexmls_connect__button right' href='". $this->browse_next_url() ."'>Next <img src='{$fmc_plugin_url}/assets/images/right.png' align='absmiddle' alt='Next Listing' title='Next Listing' /></button>";
     echo "</div>";
-
-    if ( ! empty( $record['FloPlans'] ) ) {
-      $floplans_as_photos = $this->convert_floplans_array_into_photos( $record['FloPlans'] );
-    }
-
-    if ( is_array( $sf['Photos'] ) && ! empty( $floplans_as_photos ) ) {
-      array_splice( $sf['Photos'], 1, 0, $floplans_as_photos );
-    }
 
     // begin
     echo "<div class='flexmls_connect__sr_detail' title='{$one_line_address} - MLS# {$sf['ListingId']}'>";
@@ -557,35 +549,100 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     echo "<div class='flexmls_connect__tab_group' id='flexmls_connect__detail_group'>";
 
     // render the results now
-  if( $this->property_detail_values ){
-      foreach ($this->property_detail_values as $k => $v) {
-        echo "<div class='flexmls_connect__ld_detail_table'>";
-          echo "<div class='flexmls_connect__detail_header'>{$k}</div>";
+    // Create a merged array that includes all custom fields
+    $all_property_details = array();
+    
+    // First, add all fields from $custom_fields
+    if (isset($custom_fields['Main']) && is_array($custom_fields['Main'])) {
+        foreach ($custom_fields['Main'] as $section_name => $section_fields) {
+         // Handle the location/tax/legal section name variations
+         $normalized_section_name = $section_name;
+         if (in_array(strtolower($section_name), ['location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes'])) {
+           $normalized_section_name = 'Location, Tax & Legal';
+         }
+        
+        if (!isset($all_property_details[$normalized_section_name])) {
+          $all_property_details[$normalized_section_name] = array();
+        }
+        
+        foreach ($section_fields as $field_name => $field_value) {
+          if (is_array($field_value)) {
+            // Handle array values (like checkboxes)
+            $display_values = array();
+            foreach ($field_value as $val) {
+              if ($val === true || $val === 1) {
+                $display_values[] = $field_name;
+              } elseif ($val !== false && $val !== 0) {
+                $display_values[] = $val;
+              }
+            }
+            if (!empty($display_values)) {
+              $all_property_details[$normalized_section_name][] = "<b>{$field_name}:</b> " . implode(', ', $display_values);
+            }
+          } else {
+            // Handle single values
+            if ($field_value !== false && $field_value !== 0 && $field_value !== '') {
+              $all_property_details[$normalized_section_name][] = "<b>{$field_name}:</b> {$field_value}";
+            }
+          }
+        }
+      }
+    }
+    
+    // Then, add fields from $this->property_detail_values (but avoid duplicates)
+    if ($this->property_detail_values && is_array($this->property_detail_values)) {
+      foreach ($this->property_detail_values as $section_name => $section_fields) {
+         // Handle the location/tax/legal section name variations
+         $normalized_section_name = $section_name;
+         if (in_array(strtolower($section_name), ['location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes'])) {
+           $normalized_section_name = 'Location, Tax & Legal';
+         }
+        
+        if (!isset($all_property_details[$normalized_section_name])) {
+          $all_property_details[$normalized_section_name] = array();
+        }
+        
+        foreach ($section_fields as $field_value) {
+          // Check if this field is already in the array to avoid duplicates
+          if (!in_array($field_value, $all_property_details[$normalized_section_name])) {
+            $all_property_details[$normalized_section_name][] = $field_value;
+          }
+        }
+      }
+    }
+    
+    // Display all the merged property details
+    if (!empty($all_property_details)) {
+      foreach ($all_property_details as $section_name => $section_fields) {
+        if (!empty($section_fields)) {
+          echo "<div class='flexmls_connect__ld_detail_table'>";
+          echo "<div class='flexmls_connect__detail_header'>{$section_name}</div>";
           echo "<div class='flexmls_connect__ld_property_detail_body columns2'>";
 
-            $details_count = 0;
+          $details_count = 0;
 
-            foreach ($v as $value) {
-              $details_count++;
+          foreach ($section_fields as $value) {
+            $details_count++;
 
-              if ($details_count === 1) {
-                echo "<div class='flexmls_connect__ld_property_detail_row'>";
-              }
-              echo "<div class='flexmls_connect__ld_property_detail'>{$value}</div>";
-
-              if ($details_count === 2) {
-                echo "</div>"; // end row
-                $details_count = 0;
-              }
-            }
             if ($details_count === 1) {
-              // details ended earlier without closing the last row
-              echo "</div>";
+              echo "<div class='flexmls_connect__ld_property_detail_row'>";
             }
+            echo "<div class='flexmls_connect__ld_property_detail'>{$value}</div>";
+
+            if ($details_count === 2) {
+              echo "</div>"; // end row
+              $details_count = 0;
+            }
+          }
+          if ($details_count === 1) {
+            // details ended earlier without closing the last row
+            echo "</div>";
+          }
           echo "</div>"; // end details body
-        echo "</div>"; // end details table
+          echo "</div>"; // end details table
+        }
       }
-     }
+    }
 
     echo "<div class='flexmls_connect__ld_detail_table'>";
       echo "<div class='flexmls_connect__detail_header'>Property Features</div>";

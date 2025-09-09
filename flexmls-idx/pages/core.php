@@ -388,31 +388,6 @@ class flexmlsConnectPageCore {
         return array($params, $cleaned_raw_criteria, $context);
   }
 
-    function get_flo_plans_for_listing_as_photos( $listing_id ) {
-      $floplans = $this->api->GetListingFloPlans( $listing_id );
-
-      $floplans_as_photos = $this->convert_floplans_array_into_photos( $floplans );
-
-      return $floplans_as_photos;
-    }
-
-    function convert_floplans_array_into_photos( $floplan_array ) {
-      $floplans_as_photos = array();
-
-      foreach ( $floplan_array as $floplan ) {
-        $thumb_image_index = array_search( 'all_in_one_thumbnail_png', array_column( $floplan['Images'], 'Type' ) );
-        $full_image_index = array_search( 'all_in_one_png', array_column( $floplan['Images'], 'Type' ) );
-
-        $floplans_as_photos []= array(
-          'UriThumb' => $floplan['Images'][$thumb_image_index]['Uri'],
-          'UriLarge' => $floplan['Images'][$full_image_index]['Uri'],
-          'Name' => $floplan['Name'],
-          'FloPlan' => 1
-        );
-      }
-
-      return $floplans_as_photos;
-    }
 
     function prepare_order_by_data($orderby) {
 

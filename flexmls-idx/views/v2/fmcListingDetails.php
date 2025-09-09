@@ -44,6 +44,7 @@
 					<?php endif; ?>
 				<?php endif; ?>
 			</div>
+
 			
 			<div class="price-and-actions-wrapper">
 				<?php
@@ -231,17 +232,83 @@
 
 	<div class="features-section listing-section listing-more-information">
 		<div class="property-details">
-			<?php if ( $this->property_detail_values ) : ?>
-				<?php foreach ( $this->property_detail_values as $k => $v ) : ?>
-					<div class="details-section">
-						<h3 class="detail-section-header flexmls-title-large flexmls-heading-font"><?php echo esc_html( $k ); ?></h3>
-						<div class="property-details-wrapper">
-							<?php foreach ( $v as $key => $value ) : ?>
-								<span class="detail-value"><?php echo $value; ?></span>
-							<?php endforeach; ?>
+			<?php
+			// Create a merged array that includes all custom fields
+			$all_property_details = array();
+			
+			// First, add all fields from $custom_fields
+			if (isset($custom_fields['Main']) && is_array($custom_fields['Main'])) {
+				foreach ($custom_fields['Main'] as $section_name => $section_fields) {
+					// Handle the location/tax/legal section name variations
+					$normalized_section_name = $section_name;
+					if (in_array(strtolower($section_name), ['location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes'])) {
+						$normalized_section_name = 'Location, Tax & Legal';
+					}
+					
+					if (!isset($all_property_details[$normalized_section_name])) {
+						$all_property_details[$normalized_section_name] = array();
+					}
+					
+					foreach ($section_fields as $field_name => $field_value) {
+						if (is_array($field_value)) {
+							// Handle array values (like checkboxes)
+							$display_values = array();
+							foreach ($field_value as $val) {
+								if ($val === true || $val === 1) {
+									$display_values[] = $field_name;
+								} elseif ($val !== false && $val !== 0) {
+									$display_values[] = $val;
+								}
+							}
+							if (!empty($display_values)) {
+								$all_property_details[$normalized_section_name][] = "<b>{$field_name}:</b> " . implode(', ', $display_values);
+							}
+						} else {
+							// Handle single values
+							if ($field_value !== false && $field_value !== 0 && $field_value !== '') {
+								$all_property_details[$normalized_section_name][] = "<b>{$field_name}:</b> {$field_value}";
+							}
+						}
+					}
+				}
+			}
+			
+			// Then, add fields from $this->property_detail_values (but avoid duplicates)
+			if ($this->property_detail_values && is_array($this->property_detail_values)) {
+				foreach ($this->property_detail_values as $section_name => $section_fields) {
+					// Handle the location/tax/legal section name variations
+					$normalized_section_name = $section_name;
+					if (in_array(strtolower($section_name), ['location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes'])) {
+						$normalized_section_name = 'Location, Tax & Legal';
+					}
+					
+					if (!isset($all_property_details[$normalized_section_name])) {
+						$all_property_details[$normalized_section_name] = array();
+					}
+					
+					foreach ($section_fields as $field_value) {
+						// Check if this field is already in the array to avoid duplicates
+						if (!in_array($field_value, $all_property_details[$normalized_section_name])) {
+							$all_property_details[$normalized_section_name][] = $field_value;
+						}
+					}
+				}
+			}
+			
+			// Display all the merged property details
+			if (!empty($all_property_details)) : ?>
+				<?php foreach ($all_property_details as $section_name => $section_fields) : ?>
+					<?php if (!empty($section_fields)) : ?>
+						<div class="details-section">
+							<h3 class="detail-section-header flexmls-title-large flexmls-heading-font"><?php echo esc_html($section_name); ?></h3>
+							<div class="property-details-wrapper">
+								<?php foreach ($section_fields as $field_value) : ?>
+									<span class="detail-value"><?php echo $field_value; ?></span>
+								<?php endforeach; ?>
+							</div>
 						</div>
-					</div>
-				<?php endforeach ; ?>
+					<?php endif; ?>
+				<?php endforeach; ?>
 			<?php endif; ?>
 
 			<?php if ( ! empty( $property_features_values ) ) : ?>

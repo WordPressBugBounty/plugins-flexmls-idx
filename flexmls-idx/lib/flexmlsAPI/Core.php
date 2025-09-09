@@ -43,8 +43,8 @@ class flexmlsAPI_Core {
     public $api_headers = array(
         'Accept-Encoding' => "gzip,deflate",
         'Content-Type' => "application/json",
-        'User-Agent' => "FlexMLS WordPress Plugin/3.15",
-        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.15"
+        'User-Agent' => "FlexMLS WordPress Plugin/3.15.1",
+        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.15.1"
     );
 
 
@@ -275,9 +275,6 @@ class flexmlsAPI_Core {
         return $this->return_all_results( $this->MakeAPICall("GET", "listings/".$id."/photos", '10m') );
     }
 
-    function GetListingFloPlans($id) {
-        return $this->return_all_results( $this->MakeAPICall("GET", "listings/".$id."/floplans", '10m') );
-    }
 
     function GetListingPhoto($id, $sid) {
         return $this->return_all_results( $this->MakeAPICall("GET", "listings/".$id."/photos/".$sid, '10m') );

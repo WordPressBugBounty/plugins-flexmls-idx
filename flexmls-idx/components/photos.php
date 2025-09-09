@@ -1297,11 +1297,7 @@ class fmcPhotos extends fmcWidget {
 
     $return = array();
     $page = new flexmlsConnectPageCore( $fmc_api );
-    $floplans_as_photos = $page->get_flo_plans_for_listing_as_photos( $id );
 
-    if ( is_array( $photos ) && ! empty( $floplans_as_photos ) ) {
-      array_splice( $photos, 1, 0, $floplans_as_photos );
-    }
 
     if (is_array($photos)) {
       foreach ($photos as $photo) {
