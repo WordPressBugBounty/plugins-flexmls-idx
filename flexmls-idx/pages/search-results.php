@@ -59,13 +59,13 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 		$this->search_criteria = $cleaned_raw_criteria;
 
-		$this->order_by = $this->search_criteria['OrderBy'];
+		$this->order_by = is_array($this->search_criteria) && isset($this->search_criteria['OrderBy']) ? $this->search_criteria['OrderBy'] : '';
 
 		//This unset was added to pull all information
 		unset($params['_select']);
 		//Set page size to cookie value
 
-    if ( ! empty( $this->search_criteria['Limit'] ) ) {
+    if ( is_array($this->search_criteria) && ! empty( $this->search_criteria['Limit'] ) ) {
       $this->default_page_size = intval( $this->search_criteria['Limit'] );
     }
 
@@ -211,7 +211,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 				$map_class = '';
 				$list_class = ' active';
 			}
-			$link = flexmlsConnect::make_nice_tag_url( 'search', $this->search_criteria );
+			$link = flexmlsConnect::make_nice_tag_url( 'search', is_array($this->search_criteria) ? $this->search_criteria : array() );
 			?>
 			<div class="flexmls_toggle-view">
 			<a href="<?php echo esc_url( $link ); ?>" alt="Toggle List View" class="list-view<?php echo esc_attr( $list_class ); ?>">List View</a>
@@ -229,7 +229,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 				<?php if ( ! empty( $options['portal_saving_searches'] ) && $options['portal_saving_searches'] ) : ?>
 					<?php if ( $fmc_api_portal->is_logged_in() ) : ?>
 						<?php
-							$is_existing_saved_search = flexmlsSearchUtil::is_existing_saved_search( $this->search_criteria );
+							$is_existing_saved_search = flexmlsSearchUtil::is_existing_saved_search( is_array($this->search_criteria) ? $this->search_criteria : array() );
 
 							add_filter( 'flexmls_searchable_fields', [ 'flexmlsSearchUtil', 'remove_saved_search_from_searchable_fields' ] );
 
@@ -314,7 +314,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					$listing_address          = flexmlsConnect::format_listing_street_address( $record );
 					$first_line_address       = htmlspecialchars( $listing_address[0] );
 					$second_line_address      = htmlspecialchars( $listing_address[1] );
-					$link_to_details_criteria = $this->search_criteria;
+					$link_to_details_criteria = is_array($this->search_criteria) ? $this->search_criteria : array();
 
 					$this_result_overall_index = ( $this->page_size * ( $this->current_page - 1 ) ) + $result_count;
 
@@ -373,7 +373,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			$second_line_address = htmlspecialchars($listing_address[1]);
 			$one_line_address = htmlspecialchars($listing_address[2]);
 			$one_line_address_add_slashes = addslashes($listing_address[2]);
-			$link_to_details_criteria = $this->search_criteria;
+			$link_to_details_criteria = is_array($this->search_criteria) ? $this->search_criteria : array();
 
 			$this_result_overall_index = ($this->page_size * ($this->current_page - 1)) + $result_count;
 
@@ -709,7 +709,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 	}
 
 	function make_pagination_link($page) {
-			$page_conditions = $this->search_criteria;
+			$page_conditions = is_array($this->search_criteria) ? $this->search_criteria : array();
 			$page_conditions['pg'] = $page;
       $page_conditions['Limit'] = $this->page_size;
 		$link = flexmlsConnect::make_nice_tag_url('search', $page_conditions);

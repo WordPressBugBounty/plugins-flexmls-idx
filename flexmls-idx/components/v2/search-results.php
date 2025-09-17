@@ -32,13 +32,13 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 
 		$this->search_criteria = $cleaned_raw_criteria;
 
-		$this->order_by = $this->search_criteria['OrderBy'];
+		$this->order_by = is_array($this->search_criteria) && isset($this->search_criteria['OrderBy']) ? $this->search_criteria['OrderBy'] : '';
 
 		//This unset was added to pull all information
 		unset($params['_select']);
 		//Set page size to cookie value
 
-		if ( ! empty( $this->search_criteria['Limit'] ) ) {
+		if ( is_array($this->search_criteria) && ! empty( $this->search_criteria['Limit'] ) ) {
 			$this->default_page_size = intval( $this->search_criteria['Limit'] );
 		}
 
