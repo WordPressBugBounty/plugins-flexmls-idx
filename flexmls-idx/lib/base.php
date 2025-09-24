@@ -186,10 +186,10 @@ class flexmlsConnect {
     }
 
     if ($api->last_error_code == 1500) {
-      $message = "This widget requires a subscription to FlexMLS&reg; IDX in order to work.  <a href=''>Buy Now</a>.";
+      $message = "This widget requires a subscription to Flexmls&reg; IDX in order to work.  <a href=''>Buy Now</a>.";
     }
     elseif ($detailed == true) {
-      $message = "There was an issue communicating with the FlexMLS&reg; IDX API services required to generate this widget.  Please refresh the page or try again later.  Error code: ".$api->last_error_code;
+      $message = "There was an issue communicating with the Flexmls&reg; IDX API services required to generate this widget.  Please refresh the page or try again later.  Error code: ".$api->last_error_code;
     }
     else {
       $message = "This widget is temporarily unavailable.  Please refresh the page or try again later.  Error code: ".$api->last_error_code;
@@ -208,7 +208,7 @@ class flexmlsConnect {
   static function widget_missing_requirements($widget, $reqs_missing) {
 
     if (is_user_logged_in()) {
-      return "<span style='color:red;'>FlexMLS&reg; IDX: {$reqs_missing} are required settings for the {$widget} widget.</span>";
+      return "<span style='color:red;'>Flexmls&reg; IDX: {$reqs_missing} are required settings for the {$widget} widget.</span>";
     }
     else {
       return false;

@@ -64,7 +64,7 @@ class FMCD_module extends ET_Builder_Module {
             'toggles' => array(
               'flexmls_search' => array(
                 'priority' => 24,                
-                'title' => 'FlexMLS Widget Options',
+                'title' => 'Flexmls Widget Options',
                 'sub_toggles' => array(
                     'basic_mls' => array(
                       'name' => 'Basic',
@@ -90,7 +90,7 @@ class FMCD_module extends ET_Builder_Module {
               ),
               'flexmls_basic' => array(
                 'priority' => 23,                
-                'title' => 'FlexMLS Widget Options',
+                'title' => 'Flexmls Widget Options',
               ),
             ),
           ),

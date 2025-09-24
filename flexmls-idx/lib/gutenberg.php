@@ -22,7 +22,7 @@ function flex_mls_gtb_cgb_editor_assets() {
 
     $htmlListingDetails = $htmlPhotos = $htmlMarketStats = $htmlSearch = $htmlLocationLinks =
         $htmlIDXLinksWidget = $htmlLeadgen = $htmlSearchResults = $htmlAccount = $htmlAgents =
-            "<b>Flex connection error! Have you entered FlexMLS® API credentials?</b>";
+            "<b>Flex connection error! Have you entered Flexmls® API credentials?</b>";
     $instance = array("_instance_type" => "shortcode", "_is_gutenberg_new" => true);
 
     if(class_exists("fmcListingDetails")) {
@@ -108,7 +108,7 @@ function init_flexmls_gutenberg()
             array(
                 array(
                     'slug' => 'flex',
-                    'title' => 'FlexMLS'
+                    'title' => 'Flexmls'
                 ),
             )
         );
@@ -313,7 +313,7 @@ function FlexMlsCallback($attributes )
 
     }
     else {
-        echo "<div>FlexMLS Plugin</div>";
+        echo "<div>Flexmls Plugin</div>";
     }
 
     return ob_get_clean();

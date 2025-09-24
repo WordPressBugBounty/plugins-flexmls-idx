@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: FlexMLS - Divi Integration
+Plugin Name: Flexmls - Divi Integration
 Plugin URI:  https://www.fbsidx.com/plugin/
-Description: Plugin for integrating FlexMLS plugin and Divi Page Builder
+Description: Plugin for integrating Flexmls plugin and Divi Page Builder
 Version:     1.0.0
 Author:      FBS Data
 Author URI:  https://www.flexmls.com/
@@ -11,18 +11,18 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: fmcd-divi
 Domain Path: /languages
 
-FlexMLS - Divi Integration is free software: you can redistribute it and/or modify
+Flexmls - Divi Integration is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 2 of the License, or
 any later version.
 
-FlexMLS - Divi Integration is distributed in the hope that it will be useful,
+Flexmls - Divi Integration is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with FlexMLS - Divi Integration. If not, see https://www.gnu.org/licenses/gpl-2.0.html.
+along with Flexmls - Divi Integration. If not, see https://www.gnu.org/licenses/gpl-2.0.html.
 */
 
 

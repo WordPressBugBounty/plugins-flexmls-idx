@@ -43,8 +43,8 @@ class flexmlsAPI_Core {
     public $api_headers = array(
         'Accept-Encoding' => "gzip,deflate",
         'Content-Type' => "application/json",
-        'User-Agent' => "FlexMLS WordPress Plugin/3.15.2",
-        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.15.2"
+        'User-Agent' => "Flexmls WordPress Plugin/3.15.3",
+        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.15.3"
     );
 
 
@@ -60,7 +60,7 @@ class flexmlsAPI_Core {
 
     static function admin_notices_api_connection_error(){
         echo '	<div class="notice notice-error">
-					<p>There was an error connecting to the FlexMLS&reg; IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message, please <a href="' . admin_url( 'admin.php?page=fmc_admin_settings&tab=support' ) . '">contact support</a>.</p>
+					<p>There was an error connecting to the Flexmls&reg; IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message, please <a href="' . admin_url( 'admin.php?page=fmc_admin_settings&tab=support' ) . '">contact support</a>.</p>
 				</div>';
     }
 

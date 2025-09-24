@@ -11,6 +11,76 @@ class Settings {
 
 		?>
 			<div class="wrap about-wrap about-flexmls">
+			
+			<?php
+			// Display nginx warning if nginx is detected
+			\FlexMLS\Admin\NginxCompatibility::display_nginx_warning();
+			
+			// Always show debug info for administrators (even if nginx not detected)
+			if ( current_user_can( 'manage_options' ) ) {
+				$server_info = \FlexMLS\Admin\NginxCompatibility::get_server_info();
+				$debug_enabled = defined( 'WP_DEBUG' ) && WP_DEBUG;
+				?>
+				<?php if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() ): ?>
+				<div style="background: #fff3cd; padding: 15px; margin: 10px 0; border: 1px solid #ffeaa7; border-radius: 4px;">
+					<details>
+						<summary><h4 style="display: inline; margin: 0;">⚠️ nginx Configuration Required</h4></summary>
+						<div style="margin-top: 15px;">
+							<p><strong>Your WordPress site is running on nginx.</strong> To ensure the Flexmls IDX plugin works correctly, you need to add the following rewrite rules to your nginx configuration file.</p>
+							
+							<details style="margin: 15px 0;">
+								<summary><strong>Required nginx Configuration</strong></summary>
+								<div style="margin-top: 10px;">
+									<p>Add these rules to your nginx server block configuration file (usually located at <code>/etc/nginx/sites-available/your-site</code> or similar):</p>
+									<div style="position: relative;">
+										<textarea id="nginx-config" readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 12px; background: #fff; border: 1px solid #ddd; padding: 10px;"><?php 
+										$rules = \FlexMLS\Admin\NginxCompatibility::get_nginx_rewrite_rules();
+										echo esc_textarea( implode( "\n", $rules ) ); 
+										?></textarea>
+										<button type="button" onclick="copyNginxConfig()" style="position: absolute; top: 10px; right: 10px; background: #0073aa; color: white; border: none; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;">Copy</button>
+									</div>
+									<script>
+									function copyNginxConfig() {
+										const textarea = document.getElementById('nginx-config');
+										textarea.select();
+										textarea.setSelectionRange(0, 99999); // For mobile devices
+										document.execCommand('copy');
+										
+										// Show feedback
+										const button = event.target;
+										const originalText = button.textContent;
+										button.textContent = 'Copied!';
+										button.style.background = '#28a745';
+										setTimeout(function() {
+											button.textContent = originalText;
+											button.style.background = '#0073aa';
+										}, 2000);
+									}
+									</script>
+								</div>
+							</details>
+							
+							<div style="background: #fff3cd; padding: 15px; margin: 10px 0; border: 1px solid #ffeaa7; border-radius: 4px;">
+								<h4>⚠️ Important Steps:</h4>
+								<ol>
+									<li><strong>Add the rules above</strong> to your nginx configuration file</li>
+									<li><strong>Test your nginx configuration</strong> with: <code>nginx -t</code></li>
+									<li><strong>Reload nginx</strong> with: <code>systemctl reload nginx</code> or <code>service nginx reload</code></li>
+									<li><strong>Clear any caching</strong> (if you use caching plugins)</li>
+								</ol>
+							</div>
+							
+							<div style="background: #d1ecf1; padding: 15px; margin: 10px 0; border: 1px solid #bee5eb; border-radius: 4px;">
+								<h4>💡 Need Help?</h4>
+								<p>If you're not comfortable editing nginx configuration files, please <strong>contact your website hosting provider or system administrator</strong> for assistance. They can help you add these rewrite rules to your nginx configuration.</p>
+							</div>
+						</div>
+					</details>
+				</div>
+				<?php endif; ?>
+				<?php
+			}
+			?>
 
 				<div class="intro-banner">
 					<img src="<?php echo plugin_dir_url( dirname( __FILE__ ) ) . 'assets/images/dashboard-banner.png'; ?>">
@@ -295,6 +365,7 @@ class Settings {
 		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_behavior_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_behavior_nonce' ], 'update_fmc_behavior_action' ) ){
 			$do_flush_rewrites = false;
 			$old_permabase = $fmc_settings[ 'permabase' ];
+			$old_destlink = $fmc_settings[ 'destlink' ];
 			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
 				switch( $key ){
 					case 'default_titles':
@@ -353,8 +424,29 @@ class Settings {
 			if( empty( $fmc_settings[ 'permabase' ] ) ){
 				$fmc_settings[ 'permabase' ] = 'idx';
 			}
+			// Check for changes that require nginx configuration updates
+			$nginx_config_changed = false;
+			
 			if( $old_permabase != $fmc_settings[ 'permabase' ] ){
-				add_action( 'shutdown', 'flush_rewrite_rules' );
+				// Set transient to indicate permalink base was recently changed
+				set_transient( 'fmc_permabase_changed', time(), 300 ); // 5 minutes
+				$nginx_config_changed = true;
+			}
+			
+			if( $old_destlink != $fmc_settings[ 'destlink' ] ){
+				// Set transient to indicate destination page was recently changed
+				set_transient( 'fmc_destlink_changed', time(), 300 ); // 5 minutes
+				$nginx_config_changed = true;
+			}
+			
+			if( $nginx_config_changed ){
+				// Use nginx-compatible rewrite rule handling
+				if( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
+					// For nginx, we don't flush rewrite rules as they need to be configured in nginx config
+					// The rules are still added to WordPress for URL generation
+				} else {
+					add_action( 'shutdown', 'flush_rewrite_rules' );
+				}
 			}
 			add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
 		}

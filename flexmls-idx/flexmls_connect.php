@@ -5,7 +5,7 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.15.2
+Version: 3.15.3
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
 Tested up to: 6.8
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.15.2';
+const FMC_PLUGIN_VERSION = '3.15.3';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -37,6 +37,7 @@ class FlexMLS_IDX {
 	function __construct(){
         require_once( 'lib/functions.php' );
 		require_once( 'Admin/autoloader.php' );
+		require_once( 'Admin/NginxCompatibility.php' );
 		require_once( 'Shortcodes/autoloader.php' );
 		require_once( 'SparkAPI/autoloader.php' );
 		require_once( 'Widgets/autoloader.php' );
@@ -75,6 +76,7 @@ class FlexMLS_IDX {
 		add_action( 'parse_query', array( $this, 'parse_query' ) );
 		add_action( 'plugins_loaded', array( '\FlexMLS\Admin\Settings', 'update_settings' ), 9 );
 		add_action( 'plugins_loaded', array( $this, 'session_start' ) );
+		add_filter( 'redirect_canonical', array( $this, 'prevent_idx_redirects' ), 10, 2 );
 		add_action( 'widgets_init', array( $this, 'widgets_init' ) );
 		//add_action( 'wp_ajax_fmcShortcodeContainer', array( 'flexmlsConnect', 'shortcode_container' ) );
 		add_action( 'wp_ajax_fmcShortcodeContainer', array( '\FlexMLS\Admin\TinyMCE', 'tinymce_shortcodes' ) );
@@ -175,13 +177,38 @@ class FlexMLS_IDX {
 		}
 	}
 
+	/**
+	 * Prevent WordPress from redirecting IDX URLs
+	 * This prevents WordPress from redirecting /idx/search/ to /search-2/ etc.
+	 */
+	function prevent_idx_redirects( $redirect_url, $requested_url ) {
+		$fmc_settings = get_option( 'fmc_settings' );
+		$permabase = isset( $fmc_settings['permabase'] ) ? $fmc_settings['permabase'] : 'idx';
+		
+		// Check if the requested URL contains our permabase
+		if ( strpos( $requested_url, '/' . $permabase . '/' ) !== false ) {
+			// Don't redirect IDX URLs - let them be handled by our rewrite rules
+			return false;
+		}
+		
+		return $redirect_url;
+	}
+
 	public static function plugin_activate(){
 		$is_fresh_install = false;
 		if( false === get_option( 'fmc_settings' ) ){
 			$is_fresh_install = true;
 		}
 		\FlexMLS\Admin\Update::set_minimum_options( $is_fresh_install );
-		add_action( 'shutdown', 'flush_rewrite_rules' );
+		
+		// Use nginx-compatible rewrite rule handling
+		if( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
+			// For nginx, we don't flush rewrite rules on activation
+			// The rules need to be configured in nginx config file
+		} else {
+			add_action( 'shutdown', 'flush_rewrite_rules' );
+		}
+		
 		if( false === get_option( 'fmc_plugin_version' ) ){
 			add_option( 'fmc_plugin_version', FMC_PLUGIN_VERSION, null, 'no' );
 		}
@@ -190,7 +217,9 @@ class FlexMLS_IDX {
 	public static function plugin_deactivate(){
 		$SparkAPI = new \SparkAPI\Core();
 		$SparkAPI->clear_cache( true );
-		flush_rewrite_rules();
+		
+		// Use nginx-compatible rewrite rule handling
+		\FlexMLS\Admin\NginxCompatibility::handle_rewrite_rules();
 	}
 
 	public static function plugin_uninstall(){
@@ -203,7 +232,9 @@ class FlexMLS_IDX {
 		delete_option( 'fmc_cache_version' );
 		delete_option( 'fmc_plugin_version' );
 		delete_option( 'fmc_settings' );
-		flush_rewrite_rules();
+		
+		// Use nginx-compatible rewrite rule handling
+		\FlexMLS\Admin\NginxCompatibility::handle_rewrite_rules();
 	}
 
 	function rewrite_rules(){
@@ -216,7 +247,9 @@ class FlexMLS_IDX {
 		add_rewrite_rule( 'portal/([^/]+)?', 'index.php?plugin=flexmls-idx&fmc_vow_tag=$matches[1]&page_id=' . $fmc_settings[ 'destlink' ], 'top' );
 		add_rewrite_tag( '%fmc_tag%', '([^&]+)' );
 		add_rewrite_tag( '%fmc_vow_tag%', '([^&]+)' );
-		flush_rewrite_rules();
+		
+		// Use nginx-compatible rewrite rule handling
+		\FlexMLS\Admin\NginxCompatibility::handle_rewrite_rules();
 	}
 
 	function session_start(){

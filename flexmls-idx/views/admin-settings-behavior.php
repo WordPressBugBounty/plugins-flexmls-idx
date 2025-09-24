@@ -180,6 +180,24 @@ add_thickbox();
 						<p>Note: When you activated this plugin, a page with this shortcode in the body was created automatically.</p>
 						<p>Another Note: If you're using a SEO plugin, you may need to disable Permalink Cleaning for this feature to work.</p>
 					</div>
+					
+					<?php
+					// Display nginx warning for destination page changes (only if nginx is detected and destlink is set)
+					if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() && !empty( $fmc_settings[ 'destlink' ] ) ) {
+						$last_destlink_change = get_transient( 'fmc_destlink_changed' );
+						$recently_changed_destlink = $last_destlink_change && ( time() - $last_destlink_change ) < 300;
+						
+						if ( $recently_changed_destlink ) {
+							?>
+							<div style="background: #f8d7da; padding: 10px; margin: 10px 0; border: 1px solid #f5c6cb; border-radius: 4px;">
+								<p style="margin: 0; color: #721c24; font-size: 13px;">
+									<strong>⚠️ nginx Update Required:</strong> You just changed the destination page. Your nginx configuration needs to be updated with the new page ID: <code><?php echo esc_html( $fmc_settings[ 'destlink' ] ); ?></code>
+								</p>
+							</div>
+							<?php
+						}
+					}
+					?>
 				</td>
 			</tr>
 			<tr>
@@ -189,6 +207,11 @@ add_thickbox();
 				<td>
 					<p><code><?php echo site_url( '/' ); ?></code> <input type="text" class="regular-text code" name="fmc_settings[permabase]" id="permabase" value="<?php echo $fmc_settings[ 'permabase' ]; ?>"></p>
 					<p class="description">Changes the URL for special plugin pages. e.g., <?php echo site_url( $fmc_settings[ 'permabase' ] . '/search' ); ?></p>
+					
+					<?php
+					// Display nginx warning for permalink base changes
+					\FlexMLS\Admin\NginxCompatibility::display_nginx_permabase_warning();
+					?>
 				</td>
 			</tr>
 		</tbody>
@@ -297,3 +320,77 @@ add_thickbox();
     <?php endif; ?>
     <p><?php wp_nonce_field( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
 </form>
+
+<script>
+jQuery(document).ready(function($) {
+	// Show nginx warning when permalink base field is focused or changed
+	$('#permabase').on('focus change input', function() {
+		var currentValue = $(this).val();
+		var nginxWarning = $(this).closest('td').find('.nginx-permabase-warning');
+		
+		// If nginx warning exists and value has changed, show a note and expand the warning
+		if (nginxWarning.length > 0 && currentValue !== '<?php echo esc_js( $fmc_settings[ 'permabase' ] ); ?>') {
+			// Expand the warning if it's collapsed
+			var details = nginxWarning.find('details');
+			if (details.length > 0 && !details.attr('open')) {
+				details.attr('open', 'open');
+			}
+			
+			// Add the change notice if it doesn't exist
+			if (!nginxWarning.find('.value-changed-notice').length) {
+				nginxWarning.find('details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
+			}
+		}
+	});
+	
+	// Hide the note when value is reverted to original
+	$('#permabase').on('input', function() {
+		var currentValue = $(this).val();
+		var nginxWarning = $(this).closest('td').find('.nginx-permabase-warning');
+		var valueChangedNotice = nginxWarning.find('.value-changed-notice');
+		
+		if (currentValue === '<?php echo esc_js( $fmc_settings[ 'permabase' ] ); ?>' && valueChangedNotice.length > 0) {
+			valueChangedNotice.remove();
+			// Optionally collapse the warning if it was auto-expanded
+			var details = nginxWarning.find('details');
+			if (details.length > 0 && details.attr('open') && !details.data('user-opened')) {
+				details.removeAttr('open');
+			}
+		}
+	});
+	
+	// Show nginx warning when destination page is changed
+	$('select[name="fmc_settings[destlink]"]').on('change', function() {
+		var currentValue = $(this).val();
+		var originalValue = '<?php echo esc_js( $fmc_settings[ 'destlink' ] ); ?>';
+		var nginxWarning = $('.nginx-permabase-warning');
+		
+		// If nginx warning exists and value has changed, show a note and expand the warning
+		if (nginxWarning.length > 0 && currentValue !== originalValue) {
+			// Expand the warning if it's collapsed
+			var details = nginxWarning.find('details');
+			if (details.length > 0 && !details.attr('open')) {
+				details.attr('open', 'open');
+			}
+			
+			// Add the change notice if it doesn't exist
+			if (!nginxWarning.find('.value-changed-notice').length) {
+				nginxWarning.find('details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
+			}
+		}
+		
+		// Hide the note when value is reverted to original
+		if (currentValue === originalValue) {
+			var valueChangedNotice = nginxWarning.find('.value-changed-notice');
+			if (valueChangedNotice.length > 0) {
+				valueChangedNotice.remove();
+				// Optionally collapse the warning if it was auto-expanded
+				var details = nginxWarning.find('details');
+				if (details.length > 0 && details.attr('open') && !details.data('user-opened')) {
+					details.removeAttr('open');
+				}
+			}
+		}
+	});
+});
+</script>

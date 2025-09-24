@@ -52,7 +52,7 @@ class VCE_component {
             "controls" => "full",
             "show_settings_on_create" => "false",
             "icon" => "flexmls_pin", // or css class name which you can reffer in your css file later. Example: "vc_extend_my_class"
-            "category" => 'FlexMLS®',
+            "category" => 'Flexmls®',
             'admin_enqueue_js' => $this->initLocation(),
             "params" => array_merge($this->setParams(), $this->setDesignOptions()),
         ) );

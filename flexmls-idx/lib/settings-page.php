@@ -49,7 +49,14 @@ class flexmlsConnectSettings {
         $options['oauth_secret'] = $oauth_info[0]["ClientSecret"];
       }
       update_option('fmc_settings', $options);
-      $wp_rewrite->flush_rules(true);
+      
+      // Use nginx-compatible rewrite rule handling
+      if( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
+          // For nginx, we don't flush rewrite rules as they need to be configured in nginx config
+          // The rules are still added to WordPress for URL generation
+      } else {
+          $wp_rewrite->flush_rules(true);
+      }
     }
 
     if (empty($options["portal_text"])){
