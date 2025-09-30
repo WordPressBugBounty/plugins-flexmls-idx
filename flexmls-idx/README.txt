@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 6.8.2
 Requires PHP: 7.4
-Stable tag: 3.15.3
+Stable tag: 3.15.4
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -85,6 +85,11 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.15.4 =
+Efficiency Update
+* Ajax improvements to the nginx configuration block under Behavior settings
+
+
 = 3.15.3 =
 New Feature
 * Added nginx permalink configuration info to credential and behavior setting pages

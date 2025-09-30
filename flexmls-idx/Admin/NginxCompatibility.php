@@ -390,6 +390,90 @@ class NginxCompatibility {
 	}
 
 	/**
+	 * AJAX handler to get nginx configuration rules with custom parameters
+	 */
+	public static function ajax_get_nginx_rules() {
+		// Verify nonce for security
+		if ( ! wp_verify_nonce( $_POST['nonce'], 'fmc_nginx_rules_nonce' ) ) {
+			wp_die( 'Security check failed' );
+		}
+
+		// Get parameters from AJAX request
+		$permabase = sanitize_text_field( $_POST['permabase'] );
+		$destlink = sanitize_text_field( $_POST['destlink'] );
+		
+		// Temporarily update settings for rule generation
+		$fmc_settings = get_option( 'fmc_settings' );
+		$original_permabase = $fmc_settings['permabase'];
+		$original_destlink = $fmc_settings['destlink'];
+		
+		$fmc_settings['permabase'] = $permabase;
+		$fmc_settings['destlink'] = $destlink;
+		
+		// Generate rules with temporary settings
+		$rules = self::get_nginx_rewrite_rules_with_params( $permabase, $destlink );
+		$rules_text = implode( "\n", $rules );
+		
+		// Restore original settings
+		$fmc_settings['permabase'] = $original_permabase;
+		$fmc_settings['destlink'] = $original_destlink;
+		
+		wp_send_json_success( array(
+			'rules' => $rules_text,
+			'permabase' => $permabase,
+			'destlink' => $destlink
+		) );
+	}
+
+	/**
+	 * Generate nginx rewrite rules with specific parameters
+	 * 
+	 * @param string $permabase The permalink base
+	 * @param string $destlink The destination page ID
+	 * @return array Array of nginx rewrite rules
+	 */
+	public static function get_nginx_rewrite_rules_with_params( $permabase, $destlink ) {
+		// Detect if WordPress is in a subdirectory
+		$wp_path = '';
+		$site_url = site_url();
+		
+		// Extract the path from the site URL
+		$parsed_url = parse_url( $site_url );
+		if ( isset( $parsed_url['path'] ) && $parsed_url['path'] !== '/' ) {
+			$wp_path = rtrim( $parsed_url['path'], '/' );
+		}
+		
+		$rules = array(
+			'# Flexmls IDX Plugin Rewrite Rules for nginx',
+			'# Add these rules to your nginx server block configuration',
+			'# Place these rules BEFORE the main WordPress location block',
+			'',
+			'# OAuth callback rules',
+			'location ~ ^' . $wp_path . '/oauth/callback/?$ {',
+			'    try_files $uri $uri/ ' . $wp_path . '/index.php?plugin=flexmls-idx&oauth_tag=oauth-login;',
+			'}',
+			'',
+			'location ~ ^' . $wp_path . '/oauth/spark-logout/?$ {',
+			'    try_files $uri $uri/ ' . $wp_path . '/index.php?plugin=flexmls-idx&oauth_tag=oauth-logout;',
+			'}',
+			'',
+			'# IDX permalink rules (matches WordPress: permabase/([^/]+)?)',
+			'location ~ ^' . $wp_path . '/' . $permabase . '/([^/]+)/?$ {',
+			'    try_files $uri $uri/ ' . $wp_path . '/index.php?plugin=flexmls-idx&fmc_tag=$1' . ( $destlink ? '&page_id=' . $destlink : '' ) . ';',
+			'}',
+			'',
+			'# Portal rules (matches WordPress: portal/([^/]+)?)',
+			'location ~ ^' . $wp_path . '/portal/([^/]+)/?$ {',
+			'    try_files $uri $uri/ ' . $wp_path . '/index.php?plugin=flexmls-idx&fmc_vow_tag=$1' . ( $destlink ? '&page_id=' . $destlink : '' ) . ';',
+			'}',
+			'',
+			'# End Flexmls IDX Plugin Rewrite Rules'
+		);
+
+		return $rules;
+	}
+
+	/**
 	 * Get server information for debugging
 	 * 
 	 * @return array Server information

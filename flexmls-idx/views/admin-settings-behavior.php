@@ -318,28 +318,109 @@ add_thickbox();
         </tr>
     </table>
     <?php endif; ?>
+    
+    <?php
+    // Display red warning message for nginx users about copying config and saving changes
+    if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
+        ?>
+        <div style="background: #f8d7da; padding: 15px; margin: 20px 0; border: 1px solid #f5c6cb; border-radius: 4px;">
+            <p style="margin: 0; color: #721c24; font-size: 14px; font-weight: bold;">
+                ⚠️ <strong>Important:</strong> If you see nginx configuration blocks above, you must:
+            </p>
+            <ol style="margin: 10px 0 0 0; padding-left: 20px; color: #721c24; font-size: 13px;">
+                <li><strong>Copy the nginx configuration block</strong> and add it to your nginx server configuration file</li>
+                <li><strong>Click "Save Settings" button below</strong> to save your changes to this page</li>
+            </ol>
+        </div>
+        <?php
+    }
+    ?>
+    
     <p><?php wp_nonce_field( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
 </form>
 
 <script>
 jQuery(document).ready(function($) {
+	var originalPermabase = '<?php echo esc_js( $fmc_settings[ 'permabase' ] ); ?>';
+	var originalDestlink = '<?php echo esc_js( $fmc_settings[ 'destlink' ] ); ?>';
+	var nginxConfigTextarea = null;
+	var currentValuesContainer = null;
+	
+	// Function to update nginx configuration and current values via AJAX
+	function updateNginxConfig(permabase, destlink) {
+		// Only make AJAX call if nginx warning exists
+		var nginxWarning = $('.nginx-permabase-warning');
+		if (nginxWarning.length === 0) {
+			return;
+		}
+		
+		// Find the nginx config textarea
+		if (!nginxConfigTextarea) {
+			nginxConfigTextarea = nginxWarning.find('textarea[id="nginx-permabase-config"]');
+		}
+		
+		// Find current values container - there might be multiple instances
+		if (!currentValuesContainer) {
+			currentValuesContainer = nginxWarning.find('p:contains("Current permalink base")');
+		}
+		
+		// Make AJAX request to get updated nginx rules
+		$.ajax({
+			url: ajaxurl,
+			type: 'POST',
+			data: {
+				action: 'fmc_get_nginx_rules',
+				permabase: permabase,
+				destlink: destlink,
+				nonce: '<?php echo wp_create_nonce( 'fmc_nginx_rules_nonce' ); ?>'
+			},
+			success: function(response) {
+				if (response.success) {
+					// Update nginx configuration textarea
+					if (nginxConfigTextarea.length > 0) {
+						nginxConfigTextarea.val(response.data.rules);
+					}
+					
+					// Update current values display - handle multiple instances
+					if (currentValuesContainer.length > 0) {
+						var newContent = 'Current permalink base: <code>' + response.data.permabase + '</code>';
+						if (response.data.destlink && response.data.destlink !== '0') {
+							newContent += '<br>Current destination page ID: <code>' + response.data.destlink + '</code>';
+						}
+						// Update all instances of current values
+						currentValuesContainer.each(function() {
+							$(this).html(newContent);
+						});
+					}
+				}
+			},
+			error: function() {
+				console.log('Failed to update nginx configuration');
+			}
+		});
+	}
+	
 	// Show nginx warning when permalink base field is focused or changed
 	$('#permabase').on('focus change input', function() {
 		var currentValue = $(this).val();
 		var nginxWarning = $(this).closest('td').find('.nginx-permabase-warning');
 		
 		// If nginx warning exists and value has changed, show a note and expand the warning
-		if (nginxWarning.length > 0 && currentValue !== '<?php echo esc_js( $fmc_settings[ 'permabase' ] ); ?>') {
+		if (nginxWarning.length > 0 && currentValue !== originalPermabase) {
 			// Expand the warning if it's collapsed
 			var details = nginxWarning.find('details');
 			if (details.length > 0 && !details.attr('open')) {
 				details.attr('open', 'open');
 			}
 			
-			// Add the change notice if it doesn't exist
-			if (!nginxWarning.find('.value-changed-notice').length) {
-				nginxWarning.find('details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
+			// Add the change notice only to the first nginx warning container if it doesn't exist
+			if (!$('.value-changed-notice').length) {
+				$('.nginx-permabase-warning').first().find('> details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
 			}
+			
+			// Update nginx configuration in real-time
+			var currentDestlink = $('select[name="fmc_settings[destlink]"]').val() || '0';
+			updateNginxConfig(currentValue, currentDestlink);
 		}
 	});
 	
@@ -347,50 +428,57 @@ jQuery(document).ready(function($) {
 	$('#permabase').on('input', function() {
 		var currentValue = $(this).val();
 		var nginxWarning = $(this).closest('td').find('.nginx-permabase-warning');
-		var valueChangedNotice = nginxWarning.find('.value-changed-notice');
 		
-		if (currentValue === '<?php echo esc_js( $fmc_settings[ 'permabase' ] ); ?>' && valueChangedNotice.length > 0) {
-			valueChangedNotice.remove();
+		if (currentValue === originalPermabase) {
+			$('.value-changed-notice').remove();
 			// Optionally collapse the warning if it was auto-expanded
 			var details = nginxWarning.find('details');
 			if (details.length > 0 && details.attr('open') && !details.data('user-opened')) {
 				details.removeAttr('open');
 			}
 		}
+		
+		// Update nginx configuration in real-time
+		var currentDestlink = $('select[name="fmc_settings[destlink]"]').val() || '0';
+		updateNginxConfig(currentValue, currentDestlink);
 	});
 	
 	// Show nginx warning when destination page is changed
 	$('select[name="fmc_settings[destlink]"]').on('change', function() {
 		var currentValue = $(this).val();
-		var originalValue = '<?php echo esc_js( $fmc_settings[ 'destlink' ] ); ?>';
 		var nginxWarning = $('.nginx-permabase-warning');
 		
 		// If nginx warning exists and value has changed, show a note and expand the warning
-		if (nginxWarning.length > 0 && currentValue !== originalValue) {
+		if (nginxWarning.length > 0 && currentValue !== originalDestlink) {
 			// Expand the warning if it's collapsed
 			var details = nginxWarning.find('details');
 			if (details.length > 0 && !details.attr('open')) {
 				details.attr('open', 'open');
 			}
 			
-			// Add the change notice if it doesn't exist
-			if (!nginxWarning.find('.value-changed-notice').length) {
-				nginxWarning.find('details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
+			// Add the change notice only to the first nginx warning container if it doesn't exist
+			if (!$('.value-changed-notice').length) {
+				$('.nginx-permabase-warning').first().find('> details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
 			}
+			
+			// Update nginx configuration in real-time
+			var currentPermabase = $('#permabase').val() || originalPermabase;
+			updateNginxConfig(currentPermabase, currentValue);
 		}
 		
 		// Hide the note when value is reverted to original
-		if (currentValue === originalValue) {
-			var valueChangedNotice = nginxWarning.find('.value-changed-notice');
-			if (valueChangedNotice.length > 0) {
-				valueChangedNotice.remove();
-				// Optionally collapse the warning if it was auto-expanded
-				var details = nginxWarning.find('details');
-				if (details.length > 0 && details.attr('open') && !details.data('user-opened')) {
-					details.removeAttr('open');
-				}
+		if (currentValue === originalDestlink) {
+			$('.value-changed-notice').remove();
+			// Optionally collapse the warning if it was auto-expanded
+			var details = nginxWarning.find('details');
+			if (details.length > 0 && details.attr('open') && !details.data('user-opened')) {
+				details.removeAttr('open');
 			}
 		}
+		
+		// Update nginx configuration in real-time
+		var currentPermabase = $('#permabase').val() || originalPermabase;
+		updateNginxConfig(currentPermabase, currentValue);
 	});
 });
 </script>
