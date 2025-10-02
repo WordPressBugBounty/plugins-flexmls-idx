@@ -47,7 +47,18 @@ $known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-confli
 			<p><strong>WordPress URL:</strong> <?php echo site_url(); ?></p>
 			<p><strong>WordPress Version:</strong> <?php echo $wp_version; ?></p>
 			<p><strong>Flexmls&reg; IDX Plugin Version:</strong> <?php echo FMC_PLUGIN_VERSION; ?></p>
-			<p><strong>Web Server:</strong> <?php echo $_SERVER[ 'SERVER_SOFTWARE' ]; ?></p>
+			<p><strong>Web Server:</strong> <?php 
+				$server_software = $_SERVER[ 'SERVER_SOFTWARE' ];
+				// Check if nginx is detected and add link to nginx configuration guidance
+				if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
+					printf( '%s - <a href="%s#nginx-configuration-guidance" title="View nginx configuration guidance">nginx configuration help</a>', 
+						$server_software, 
+						admin_url( 'admin.php?page=fmc_admin_settings' ) 
+					);
+				} else {
+					echo $server_software;
+				}
+			?></p>
 			<p><strong>PHP Version:</strong> <?php echo phpversion(); ?></p>
 			<p><strong>Theme:</strong> <?php
 				if( $active_theme->get( 'ThemeURI' ) ){

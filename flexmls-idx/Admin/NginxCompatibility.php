@@ -17,28 +17,42 @@ class NginxCompatibility {
 			if ( strpos( $server_software, 'nginx' ) !== false ) {
 				return true;
 			}
+			// Explicitly check for other servers to avoid false positives
+			$non_nginx_servers = array(
+				'litespeed',
+				'apache',
+				'iis',
+				'caddy',
+				'lighttpd',
+				'tomcat',
+				'jetty',
+				'h2o',
+				'kestrel',
+				'cowboy',
+				'traffic server',
+				'zeus',
+				'cherokee',
+				'resin',
+				'tengine',
+				'yaws',
+				'monkey',
+				'abyss',
+				'openresty'
+			);
+			
+			foreach ( $non_nginx_servers as $server ) {
+				if ( strpos( $server_software, $server ) !== false ) {
+					return false;
+				}
+			}
 		}
 
-		// Check for nginx-specific headers
-		if ( isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) || 
-			 isset( $_SERVER['HTTP_X_REAL_IP'] ) || 
-			 isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) ) {
-			// These headers are commonly set by nginx
-			return true;
-		}
-
-		// Check for nginx in HTTP headers
-		if ( function_exists( 'apache_get_modules' ) ) {
-			// If apache_get_modules exists, we're likely on Apache
-			return false;
-		}
-
-		// Additional check: look for nginx in environment variables
+		// Check for nginx-specific environment variables
 		if ( isset( $_SERVER['NGINX_VERSION'] ) ) {
 			return true;
 		}
 
-		// Check if we can detect nginx through other means
+		// Check for nginx-specific headers (more specific than generic proxy headers)
 		$nginx_indicators = array(
 			'HTTP_X_NGINX_PROXY',
 			'HTTP_X_NGINX_UPSTREAM',
@@ -51,16 +65,38 @@ class NginxCompatibility {
 			}
 		}
 
-		// Additional check: if we can't detect Apache modules and no clear server software
-		// This is a fallback for cases where server software isn't clearly identified
-		if ( ! function_exists( 'apache_get_modules' ) && 
-			 ( ! isset( $_SERVER['SERVER_SOFTWARE'] ) || 
-			   strpos( strtolower( $_SERVER['SERVER_SOFTWARE'] ), 'apache' ) === false ) ) {
-			// If we can't detect Apache and server software doesn't mention Apache,
-			// assume it might be nginx (this is a fallback)
-			return true;
+		// Check for Apache modules - if they exist, we're likely on Apache
+		if ( function_exists( 'apache_get_modules' ) ) {
+			return false;
 		}
 
+		// Check for specific server indicators to avoid false positives
+		$server_indicators = array(
+			// LiteSpeed
+			'LSWS_EDITION' => false,
+			'HTTP_X_LITESPEED_CACHE' => false,
+			// IIS
+			'IIS' => false,
+			'Microsoft-IIS' => false,
+			// Apache Tomcat
+			'TOMCAT_HOME' => false,
+			'CATALINA_HOME' => false,
+			// Jetty
+			'JETTY_HOME' => false,
+			// Caddy
+			'CADDY_HOME' => false,
+			// Lighttpd
+			'LIGHTTPD_HOME' => false
+		);
+
+		foreach ( $server_indicators as $indicator => $is_nginx ) {
+			if ( isset( $_SERVER[ $indicator ] ) ) {
+				return $is_nginx;
+			}
+		}
+
+		// Only return true if we have strong evidence of nginx
+		// Don't use generic proxy headers as they can be set by any server behind a proxy
 		return false;
 	}
 
@@ -154,7 +190,6 @@ class NginxCompatibility {
 			<div style="background: #d1ecf1; padding: 15px; margin: 10px 0; border: 1px solid #bee5eb; border-radius: 4px;">
 				<h4>💡 Need Help?</h4>
 				<p>If you're not comfortable editing nginx configuration files, please <strong>contact your website hosting provider or system administrator</strong> for assistance. They can help you add these rewrite rules to your nginx configuration.</p>
-				<p>You can also <a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ); ?>">contact Flexmls support</a> for additional guidance.</p>
 			</div>
 			
 		</div>
@@ -283,7 +318,7 @@ class NginxCompatibility {
 	}
 
 	/**
-	 * Display nginx warning for permalink base changes
+	 * Display nginx guidance for permalink base changes
 	 * This is specifically for the behavior settings page
 	 */
 	public static function display_nginx_permabase_warning() {
@@ -304,12 +339,16 @@ class NginxCompatibility {
 		$recently_changed_destlink = $last_destlink_change && ( time() - $last_destlink_change ) < 300; // 5 minutes
 		$recently_changed = $recently_changed_permabase || $recently_changed_destlink;
 		
+		// Generate test URLs
+		$test_url = home_url( '/' . $permabase . '/search' );
+		$test_listing_url = home_url( '/' . $permabase . '/test-listing' );
+		
 		?>
-		<div class="nginx-permabase-warning" style="background: <?php echo $recently_changed ? '#f8d7da' : '#fff3cd'; ?>; padding: 15px; margin: 10px 0; border: 1px solid <?php echo $recently_changed ? '#f5c6cb' : '#ffeaa7'; ?>; border-radius: 4px;">
+		<div id="nginx-configuration-guidance" class="nginx-permabase-guidance" style="background: #e7f3ff; padding: 15px; margin: 10px 0; border: 1px solid #b3d9ff; border-radius: 4px;">
 			<details <?php echo $recently_changed ? 'open' : ''; ?> style="margin: 0;">
-				<summary style="cursor: pointer; font-weight: bold; color: <?php echo $recently_changed ? '#721c24' : '#856404'; ?>; list-style: none; padding: 0; margin: 0 0 10px 0;">
+				<summary style="cursor: pointer; font-weight: bold; color: #004085; list-style: none; padding: 0; margin: 0 0 10px 0;">
 					<h4 style="margin: 0; display: inline;">
-						<?php echo $recently_changed ? '🚨' : '⚠️'; ?> nginx Configuration Required (after updating permalink base or destination page)
+						<?php echo $recently_changed ? '🔄' : 'ℹ️'; ?> nginx Server Detected - Testing Guide
 					</h4>
 				</summary>
 				
@@ -321,31 +360,50 @@ class NginxCompatibility {
 							$changed_items[] = 'Permalink Base';
 						}
 						if ( $recently_changed_destlink ) {
-							$changed_items[] = 'Destination Page (Framed on this page)';
+							$changed_items[] = 'Destination Page';
 						}
 						$changed_text = implode( ' and ', $changed_items );
 						?>
-						<p style="margin: 0 0 10px 0; color: #721c24;"><strong>URGENT:</strong> You just changed the <?php echo esc_html( $changed_text ); ?>! Your nginx configuration must be updated immediately or your IDX URLs will return 404 errors.</p>
-						<p style="margin: 0 0 10px 0; color: #721c24; font-size: 13px;">
-							Current permalink base: <code><?php echo esc_html( $permabase ); ?></code>
-							<?php if ( $recently_changed_destlink ): ?>
-								<br>Current destination page ID: <code><?php echo esc_html( $fmc_settings['destlink'] ); ?></code>
-							<?php endif; ?>
-						</p>
+						<div style="background: #fff3cd; padding: 12px; margin: 0 0 15px 0; border: 1px solid #ffeaa7; border-radius: 4px;">
+							<p style="margin: 0 0 8px 0; color: #856404; font-weight: bold;">You just changed the <?php echo esc_html( $changed_text ); ?>!</p>
+							<p style="margin: 0; color: #856404; font-size: 13px;">
+								Current permalink base: <code><?php echo esc_html( $permabase ); ?></code>
+								<?php if ( $recently_changed_destlink ): ?>
+									<br>Current destination page ID: <code><?php echo esc_html( $fmc_settings['destlink'] ); ?></code>
+								<?php endif; ?>
+							</p>
+						</div>
 					<?php else: ?>
-						<p style="margin: 0 0 10px 0;"><strong>Your site is running on nginx.</strong> When you change the Permalink Base or Destination Page setting, you must also update your nginx configuration file with the new rewrite rules.</p>
-						<p style="margin: 0 0 10px 0; font-size: 13px; color: #6c757d;">
-							Current permalink base: <code><?php echo esc_html( $permabase ); ?></code>
-							<?php if ( !empty( $fmc_settings['destlink'] ) ): ?>
-								<br>Current destination page ID: <code><?php echo esc_html( $fmc_settings['destlink'] ); ?></code>
-							<?php endif; ?>
-						</p>
+						<p style="margin: 0 0 15px 0; color: #004085;"><strong>Your site is running on nginx.</strong> This is just informational - you may not need to make any changes!</p>
 					<?php endif; ?>
 					
+					<div style="background: #d4edda; padding: 15px; margin: 0 0 15px 0; border: 1px solid #c3e6cb; border-radius: 4px;">
+						<h5 style="margin: 0 0 10px 0; color: #155724;">🧪 First, Test Your URLs</h5>
+						<p style="margin: 0 0 10px 0; color: #155724; font-size: 14px;">Before making any nginx changes, test if your IDX URLs are working:</p>
+						<ol style="margin: 0 0 10px 0; padding-left: 20px; color: #155724;">
+							<li><strong>Test search page:</strong> <a href="<?php echo esc_url( $test_url ); ?>" target="_blank" style="color: #155724; text-decoration: underline;"><?php echo esc_html( $test_url ); ?></a></li>
+							<li><strong>Check if listings appear</strong> on the search page</li>
+							<li><strong>If no listings show</strong> → Try enabling "Allow multiple summary lists per page" setting above</li>
+							<li><strong>Click on a listing</strong> to see if the detail page loads</li>
+							<li><strong>If both work</strong> → You don't need to change anything! 🎉</li>
+							<li><strong>If you get 404 errors</strong> → You may need nginx configuration (see below)</li>
+						</ol>
+						<p style="margin: 0; color: #155724; font-size: 13px; font-style: italic;">Many hosting providers already have nginx configured correctly for WordPress permalinks.</p>
+					</div>
+					
 					<details style="margin: 10px 0;">
-						<summary style="cursor: pointer; font-weight: bold; color: <?php echo $recently_changed ? '#721c24' : '#856404'; ?>;">Show nginx Configuration Rules</summary>
+						<summary style="cursor: pointer; font-weight: bold; color: #004085;">🔧 nginx Configuration (Only if URLs don't work)</summary>
 						<div style="margin-top: 15px;">
-							<p>Add these rules to your nginx server block configuration file:</p>
+							<div style="background: #f8f9fa; padding: 12px; margin: 0 0 15px 0; border: 1px solid #dee2e6; border-radius: 4px;">
+								<p style="margin: 0 0 8px 0; color: #495057; font-weight: bold;">⚠️ Important Notes:</p>
+								<ul style="margin: 0; padding-left: 20px; color: #495057; font-size: 13px;">
+									<li>Only needed if your IDX URLs return 404 errors</li>
+									<li>Many shared hosting providers don't allow nginx config changes</li>
+									<li>Contact your hosting provider if you can't access nginx configuration</li>
+								</ul>
+							</div>
+							
+							<p style="margin: 0 0 10px 0; color: #495057;">If your test URLs don't work, add these rules to your nginx server block configuration file:</p>
 							<div style="position: relative;">
 								<textarea id="nginx-permabase-config" readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 11px; background: #fff; border: 1px solid #ddd; padding: 10px; resize: vertical;"><?php echo esc_textarea( $rules_text ); ?></textarea>
 								<button type="button" onclick="copyNginxPermabaseConfig()" style="position: absolute; top: 10px; right: 10px; background: #0073aa; color: white; border: none; padding: 6px 10px; border-radius: 3px; cursor: pointer; font-size: 11px;">Copy</button>
@@ -367,22 +425,25 @@ class NginxCompatibility {
 								}, 2000);
 							}
 							</script>
+							
+							<div style="background: #d1ecf1; padding: 12px; margin: 15px 0; border: 1px solid #bee5eb; border-radius: 4px;">
+								<h6 style="margin: 0 0 8px 0; color: #0c5460;">Steps to Update nginx (if needed):</h6>
+								<ol style="margin: 0; padding-left: 20px; color: #0c5460; font-size: 13px;">
+									<li>Add the rules above to your nginx configuration file</li>
+									<li>Test configuration: <code>nginx -t</code></li>
+									<li>Reload nginx: <code>systemctl reload nginx</code></li>
+									<li>Clear any caching plugins</li>
+									<li>Test your URLs again</li>
+								</ol>
+							</div>
 						</div>
 					</details>
 					
-					<div style="background: #d1ecf1; padding: 10px; margin: 10px 0; border: 1px solid #bee5eb; border-radius: 4px;">
-						<h5 style="margin: 0 0 8px 0; color: #0c5460;">📋 Steps to Update nginx:</h5>
-						<ol style="margin: 0; padding-left: 20px; color: #0c5460;">
-							<li>Add the rules above to your nginx configuration file</li>
-							<li>Test configuration: <code>nginx -t</code></li>
-							<li>Reload nginx: <code>systemctl reload nginx</code></li>
-							<li>Clear any caching plugins</li>
-						</ol>
+					<div style="background: #fff3cd; padding: 12px; margin: 15px 0 0 0; border: 1px solid #ffeaa7; border-radius: 4px;">
+						<p style="margin: 0; color: #856404; font-size: 13px;">
+							<strong>Need help?</strong> If you can't access nginx configuration or need assistance, contact your hosting provider.
+						</p>
 					</div>
-					
-					<p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">
-						<strong>Need help?</strong> Contact your hosting provider or system administrator to update your nginx configuration.
-					</p>
 				</div>
 			</details>
 		</div>
@@ -484,14 +545,14 @@ class NginxCompatibility {
 			'is_nginx' => self::is_nginx(),
 			'is_apache' => function_exists( 'apache_get_modules' ),
 			'permalinks_enabled' => get_option( 'permalink_structure' ) !== '',
-			'nginx_headers' => array()
+			'nginx_headers' => array(),
+			'litespeed_headers' => array(),
+			'proxy_headers' => array(),
+			'server_indicators' => array()
 		);
 
 		// Check for nginx-specific headers
 		$nginx_headers = array(
-			'HTTP_X_FORWARDED_FOR',
-			'HTTP_X_REAL_IP',
-			'HTTP_X_FORWARDED_PROTO',
 			'HTTP_X_NGINX_PROXY',
 			'HTTP_X_NGINX_UPSTREAM',
 			'HTTP_X_NGINX_CACHE',
@@ -501,6 +562,51 @@ class NginxCompatibility {
 		foreach ( $nginx_headers as $header ) {
 			if ( isset( $_SERVER[ $header ] ) ) {
 				$info['nginx_headers'][ $header ] = $_SERVER[ $header ];
+			}
+		}
+
+		// Check for LiteSpeed-specific headers
+		$litespeed_headers = array(
+			'LSWS_EDITION',
+			'HTTP_X_LITESPEED_CACHE'
+		);
+
+		foreach ( $litespeed_headers as $header ) {
+			if ( isset( $_SERVER[ $header ] ) ) {
+				$info['litespeed_headers'][ $header ] = $_SERVER[ $header ];
+			}
+		}
+
+		// Check for generic proxy headers (for debugging purposes)
+		$proxy_headers = array(
+			'HTTP_X_FORWARDED_FOR',
+			'HTTP_X_REAL_IP',
+			'HTTP_X_FORWARDED_PROTO'
+		);
+
+		foreach ( $proxy_headers as $header ) {
+			if ( isset( $_SERVER[ $header ] ) ) {
+				$info['proxy_headers'][ $header ] = $_SERVER[ $header ];
+			}
+		}
+
+		// Check for server-specific indicators
+		$server_indicators = array(
+			'LSWS_EDITION',
+			'HTTP_X_LITESPEED_CACHE',
+			'IIS',
+			'Microsoft-IIS',
+			'TOMCAT_HOME',
+			'CATALINA_HOME',
+			'JETTY_HOME',
+			'CADDY_HOME',
+			'LIGHTTPD_HOME',
+			'NGINX_VERSION'
+		);
+
+		foreach ( $server_indicators as $indicator ) {
+			if ( isset( $_SERVER[ $indicator ] ) ) {
+				$info['server_indicators'][ $indicator ] = $_SERVER[ $indicator ];
 			}
 		}
 

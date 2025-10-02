@@ -5,10 +5,10 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.15.4
+Version: 3.15.5
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
-Tested up to: 6.8
+Tested up to: 6.8.3
 Requires PHP: 7.4
 */
 
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.15.4';
+const FMC_PLUGIN_VERSION = '3.15.5';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 

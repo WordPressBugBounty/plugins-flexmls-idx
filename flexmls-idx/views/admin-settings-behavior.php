@@ -319,22 +319,6 @@ add_thickbox();
     </table>
     <?php endif; ?>
     
-    <?php
-    // Display red warning message for nginx users about copying config and saving changes
-    if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
-        ?>
-        <div style="background: #f8d7da; padding: 15px; margin: 20px 0; border: 1px solid #f5c6cb; border-radius: 4px;">
-            <p style="margin: 0; color: #721c24; font-size: 14px; font-weight: bold;">
-                ⚠️ <strong>Important:</strong> If you see nginx configuration blocks above, you must:
-            </p>
-            <ol style="margin: 10px 0 0 0; padding-left: 20px; color: #721c24; font-size: 13px;">
-                <li><strong>Copy the nginx configuration block</strong> and add it to your nginx server configuration file</li>
-                <li><strong>Click "Save Settings" button below</strong> to save your changes to this page</li>
-            </ol>
-        </div>
-        <?php
-    }
-    ?>
     
     <p><?php wp_nonce_field( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
 </form>
@@ -346,10 +330,26 @@ jQuery(document).ready(function($) {
 	var nginxConfigTextarea = null;
 	var currentValuesContainer = null;
 	
+	// Auto-expand nginx guidance section if URL contains the anchor
+	if (window.location.hash === '#nginx-configuration-guidance') {
+		// Wait a moment for the page to fully load, then expand the nginx guidance
+		setTimeout(function() {
+			var nginxGuidance = $('#nginx-configuration-guidance');
+			if (nginxGuidance.length > 0) {
+				var details = nginxGuidance.find('details');
+				if (details.length > 0 && !details.attr('open')) {
+					details.attr('open', 'open');
+					// Scroll to the section
+					nginxGuidance[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}
+			}
+		}, 100);
+	}
+	
 	// Function to update nginx configuration and current values via AJAX
 	function updateNginxConfig(permabase, destlink) {
 		// Only make AJAX call if nginx warning exists
-		var nginxWarning = $('.nginx-permabase-warning');
+		var nginxWarning = $('.nginx-permabase-guidance');
 		if (nginxWarning.length === 0) {
 			return;
 		}
@@ -403,7 +403,7 @@ jQuery(document).ready(function($) {
 	// Show nginx warning when permalink base field is focused or changed
 	$('#permabase').on('focus change input', function() {
 		var currentValue = $(this).val();
-		var nginxWarning = $(this).closest('td').find('.nginx-permabase-warning');
+		var nginxWarning = $(this).closest('td').find('.nginx-permabase-guidance');
 		
 		// If nginx warning exists and value has changed, show a note and expand the warning
 		if (nginxWarning.length > 0 && currentValue !== originalPermabase) {
@@ -415,7 +415,7 @@ jQuery(document).ready(function($) {
 			
 			// Add the change notice only to the first nginx warning container if it doesn't exist
 			if (!$('.value-changed-notice').length) {
-				$('.nginx-permabase-warning').first().find('> details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
+				$('.nginx-permabase-guidance').first().find('> details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
 			}
 			
 			// Update nginx configuration in real-time
@@ -427,7 +427,7 @@ jQuery(document).ready(function($) {
 	// Hide the note when value is reverted to original
 	$('#permabase').on('input', function() {
 		var currentValue = $(this).val();
-		var nginxWarning = $(this).closest('td').find('.nginx-permabase-warning');
+		var nginxWarning = $(this).closest('td').find('.nginx-permabase-guidance');
 		
 		if (currentValue === originalPermabase) {
 			$('.value-changed-notice').remove();
@@ -446,7 +446,7 @@ jQuery(document).ready(function($) {
 	// Show nginx warning when destination page is changed
 	$('select[name="fmc_settings[destlink]"]').on('change', function() {
 		var currentValue = $(this).val();
-		var nginxWarning = $('.nginx-permabase-warning');
+		var nginxWarning = $('.nginx-permabase-guidance');
 		
 		// If nginx warning exists and value has changed, show a note and expand the warning
 		if (nginxWarning.length > 0 && currentValue !== originalDestlink) {
@@ -458,7 +458,7 @@ jQuery(document).ready(function($) {
 			
 			// Add the change notice only to the first nginx warning container if it doesn't exist
 			if (!$('.value-changed-notice').length) {
-				$('.nginx-permabase-warning').first().find('> details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
+				$('.nginx-permabase-guidance').first().find('> details > div').prepend('<div class="value-changed-notice" style="background: #d4edda; padding: 8px; margin-bottom: 10px; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724; font-size: 13px;"><strong>Note:</strong> You will need to update your nginx configuration after saving this change.</div>');
 			}
 			
 			// Update nginx configuration in real-time

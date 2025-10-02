@@ -2,9 +2,9 @@
 Tags: flexmls, IDX, MLS search
 Contributors: flexmls
 Requires at least: 5.0
-Tested up to: 6.8.2
+Tested up to: 6.8.3
 Requires PHP: 7.4
-Stable tag: 3.15.4
+Stable tag: 3.15.5
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -83,8 +83,11 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 ###<a href="https://fbsidx.com/help" target="_blank">Help Center</a>###
 
 
-
 == Changelog ==
+= 3.15.5 =
+Efficiency Update
+* Adjustments made to the nginx description, testing procedures, and configuration steps.
+
 = 3.15.4 =
 Efficiency Update
 * Ajax improvements to the nginx configuration block under Behavior settings
