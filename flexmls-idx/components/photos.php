@@ -200,7 +200,7 @@ class fmcPhotos extends fmcWidget {
       $params['_orderby'] = "YearBuilt";
     }
 
-    $pure_conditions['OrderBy'] = ($params['_orderby']) ? $params['_orderby'] : 'natural';
+    $pure_conditions['OrderBy'] = isset($params['_orderby']) && $params['_orderby'] ? $params['_orderby'] : 'natural';
     $pure_conditions['Limit'] = $params['_limit'];
 
     $api_system_info = $fmc_api->GetSystemInfo();
@@ -251,6 +251,7 @@ class fmcPhotos extends fmcWidget {
       $filter_conditions[] = "SavedSearch Eq '{$link_details['SearchId']}'";
     }
 
+
     $params['_filter'] = implode(" And ", $filter_conditions);
     $params['_select'] = 'MlsId,ListPrice,ListOfficeId,ListOfficeName,OpenHouses,BedsTotal,BathsTotal,
       BuildingAreaTotal,LivingArea,ListingKey,Photos,ListingId,SubdivisionName,PublicRemarks,UnparsedFirstLineAddress,
@@ -289,11 +290,19 @@ class fmcPhotos extends fmcWidget {
 
     $pure_conditions['pg'] = array_key_exists('_page', $params) ? $params['_page'] : 1;
 
-    if ($fmc_api->last_count == 1) {
+    // Create a separate conditions array for the hyperlink that excludes the Limit parameter
+    // This prevents the slideshow dimensions from limiting the "(number) Listings" hyperlink
+    $hyperlink_conditions = $pure_conditions;
+    unset($hyperlink_conditions['Limit']);
+
+    $last_count = $fmc_api->last_count;
+    if ($last_count == 1) {
       $show_count = "1 Listing";
     }
     else {
-      $show_count = number_format($fmc_api->last_count) . " Listings";
+      // Ensure last_count is a valid number before formatting
+      $last_count = is_numeric($last_count) ? $last_count : 0;
+      $show_count = number_format($last_count) . " Listings";
     }
 
     $api_page_size = $fmc_api->page_size;
@@ -309,7 +318,7 @@ class fmcPhotos extends fmcWidget {
     $full_search_destination_link = null;
 
     if ($destination == 'local') {
-      $full_search_destination_link = flexmlsConnect::make_nice_tag_url('search', $pure_conditions );
+      $full_search_destination_link = flexmlsConnect::make_nice_tag_url('search', $hyperlink_conditions );
       $listing_destination_link = $full_search_destination_link;
     }
     else {
@@ -428,10 +437,10 @@ class fmcPhotos extends fmcWidget {
 
         $this_result_overall_index = ($api_page_size * ($api_current_page - 1)) + $result_count;
         // figure out if there's a previous listing
-        $pure_conditions['p'] = ($this_result_overall_index != 1) ? 'y' : 'n';
+        $hyperlink_conditions['p'] = ($this_result_overall_index != 1) ? 'y' : 'n';
 
         // figure out if there's a next listing possible
-        $pure_conditions['n'] = ( $this_result_overall_index < $api_last_count ) ? 'y' : 'n';
+        $hyperlink_conditions['n'] = ( $this_result_overall_index < $api_last_count ) ? 'y' : 'n';
 
         $total_listings++;
         $show_idx_badge = "";
@@ -439,7 +448,7 @@ class fmcPhotos extends fmcWidget {
         $listing = $li['StandardFields'];
 
         //Get MlsId for MLS IDX Share Listings
-        $pure_conditions['m'] = $listing['MlsId'];
+        $hyperlink_conditions['m'] = $listing['MlsId'];
 
         $listing_address = flexmlsConnect::format_listing_street_address($li);
         $first_line_address = $listing_address[0];
@@ -471,7 +480,7 @@ class fmcPhotos extends fmcWidget {
 
         if ($source != "my" and $source != "my_office" and flexmlsConnect::get_office_id() != $listing['ListOfficeId'] ) {
           if (array_key_exists('IdxLogoSmall', $api_system_info['Configuration'][0]) && !empty($api_system_info['Configuration'][0]['IdxLogoSmall'])) {
-            $show_idx_badge = "<img src='{$api_system_info['Configuration'][0]['IdxLogoSmall']}' class='flexmls_connect__badge_image' title='{$listing['ListOfficeName']}' />";
+            $show_idx_badge = "<img src='{$api_system_info['Configuration'][0]['IdxLogoSmall']}' class='flexmls_connect__badge_image' title='{$listing['ListOfficeName']}' alt='IDX Logo' />";
           }
           else {
             $show_idx_badge = "<span class='flexmls_connect__badge' title='{$listing['ListOfficeName']}'>IDX</span>";
@@ -535,7 +544,7 @@ class fmcPhotos extends fmcWidget {
           $this_target = null;
 
           if ($destination == 'local') {
-            $this_link = flexmlsConnect::make_nice_address_url($li, $pure_conditions);
+            $this_link = flexmlsConnect::make_nice_address_url($li, $hyperlink_conditions);
           }
           else {
             $this_link = flexmlsConnect::make_destination_link("{$listing_destination_link}&start=details&start_id={$listing['ListingKey']}");
@@ -667,21 +676,21 @@ class fmcPhotos extends fmcWidget {
 
       if ($total_listings > 0) {
         $return .= "<div class='flexmls_connect__carousel_nav clearfix'>
-                <a href='#' class='previous'>previous</a>
-                <a href='#' class='next'>next</a>
+                <a href='#' class='previous' role='button'>previous</a>
+                <a href='#' class='next' role='button'>next</a>
               </div>";
 
         if ($source != "my" && $source != "my_office") {
           $return .= "<p class='flexmls_connect__disclaimer'>";
 
           if (array_key_exists('IdxLogoSmall', $api_system_info['Configuration'][0]) && !empty($api_system_info['Configuration'][0]['IdxLogoSmall'])) {
-            $return .= "<img src='{$api_system_info['Configuration'][0]['IdxLogoSmall']}' class='flexmls_connect__badge_image' title='Read the full IDX Listings Disclosure' />";
+            $return .= "<img src='{$api_system_info['Configuration'][0]['IdxLogoSmall']}' class='flexmls_connect__badge_image' title='Read the full IDX Listings Disclosure' alt='IDX Logo' />";
           }
           else {
             $return .= "  <span class='flexmls_connect__badge' title='Read the full IDX Listings Disclosure'>IDX</span>";
           }
 
-          $return .= "  <a title='Read the full IDX Listings Disclosure'>MLS IDX Listing Disclosure &copy; ".date("Y")."</a>";
+          $return .= "  <a title='Read the full IDX Listings Disclosure' role='button'>MLS IDX Listing Disclosure &copy; ".date("Y")."</a>";
           $return .= "</p>";
           $return .= "<p class='flexmls_connect__hidden flexmls_connect__disclaimer_text'>";
           $return .= $api_system_info['Configuration'][0]['IdxDisclaimer'];
@@ -1271,7 +1280,7 @@ class fmcPhotos extends fmcWidget {
     $instance['agent'] = strip_tags($new_instance['agent']);
     $instance['send_to'] = strip_tags($new_instance['send_to']);
     $additional_fields_selected = "";
-    if (is_array($new_instance['additional_fields'])) {
+    if (isset($new_instance['additional_fields']) && is_array($new_instance['additional_fields'])) {
       foreach ($new_instance['additional_fields'] as $v) {
         if (!empty($additional_fields_selected)) {
           $additional_fields_selected .= ",";
@@ -1374,9 +1383,10 @@ class fmcPhotos extends fmcWidget {
 
     // these get parsed from the sent AJAX response
     $settings = json_decode($settings_string, true);
+    $settings = is_array($settings) ? $settings : array();
 
-    $horizontal = $settings['horizontal'];
-    $vertical = $settings['vertical'];
+    $horizontal = isset($settings['horizontal']) && is_numeric($settings['horizontal']) ? (int) $settings['horizontal'] : 3;
+    $vertical = isset($settings['vertical']) && is_numeric($settings['vertical']) ? (int) $settings['vertical'] : 3;
 
     $total_listings_to_show = ($horizontal * $vertical);
     if ($total_listings_to_show > 25) {

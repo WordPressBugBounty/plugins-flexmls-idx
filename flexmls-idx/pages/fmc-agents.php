@@ -18,9 +18,13 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
     global $fmc_plugin_url;
     //Need to get all search criteria here.
     $this->api_my_account = $fmc_api->GetMyAccount();
+    if ( ! is_array( $this->api_my_account ) ) {
+      $this->api_my_account = array();
+    }
 
     $params = $this->get_search_data();
-    $this->fmc_accounts = $fmc_api->GetAccounts($params);
+    $accounts = $fmc_api->GetAccounts($params);
+    $this->fmc_accounts = is_array( $accounts ) ? $accounts : array();
     $this->total_pages = $fmc_api->total_pages;
     $this->current_page = $fmc_api->current_page;
     $this->total_rows = $fmc_api->last_count;
@@ -35,8 +39,9 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
 
     ob_start();
 
-    if (isset($this->settings['title']))
+    if ( is_array( $this->settings ) && isset( $this->settings['title'] ) ) {
       echo "<h2>".$this->settings['title']."</h2>";
+    }
 
     $this->print_search_box();
 
@@ -49,10 +54,14 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
 
     <?php
     $plural = ($this->total_rows==1 ? "":"s");
-    if (isset($this->search_criteria['office_search'] )){
+    $search_criteria = is_array( $this->search_criteria ) ? $this->search_criteria : array();
+    if ( isset( $search_criteria['office_search'] ) && ! empty( $this->fmc_accounts ) && isset( $this->fmc_accounts[0]['Office'] ) ) {
       echo "Agent".$plural." in <b>".$this->fmc_accounts[0]['Office']."</b>";
     }
-    elseif (($this->search_criteria['search_type']=='offices')){
+    elseif ( isset( $search_criteria['office_search'] ) ) {
+      echo "Agent".$plural." Found";
+    }
+    elseif ( isset( $search_criteria['search_type'] ) && $search_criteria['search_type'] == 'offices' ) {
       echo "Office".$plural." Found";
     }
     else {
@@ -81,9 +90,10 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
   * @return void
   */
   function print_search_box(){
-
-    if ($this->settings['search']!='true')
+    $settings = is_array( $this->settings ) ? $this->settings : array();
+    if ( empty( $settings['search'] ) || $settings['search'] !== 'true' ) {
       return;
+    }
 
     ?>
     <form method="get" action="#">
@@ -92,12 +102,12 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
         <br />
         <span style='padding:8px'>
           <input name=search_type
-          <?php if ($this->search_criteria['search_type']=='offices') print " checked=checked "; ?>
+          <?php if ( is_array( $this->search_criteria ) && isset( $this->search_criteria['search_type'] ) && $this->search_criteria['search_type'] === 'offices' ) print " checked=checked "; ?>
             value=offices type="radio" /> Offices
         </span>
         <span style='padding:8px'>
           <input name=search_type
-          <?php if ($this->search_criteria['search_type']=='agents') print " checked=checked "; ?>
+          <?php if ( is_array( $this->search_criteria ) && isset( $this->search_criteria['search_type'] ) && $this->search_criteria['search_type'] === 'agents' ) print " checked=checked "; ?>
             value=agents type="radio" /> Agents
         </span>
         <br />
@@ -126,14 +136,15 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
     $fmc_agent_name = $agent['Name'];
 
 
-    if ($agent['Name'] != $agent['Office'])
-      $fmc_agent_office = utf8_decode($agent['Office']);
-    else
-      $fmc_agent_office = utf8_decode($agent['Mls']);
+    if ( isset( $agent['Name'], $agent['Office'] ) && $agent['Name'] != $agent['Office'] ) {
+      $fmc_agent_office = function_exists( 'mb_convert_encoding' ) ? mb_convert_encoding( (string) $agent['Office'], 'ISO-8859-1', 'UTF-8' ) : (string) $agent['Office'];
+    } else {
+      $fmc_agent_office = isset( $agent['Mls'] ) && function_exists( 'mb_convert_encoding' ) ? mb_convert_encoding( (string) $agent['Mls'], 'ISO-8859-1', 'UTF-8' ) : ( isset( $agent['Mls'] ) ? (string) $agent['Mls'] : '' );
+    }
 
     //Phone
     $fmc_agent_phone=false;
-    if (is_array($agent['Phones'])){
+    if ( isset( $agent['Phones'] ) && is_array( $agent['Phones'] ) ) {
       foreach ($agent['Phones'] as $fmc_agent_phone2){
         if ($fmc_agent_phone2['Primary']){
           $fmc_agent_phone = $fmc_agent_phone2['Number'];
@@ -262,8 +273,7 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
 
 
   function make_pagination_link($page) {
-
-      $page_conditions = $this->search_criteria;
+      $page_conditions = is_array( $this->search_criteria ) ? $this->search_criteria : array();
       $page_conditions['pg'] = $page;
       return get_permalink() . '?' . http_build_query($page_conditions);
   }
@@ -272,12 +282,17 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
   * Sets api parameters for GetAccounts for the agent/office search widget
   */
   function get_search_data(){
+    if ( ! is_array( $this->search_criteria ) ) {
+      $this->search_criteria = array();
+    }
 
     $custom_search = array();   //The parameters which will get returned
     $filter_conditions = array();   //The filter conditions for the search (Will get seperated by And)
 
     //If current user has chosen a search type, use that
     $fmc_office_id = flexmlsConnect::wp_input_get_post('office_search');
+    $api_my_account = is_array( $this->api_my_account ) ? $this->api_my_account : array();
+    $settings = is_array( $this->settings ) ? $this->settings : array();
 
     /* Find User Type  */
     //If an Office link was clicked on, show members in that office
@@ -286,10 +301,10 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
       $filter_conditions[]="UserType Eq 'Member'";
       $filter_conditions[]="OfficeId Eq '$fmc_office_id'";
     }
-    elseif ($this->api_my_account['UserType'] != 'Office') {
+    elseif ( isset( $api_my_account['UserType'] ) && $api_my_account['UserType'] != 'Office' ) {
       $this->search_criteria['search_type'] = flexmlsConnect::wp_input_get_post('search_type');
       if (!isset($this->search_criteria['search_type'])){
-        $this->search_criteria['search_type']=$this->settings['search_type'];
+        $this->search_criteria['search_type'] = isset( $settings['search_type'] ) ? $settings['search_type'] : 'agents';
       }
       switch($this->search_criteria['search_type']){
         case "agents":
@@ -306,7 +321,8 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
     }
     else {
       $filter_conditions[]="UserType Eq 'Member'";
-      $filter_conditions[]="OfficeId Eq '{$this->api_my_account['OfficeId']}'";
+      $office_id = isset( $api_my_account['OfficeId'] ) ? $api_my_account['OfficeId'] : '';
+      $filter_conditions[]="OfficeId Eq '{$office_id}'";
     }
     /* End Find User Type  */
 

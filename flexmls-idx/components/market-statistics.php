@@ -481,14 +481,16 @@
         function update($new_instance, $old_instance) {
             $instance = $old_instance;
 
-            $instance['title'] = strip_tags($new_instance['title']);
-            $instance['width'] = strip_tags($new_instance['width']);
-            $instance['height'] = strip_tags($new_instance['height']);
-            $instance['chart_type'] = strip_tags($new_instance['chart_type']);
-            $instance['type'] = strip_tags($new_instance['type']);
-            $instance['property_type'] = strip_tags($new_instance['property_type']);
-            $instance['display'] = implode(",", array_map('strip_tags', $new_instance['display']));
-            $instance['location'] = strip_tags($new_instance['location']);
+            $instance['title'] = isset($new_instance['title']) ? strip_tags($new_instance['title']) : ($instance['title'] ?? '');
+            $instance['width'] = isset($new_instance['width']) ? strip_tags($new_instance['width']) : ($instance['width'] ?? '');
+            $instance['height'] = isset($new_instance['height']) ? strip_tags($new_instance['height']) : ($instance['height'] ?? '');
+            $instance['chart_type'] = isset($new_instance['chart_type']) ? strip_tags($new_instance['chart_type']) : ($instance['chart_type'] ?? '');
+            $instance['type'] = isset($new_instance['type']) ? strip_tags($new_instance['type']) : ($instance['type'] ?? '');
+            $instance['property_type'] = isset($new_instance['property_type']) ? strip_tags($new_instance['property_type']) : ($instance['property_type'] ?? '');
+            $instance['display'] = (isset($new_instance['display']) && is_array($new_instance['display']))
+                ? implode(",", array_map('strip_tags', $new_instance['display']))
+                : ($instance['display'] ?? '');
+            $instance['location'] = isset($new_instance['location']) ? strip_tags($new_instance['location']) : ($instance['location'] ?? '');
 
             return $instance;
         }

@@ -41,13 +41,25 @@ class fmcLeadGen extends fmcWidget {
       $settings['title'] = "Lead Generation";
     }
 
-    $api_prefs = $fmc_api->GetPreferences();
-
-    if ($api_prefs === false) {
+    // Check if API credentials are available before making API calls
+    $fmc_settings = get_option( 'fmc_settings' );
+    if ( empty( $fmc_settings['api_key'] ) || empty( $fmc_settings['api_secret'] ) ) {
       return flexmlsConnect::widget_not_available($fmc_api, false, $args, $settings);
     }
 
-    if (!array_key_exists('RequiredFields', $api_prefs)) {
+    // Attempt API call to capture actual error codes (like 1010 for disabled key)
+    $api_prefs = $fmc_api->GetPreferences();
+
+    // Check if API is actually working - GetPreferences returns false when API is unavailable
+    // Also check if we got a valid response (should have at least some preference keys)
+    if ($api_prefs === false || !is_array($api_prefs)) {
+      // Error code should now be set in $fmc_api->last_error_code from the API call
+      return flexmlsConnect::widget_not_available($fmc_api, false, $args, $settings);
+    }
+
+    // Ensure api_prefs is an array and RequiredFields exists and is an array
+    if (!is_array($api_prefs) || !isset($api_prefs['RequiredFields']) || !is_array($api_prefs['RequiredFields'])) {
+      $api_prefs = is_array($api_prefs) ? $api_prefs : array();
       $api_prefs['RequiredFields'] = array();
     }
 
@@ -138,11 +150,9 @@ class fmcLeadGen extends fmcWidget {
     $success = true;
     $message = "";
 
-    if (is_array($api_prefs) && !array_key_exists('RequiredFields', $api_prefs)) {
-      $api_prefs['RequiredFields'] = array();
-    }
-
-    if (is_array($api_prefs) && !is_array($api_prefs['RequiredFields'])) {
+    // Ensure api_prefs is an array and RequiredFields exists and is an array
+    if (!is_array($api_prefs) || !isset($api_prefs['RequiredFields']) || !is_array($api_prefs['RequiredFields'])) {
+      $api_prefs = is_array($api_prefs) ? $api_prefs : array();
       $api_prefs['RequiredFields'] = array();
     }
 

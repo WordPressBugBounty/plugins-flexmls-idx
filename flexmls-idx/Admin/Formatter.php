@@ -6,8 +6,14 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 class Formatter {
 
 	static function build_address_url( $record, $params = array(), $type = 'fmc_tag' ){
+		if ( ! is_array( $record ) || ! isset( $record['StandardFields']['ListingId'] ) ) {
+			return '';
+		}
 		$address = self::format_listing_street_address( $record );
-		$return = $address[ 0 ] . '-' . $address[ 1 ] . '-mls_' . $record[ 'StandardFields' ][ 'ListingId' ];
+		if ( ! is_array( $address ) || ! isset( $address[0], $address[1] ) ) {
+			return '';
+		}
+		$return = $address[0] . '-' . $address[1] . '-mls_' . $record['StandardFields']['ListingId'];
 		//$return = preg_replace( '/[^\w]/', '-', $return );
 		$return = sanitize_title_with_dashes( $return );
 		while( preg_match( '/\-\-/', $return ) ){
@@ -68,8 +74,9 @@ class Formatter {
 	}
 
 	static function clean_comma_list( $var ){
+		$var = ( $var !== null && $var !== '' ) ? (string) $var : '';
 		$return = '';
-		if( false !== strpos( $var, ',' ) ){
+		if ( '' !== $var && false !== strpos( $var, ',' ) ) {
 			// $var contains a comma so break it apart into a list...
 			$list = explode( ',', $var );
 			$list = array_map( 'sanitize_text_field', $list );
@@ -81,19 +88,23 @@ class Formatter {
 	}
 
 	static function format_listing_street_address( $record ){
-		$first_line_address = self::is_not_blank_or_restricted( $record[ 'StandardFields' ][ 'UnparsedFirstLineAddress' ] ) ? sanitize_text_field( $record[ 'StandardFields' ][ 'UnparsedFirstLineAddress' ] ) : '';
+		if ( ! is_array( $record ) || ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
+			return array( '', '', '' );
+		}
+		$sf = $record['StandardFields'];
+		$first_line_address = isset( $sf['UnparsedFirstLineAddress'] ) && self::is_not_blank_or_restricted( $sf['UnparsedFirstLineAddress'] ) ? sanitize_text_field( $sf['UnparsedFirstLineAddress'] ) : '';
 		$second_line_address = array();
 
-		if( self::is_not_blank_or_restricted( $record[ 'StandardFields' ][ 'City' ] ) ){
-			$second_line_address[] = sanitize_text_field( $record[ 'StandardFields' ][ 'City' ] );
+		if ( isset( $sf['City'] ) && self::is_not_blank_or_restricted( $sf['City'] ) ) {
+			$second_line_address[] = sanitize_text_field( $sf['City'] );
 		}
-		if( self::is_not_blank_or_restricted( $record[ 'StandardFields' ][ 'StateOrProvince' ] ) ){
-			$second_line_address[] = sanitize_text_field( $record[ 'StandardFields' ][ 'StateOrProvince' ] );
+		if ( isset( $sf['StateOrProvince'] ) && self::is_not_blank_or_restricted( $sf['StateOrProvince'] ) ) {
+			$second_line_address[] = sanitize_text_field( $sf['StateOrProvince'] );
 		}
 		$second_line_address = implode( ', ', $second_line_address );
 		$second_line_address = array( $second_line_address );
-		if( self::is_not_blank_or_restricted( $record[ 'StandardFields' ][ 'StateOrProvince' ] ) ){
-			$second_line_address[] = sanitize_text_field( $record[ 'StandardFields' ][ 'PostalCode' ] );
+		if ( isset( $sf['StateOrProvince'] ) && self::is_not_blank_or_restricted( $sf['StateOrProvince'] ) && isset( $sf['PostalCode'] ) ) {
+			$second_line_address[] = sanitize_text_field( $sf['PostalCode'] );
 		}
 		$second_line_address = implode( ' ', $second_line_address );
 

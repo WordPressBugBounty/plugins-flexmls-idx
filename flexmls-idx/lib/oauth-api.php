@@ -96,11 +96,21 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
   function user_start_time(){
     if ($this->is_logged_in() and isset($_COOKIE['user_start_time'])){
         //mark cookie for deletion
-        setcookie ("user_start_time", "", time() - 3600);
+        if( !headers_sent() ){
+			setcookie( "user_start_time", "", array(
+				'expires' => time() - 3600,
+				'path' => '/',
+				'samesite' => 'Lax'
+			) );
+		}
         return NULL;
     }
     else if (!isset($_COOKIE['user_start_time']) and (!headers_sent())){
-      setcookie('user_start_time', time() ,time()+60*60*24*30);
+      setcookie( 'user_start_time', time(), array(
+		  'expires' => time() + 60*60*24*30,
+		  'path' => '/',
+		  'samesite' => 'Lax'
+	  ) );
     }
     return isset($_COOKIE['user_start_time']) ? $_COOKIE['user_start_time'] : time();
   }
@@ -139,7 +149,13 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
   * Does NOT delete any cookies which may exist.
   */
 	public function log_out(){
-		setcookie( 'spark_oauth', json_encode( array() ), time() - DAY_IN_SECONDS, '/' );
+		if( !headers_sent() ){
+			setcookie( 'spark_oauth', json_encode( array() ), array(
+				'expires' => time() - DAY_IN_SECONDS,
+				'path' => '/',
+				'samesite' => 'Lax'
+			) );
+		}
 		$OAuth = new \SparkAPI\OAuth();
 		//$OAuth->log_out();
 		$request = $OAuth->sign_request( array(
@@ -185,9 +201,16 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
     global $fmc_api;
     $options = get_option('fmc_settings');
     $Name = $fmc_api->GetPortal();
+    
+    // Handle case when API key is disabled or GetPortal() returns false/null
+    $portal_name = '';
+    if (is_array($Name) && !empty($Name) && isset($Name[0]['Name'])) {
+      $portal_name = $Name[0]['Name'];
+    }
+    
     //$raw_state = "http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
     $protocol = (is_ssl()) ? 'https' : 'http';
-    $raw_state = parse_url("$protocol://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]");
+    $raw_state = parse_url("$protocol://" . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''));
     if ($page_override != null and count($additional_state_params)>0){
       $raw_state = parse_url($page_override);
     }
@@ -204,7 +227,7 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
       $state = $page[0].'?'.$raw_state['query'];
     }
     else
-      $state = "$protocol://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+      $state = "$protocol://" . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '');
 
     $page_conditions = array(
       'response_type' =>'code',
@@ -212,7 +235,10 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
       'redirect_uri' => $this->redirect_uri(),
       'state' => $state,
     );
-    $main_link = "https://portal.flexmls.com/r/login/".$Name[0]['Name'];
+    $main_link = "https://portal.flexmls.com/r/login/";
+    if (!empty($portal_name)) {
+      $main_link .= $portal_name;
+    }
     if ($signup)
       $main_link.='/signup/';
     return $main_link . '?' . http_build_query($page_conditions);
@@ -291,7 +317,13 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 				'last_token' => $response[ 'access_token' ],
 				'refresh_token' => $response[ 'refresh_token' ]
 			);
-			setcookie( 'spark_oauth', json_encode( $spark_oauth_global ), time() + 30 * DAY_IN_SECONDS, '/' );
+			if( !headers_sent() ){
+				setcookie( 'spark_oauth', json_encode( $spark_oauth_global ), array(
+					'expires' => time() + 30 * DAY_IN_SECONDS,
+					'path' => '/',
+					'samesite' => 'Lax'
+				) );
+			}
 			//$this->SetAccessToken( $response[ 'access_token' ] );
 			//$this->SetRefreshToken( $response[ 'refresh_token' ] );
 			if( is_callable( $this->access_change_callback ) ){
@@ -394,7 +426,13 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 		$spark_oauth_global[ 'access_token' ] = $token;
 		$spark_oauth[ 'last_token' ] = $token;
 		$spark_oauth_global[ 'last_token' ] = $token;
-		setcookie( 'spark_oauth', json_encode( $spark_oauth ), time() + 30 * DAY_IN_SECONDS, '/' );
+		if( !headers_sent() ){
+			setcookie( 'spark_oauth', json_encode( $spark_oauth ), array(
+				'expires' => time() + 30 * DAY_IN_SECONDS,
+				'path' => '/',
+				'samesite' => 'Lax'
+			) );
+		}
 	}
 
 	function SetRefreshToken($token) {
@@ -410,7 +448,13 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 
 		$spark_oauth[ 'refresh_token' ] = $token;
 		$spark_oauth_global[ 'refresh_token' ] = $token;
-		setcookie( 'spark_oauth', json_encode( $spark_oauth ), time() + 30 * DAY_IN_SECONDS, '/' );
+		if( !headers_sent() ){
+			setcookie( 'spark_oauth', json_encode( $spark_oauth ), array(
+				'expires' => time() + 30 * DAY_IN_SECONDS,
+				'path' => '/',
+				'samesite' => 'Lax'
+			) );
+		}
 	}
 
 	function sign_request( $request ){

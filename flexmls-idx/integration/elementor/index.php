@@ -102,9 +102,27 @@ add_action('elementor/widgets/register', function($widgets_manager){
 });
 
 function fmc_widget_rename($id_base, $widget_types){
-    $w = $widget_types["wp-widget-{$id_base}"];
-    $w_name = $w->get_widget_instance()->name;
-    $w->get_widget_instance()->name = $w_name.' <br><span style="color:red">deprecated</span>'; 
+    $widget_key = "wp-widget-{$id_base}";
+    
+    // Check if the widget exists in the widget types array
+    if (!isset($widget_types[$widget_key]) || is_null($widget_types[$widget_key])) {
+        return; // Exit early if widget doesn't exist
+    }
+    
+    $w = $widget_types[$widget_key];
+    
+    // Check if the widget has a valid instance before accessing it
+    if (is_null($w) || !method_exists($w, 'get_widget_instance')) {
+        return; // Exit early if widget is invalid
+    }
+    
+    $widget_instance = $w->get_widget_instance();
+    if (is_null($widget_instance) || !isset($widget_instance->name)) {
+        return; // Exit early if widget instance is invalid
+    }
+    
+    $w_name = $widget_instance->name;
+    $widget_instance->name = $w_name.' <br><span style="color:red">deprecated</span>'; 
 }
 
 add_action('elementor/controls/controls_registered', function($controls_manager){  

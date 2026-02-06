@@ -5,10 +5,10 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.15.5
+Version: 3.15.11
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
-Tested up to: 6.8.3
+Tested up to: 6.9
 Requires PHP: 7.4
 */
 
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.15.5';
+const FMC_PLUGIN_VERSION = '3.15.11';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -138,16 +138,31 @@ class FlexMLS_IDX {
 				$SparkAPI = new \SparkAPI\Core();
 				$auth_token = $SparkAPI->generate_auth_token();
 				if( false === $auth_token ){
-					echo '<div class="notice notice-error">
-					<p>There was an error connecting to the Flexmls&reg; IDX API. 
-					<ul style="list-style-type: square; padding-left: 25px;">
-					<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
-					please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
-					<p>or</p></li>
-					<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
-					</ul>
-					</p>
-				</div>';
+					// Check for specific error code 1010 (Plugin Key Disabled)
+					$last_error_code = isset( $SparkAPI->last_error_code ) ? $SparkAPI->last_error_code : null;
+					if ( $last_error_code == 1010 ) {
+						echo '<div class="notice notice-error">
+						<p>Your Flexmls&reg; IDX Plugin Key has been disabled.
+						<ul style="list-style-type: square; padding-left: 25px;">
+						<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
+						please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
+						<p>or</p></li>
+						<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
+						</ul>
+						</p>
+					</div>';
+					} else {
+						echo '<div class="notice notice-error">
+						<p>There was an error connecting to the Flexmls&reg; IDX API. 
+						<ul style="list-style-type: square; padding-left: 25px;">
+						<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
+						please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
+						<p>or</p></li>
+						<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
+						</ul>
+						</p>
+					</div>';
+					}
 				} else {
 					if( !isset( $options[ 'google_maps_api_key' ] ) || empty( $options[ 'google_maps_api_key' ] ) ){
 						printf(
@@ -174,8 +189,29 @@ class FlexMLS_IDX {
 			}
 			if( 'oauth-logout' == $wp_query->query_vars[ 'oauth_tag' ] ){
 				\SparkAPI\OAuth::log_out();
-				$state = isset( $_GET[ 'redirect' ] ) ? $_GET[ 'redirect' ] : home_url();
-				exit( '<meta http-equiv="refresh" content="0; url=' . $state . '">' );
+				
+				$redirect_url = home_url();
+				if( isset( $_GET[ 'redirect' ] ) ){
+					$requested_redirect = esc_url_raw( $_GET[ 'redirect' ] );
+					
+					if( !empty( $requested_redirect ) ){
+
+						if( strpos( $requested_redirect, '/' ) === 0 && strpos( $requested_redirect, '//' ) !== 0 ){
+
+							$redirect_url = home_url( $requested_redirect );
+						} else {
+
+							$validated_url = wp_validate_redirect( $requested_redirect, home_url() );
+							if( $validated_url !== false ){
+								$redirect_url = $validated_url;
+							}
+						}
+					}
+				}
+				
+				// Use WordPress safe redirect function
+				wp_safe_redirect( $redirect_url );
+				exit;
 			}
 		}
 	}
@@ -198,12 +234,15 @@ class FlexMLS_IDX {
 	}
 
 	public static function plugin_activate(){
+		// Prevent any output during activation from triggering "unexpected output" on the plugins screen.
+		ob_start();
+
 		$is_fresh_install = false;
 		if( false === get_option( 'fmc_settings' ) ){
 			$is_fresh_install = true;
 		}
 		\FlexMLS\Admin\Update::set_minimum_options( $is_fresh_install );
-		
+
 		// Use nginx-compatible rewrite rule handling
 		if( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
 			// For nginx, we don't flush rewrite rules on activation
@@ -211,10 +250,12 @@ class FlexMLS_IDX {
 		} else {
 			add_action( 'shutdown', 'flush_rewrite_rules' );
 		}
-		
+
 		if( false === get_option( 'fmc_plugin_version' ) ){
 			add_option( 'fmc_plugin_version', FMC_PLUGIN_VERSION, null, 'no' );
 		}
+
+		ob_end_clean();
 	}
 
 	public static function plugin_deactivate(){
@@ -246,8 +287,10 @@ class FlexMLS_IDX {
 		add_rewrite_rule( 'oauth/spark-logout/?', 'index.php?plugin=flexmls-idx&oauth_tag=oauth-logout', 'top' );
 		add_rewrite_tag( '%oauth_tag%', '([^&]+)' );
 
-		add_rewrite_rule( $fmc_settings[ 'permabase' ] . '/([^/]+)?' , 'index.php?plugin=flexmls-idx&fmc_tag=$matches[1]&page_id=' . $fmc_settings[ 'destlink' ], 'top' );
-		add_rewrite_rule( 'portal/([^/]+)?', 'index.php?plugin=flexmls-idx&fmc_vow_tag=$matches[1]&page_id=' . $fmc_settings[ 'destlink' ], 'top' );
+		if ( is_array( $fmc_settings ) && isset( $fmc_settings['permabase'] ) && isset( $fmc_settings['destlink'] ) ) {
+			add_rewrite_rule( $fmc_settings['permabase'] . '/([^/]+)?' , 'index.php?plugin=flexmls-idx&fmc_tag=$matches[1]&page_id=' . $fmc_settings['destlink'], 'top' );
+			add_rewrite_rule( 'portal/([^/]+)?', 'index.php?plugin=flexmls-idx&fmc_vow_tag=$matches[1]&page_id=' . $fmc_settings['destlink'], 'top' );
+		}
 		add_rewrite_tag( '%fmc_tag%', '([^&]+)' );
 		add_rewrite_tag( '%fmc_vow_tag%', '([^&]+)' );
 		
@@ -277,7 +320,13 @@ class FlexMLS_IDX {
 		global $listings_per_page;
 		if( isset( $_GET[ 'Limit' ] ) ){
 			$listings_per_page = intval( $_GET[ 'Limit' ] );
-			setcookie( 'spark_listings_per_page', $listings_per_page, time() + 30 * DAY_IN_SECONDS, '/' );
+			if( !headers_sent() ){
+				setcookie( 'spark_listings_per_page', (string) $listings_per_page, array(
+					'expires' => time() + 30 * DAY_IN_SECONDS,
+					'path' => '/',
+					'samesite' => 'Lax'
+				) );
+			}
 		} elseif( isset( $_COOKIE[ 'spark_listings_per_page' ] ) ){
 			$listings_per_page = intval( $_COOKIE[ 'spark_listings_per_page' ] );
 		} else {
@@ -287,7 +336,13 @@ class FlexMLS_IDX {
 		global $listings_orderby;
 		if( isset( $_GET[ 'OrderBy' ] ) ){
 			$listings_orderby = sanitize_text_field( $_GET[ 'OrderBy' ] );
-			setcookie( 'spark_listings_orderby', $listings_orderby, time() + 30 * DAY_IN_SECONDS, '/' );
+			if( !headers_sent() ){
+				setcookie( 'spark_listings_orderby', $listings_orderby, array(
+					'expires' => time() + 30 * DAY_IN_SECONDS,
+					'path' => '/',
+					'samesite' => 'Lax'
+				) );
+			}
 		} elseif( isset( $_COOKIE[ 'spark_listings_orderby' ] ) ){
 			$listings_orderby = $_COOKIE[ 'spark_listings_orderby' ];
 		} else {

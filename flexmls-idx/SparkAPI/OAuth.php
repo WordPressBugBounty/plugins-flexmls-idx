@@ -136,7 +136,13 @@ class OAuth extends Core {
 					'refresh_token' => $json[ 'refresh_token' ],
 					'last_token' => $body[ 'grant_type' ]
 				);
-				setcookie( 'spark_oauth', json_encode( $spark_oauth_global ), 30 * DAY_IN_SECONDS, '/' );
+				if( !headers_sent() ){
+					setcookie( 'spark_oauth', json_encode( $spark_oauth_global ), array(
+						'expires' => time() + 30 * DAY_IN_SECONDS,
+						'path' => '/',
+						'samesite' => 'Lax'
+					) );
+				}
 				$auth_token = $json[ 'access_token' ];
 			} else {
 				$auth_token_failures++;
@@ -175,7 +181,13 @@ class OAuth extends Core {
 		global $spark_oauth_global;
 		$spark_oauth_global = array();
 		if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-			setcookie( 'spark_oauth', '', time() - MONTH_IN_SECONDS, '/' );
+			if( !headers_sent() ){
+				setcookie( 'spark_oauth', '', array(
+					'expires' => time() - MONTH_IN_SECONDS,
+					'path' => '/',
+					'samesite' => 'Lax'
+				) );
+			}
 			unset( $_COOKIE[ 'spark_oauth' ] );
 		}
 		return true;

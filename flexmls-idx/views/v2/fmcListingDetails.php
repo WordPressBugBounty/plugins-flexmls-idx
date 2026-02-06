@@ -1,23 +1,26 @@
 <?php flexmlsPortalPopup::popup_portal('detail_page');
-      $api_prefs = $fmc_api->GetPreferences(); 
+      $api_prefs = $fmc_api->GetPreferences();
+      if (!is_array($api_prefs) || !isset($api_prefs['RequiredFields']) || !is_array($api_prefs['RequiredFields'])) {
+        $api_prefs['RequiredFields'] = array();
+      }
       $phone_req  = in_array('phone', $api_prefs['RequiredFields']);
 ?>
 <div class="flexmls-listing-details flexmls-v2-widget flexmls-widthchange-wrapper flexmls-body-font">
 	<?php $has_search_return = ! empty( $_GET['search_referral_url'] ); ?>
 	<div class="flexmls-actions-wrapper listing-section <?php echo $has_search_return ? 'has-return-button' : ''; ?>">
 		<?php if ( $has_search_return ) : ?>
-			<?php $search_referral_url = $_GET['search_referral_url']; ?>
-			<?php $back_button_link = wp_validate_redirect( $search_referral_url, flexmlsConnect::get_destination_link() );
-				?>
-		<?php 
-		$back_to_search_link = '';
-		if ( strpos($search_referral_url, "'") ) {
-			$back_to_search_link = stripslashes($search_referral_url);
-		} else {
-			$back_to_search_link = wp_validate_redirect( $search_referral_url, flexmlsConnect::get_destination_link() );
-		}
-		?>
-				<a class="back-to-search-link flexmls-primary-color-font" href="<?php echo $back_to_search_link; ?>">&larr; Back to search</a>
+			<?php 
+			// Sanitize and validate the search referral URL to prevent XSS attacks
+			$search_referral_url = isset( $_GET['search_referral_url'] ) ? $_GET['search_referral_url'] : '';
+			
+			// Get the default search URL with permalink base (e.g., /idx/search/)
+			$options = get_option('fmc_settings');
+			$permabase = isset( $options['permabase'] ) ? $options['permabase'] : 'idx';
+			$default_search_url = get_home_url() . '/' . $permabase . '/search/';
+			
+			$back_to_search_link = wp_validate_redirect( $search_referral_url, $default_search_url );
+			?>
+			<a class="back-to-search-link flexmls-primary-color-font" href="<?php echo esc_url( $back_to_search_link ); ?>">&larr; Back to search</a>
 		<?php endif; ?>
 		<button class="flexmls-btn flexmls-btn-primary flexmls-primary-color-background" onclick="flexmls_connect.contactForm({
 			'title': 'Contact agent',
@@ -101,7 +104,20 @@
 						<?php endif; ?>
 					<?php endif; ?>
 
-					<img class="owl-lazy" data-src="<?php echo esc_url( $p['UriLarge'] ); ?>" />
+					<?php
+					// Set alt value for ADA compliance
+					$img_alt_attr = '';
+					if ( !empty( $p['Caption'] ) ) {
+						$img_alt_attr = htmlspecialchars( $p['Caption'], ENT_QUOTES );
+					} elseif ( !empty( $p['Name'] ) ) {
+						$img_alt_attr = htmlspecialchars( $p['Name'], ENT_QUOTES );
+					} elseif ( !empty( $one_line_address ) ) {
+						$img_alt_attr = $one_line_address;
+					} else {
+						$img_alt_attr = "Photo for listing #" . $sf['ListingId'];
+					}
+					?>
+					<img class="owl-lazy" data-src="<?php echo esc_url( $p['UriLarge'] ); ?>" alt="<?php echo esc_attr( $img_alt_attr ); ?>" />
 				<?php endforeach; ?>
 			</div>
 		</div>
@@ -390,14 +406,46 @@
 		<?php endif; ?>
 	</div>
 
+	<?php if ( flexmlsConnect::mls_requires_office_name_in_listing_details() ) : ?>
+		<?php $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of' : 'Listing Office:'; ?>
+		<div class="flexmls-office-name listing-section">
+			<span class="flexmls-bold-label"><?php echo esc_html( $listing_office_label ) ; ?></span>
+			<?php echo esc_html( $sf["ListOfficeName"] ); ?>
+		</div>
+	<?php endif; ?>
+
+	<?php if ( flexmlsConnect::mls_requires_agent_name_in_listing_details() ) : ?>
+		<div class="flexmls-agent-name-and-label-wrapper listing-section">
+			<span class="flexmls-agent-name">
+				<span class="flexmls-bold-label">Listing Agent: </span>
+				<?php echo esc_html( $sf["ListAgentName"] ); ?>
+
+				<?php if ( flexmlsConnect::mls_requires_agent_phone_in_listing_details() ) : ?>
+					<?php 
+					$phone_number = flexmlsConnect::get_agent_phone_with_fallback( $sf, 'detail' );
+					if ( ! empty( $phone_number ) ) {
+						echo "<br/>" . esc_html( $phone_number );
+					}
+					?>
+				<?php endif; ?>
+
+				<?php if ( flexmlsConnect::mls_requires_agent_email_in_listing_details() ) : ?>
+					<?php echo " |  " . esc_html( $sf["ListAgentEmail"] ); ?>
+				<?php endif; ?>
+				
+			</span>
+		</div>
+	<?php endif; ?>
+
+	<div class="compliance-section listing-section">
+		<?php fmcSearchResults::compliance_label( $record, "Detail" ); ?>
+	</div>
+
 	<div class="disclosure-section listing-section">
 		<?php if ( $sf['StateOrProvince'] != 'NY' ) : ?>
 			<?php foreach ( $compList as $reqs ) : ?>
 				<?php if ( flexmlsConnect::is_not_blank_or_restricted( $reqs[1] ) ) : ?>
-					<?php if ( $reqs[0] == 'LOGO' ) : ?>
-						<?php $listing_disclosure_title = $one_line_address . '- MLS# ' . $sf['ListingId']; ?>
-						<img style='padding-bottom: 5px' src='<?php echo esc_attr( $reqs[1] ); ?>' alt='<?php echo esc_attr( $listing_disclosure_title ); ?>' title='<?php echo esc_attr( $listing_disclosure_title ); ?>' />
-					<?php else:  ?>
+					<?php if ( $reqs[0] != 'Listing Office:' && $reqs[0] != 'Listing Courtesy of' && $reqs[0] != 'Listing Agent:' && $reqs[0] != 'LOGO' ) : ?>
 						<div class="listing-req"><?php echo esc_html( $reqs[0] ); ?> <?php echo esc_html( $reqs[1] ); ?></div>
 					<?php endif; ?>
 				<?php endif; ?>

@@ -309,7 +309,11 @@ function FlexMlsCallback($attributes )
         $err = curl_error($ch);
         curl_close ($ch);
         $output = flexmlsJSON::json_decode($server_output);
-        echo $output['body'];
+        if (is_array($output) && isset($output['body'])) {
+            echo $output['body'];
+        } else {
+            echo "<div>Error loading content</div>";
+        }
 
     }
     else {

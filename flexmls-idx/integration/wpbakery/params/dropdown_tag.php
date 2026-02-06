@@ -26,9 +26,7 @@ function dropdown_tag_field( $settings, $value ) {
 	} elseif (is_string( $value ) && $isMultiple === 'true') {
 		$output.='<input type="hidden" dataId="'.$dataId.'" value="'.$value.'"/>';
 	}
-	if($id !== ''){
-		$id_use = 'id=' . $id; 
-	}
+	$id_use = ( $id !== '' ) ? 'id="' . esc_attr( $id ) . '"' : '';
 	$output .= '<select name="' . $settings['param_name'] . '" ' . $id_use . ' class="wpb_vc_param_value wpb-input wpb-select ' . $class . ' ' . $settings['param_name'] . ' ' . $settings['type'] . ' ' . $multiply . '">';
 	if ( ! empty( $settings['value'] ) ) {
 		if($isgroup == true){

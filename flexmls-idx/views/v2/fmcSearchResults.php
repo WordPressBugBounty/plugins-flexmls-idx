@@ -1,5 +1,10 @@
 <?php flexmlsPortalPopup::popup_portal('search_page'); ?>
 <?php global $fmc_api_portal; ?>
+<?php
+	if ( empty( $options ) ) {
+		$options = get_option( 'fmc_settings' );
+	}
+?>
 <div class="flexmls_connect__search_results_v2 flexmls-v2-widget flexmls-body-font">
 	<?php
 		$is_saved_search_enabled = ! empty( $options['portal_saving_searches'] ) && $options['portal_saving_searches'];
@@ -15,7 +20,15 @@
 			<?php endif; ?>
 			<?php if ( $show_login_buttons ) : ?>
 				<div class="flexmls-login-buttons">
-					<a href="<?php echo esc_url( $fmc_api_portal->get_portal_page() ); ?>" class="flexmls-btn flexmls-btn-primary flexmls-btn-sm flexmls-primary-color-background">Sign up or log in</a>
+					<?php
+					$portal_url = '';
+					if ( method_exists( $fmc_api_portal, 'get_portal_page' ) ) {
+						$portal_url = $fmc_api_portal->get_portal_page();
+					}
+					if ( ! empty( $portal_url ) ) :
+					?>
+						<a href="<?php echo esc_url( $portal_url ); ?>" class="flexmls-btn flexmls-btn-primary flexmls-btn-sm flexmls-primary-color-background">Sign up or log in</a>
+					<?php endif; ?>
 				</div>
 			<?php endif; ?>
 		</div>
@@ -42,7 +55,7 @@
 	</div>
 	<div class="flexmls-count-and-filters-wrapper">
 		<div class="flexmls-count-wrapper">
-			<span class="flexmls-matches-count"><?php echo number_format( $this->total_rows, 0, '.', ',' ); ?> Matches Found</span>
+			<span class="flexmls-matches-count"><?php echo number_format( (float) ( $this->total_rows ?? 0 ), 0, '.', ',' ); ?> Matches Found</span>
 		</div>
 
 		<div class="flexmls-filters-wrapper">
@@ -52,8 +65,10 @@
 
 	<?php require( __DIR__ . '/fmcSearchResults/_listings_list.php' ); ?>
 
-	<?php $widget = new fmcSearchResults; ?>
-	<?php echo $widget->pagination( $this->current_page, $this->total_pages ); ?>
+	<?php if ( class_exists( 'fmcSearchResults' ) ) : ?>
+		<?php $widget = new fmcSearchResults; ?>
+		<?php echo $widget->pagination( $this->current_page, $this->total_pages ); ?>
+	<?php endif; ?>
 
 	<div class='flexmls_connect__idx_disclosure_text flexmls_connect__disclaimer_text'>
 		<?php echo flexmlsConnect::get_big_idx_disclosure_text(); ?>

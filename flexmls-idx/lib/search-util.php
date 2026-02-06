@@ -33,12 +33,14 @@ class flexmlsSearchUtil {
 	public static function parse_search_parameters_into_api_request( $input_source, $input_data ) {
 			global $fmc_api;
 
-			// pull StandardFields from the API to verify searchability prior to searching
-			$result = $fmc_api->GetStandardFields();
-			$standard_fields = $result[0];
+		// pull StandardFields from the API to verify searchability prior to searching
+		$result = $fmc_api->GetStandardFields();
+		$standard_fields = (is_array($result) && isset($result[0]) && is_array($result[0])) ? $result[0] : array();
 
-			$sf_sqft_value = '';
-			$sf_sqft_value = ( in_array( 'BuildingAreaTotal', $standard_fields ) ) ? $standard_fields['BuildingAreaTotal'] : $standard_fields['LivingArea'];
+		$sf_sqft_value = '';
+		if (is_array($standard_fields) && !empty($standard_fields)) {
+			$sf_sqft_value = ( in_array( 'BuildingAreaTotal', $standard_fields ) ) ? $standard_fields['BuildingAreaTotal'] : (isset($standard_fields['LivingArea']) ? $standard_fields['LivingArea'] : '');
+		}
 
 
 			$catch_fields = array(
@@ -231,22 +233,22 @@ class flexmlsSearchUtil {
 					),
 			);
 
-			$searchable_fields = array();
-			if( count( $standard_fields ) ){
-					foreach( $standard_fields as $k => $v ){
-							if( $v[ 'Searchable' ] ){
-									$searchable_fields[] = $k;
-									if (!array_key_exists($k, $catch_fields)) {
-											$catch_fields[] = [
-													'input' => $k,
-													'operator' => 'Eq',
-													'field' => $k,
-													'allow_or' => true
-											];
-									}
-							}
-					}
-			}
+		$searchable_fields = array();
+		if( is_array($standard_fields) && count( $standard_fields ) ){
+				foreach( $standard_fields as $k => $v ){
+						if( is_array($v) && isset($v['Searchable']) && $v[ 'Searchable' ] ){
+								$searchable_fields[] = $k;
+								if (!array_key_exists($k, $catch_fields)) {
+										$catch_fields[] = [
+												'input' => $k,
+												'operator' => 'Eq',
+												'field' => $k,
+												'allow_or' => true
+										];
+								}
+						}
+				}
+		}
 
 			// add in special fields
 			$searchable_fields[] = 'SavedSearch';
@@ -295,7 +297,7 @@ class flexmlsSearchUtil {
 
 					if ( array_key_exists( 'type', $f ) ) {
 							$type = $f['type'];
-					} elseif ( array_key_exists( $f['field'], $standard_fields ) ) {
+					} elseif ( is_array( $standard_fields ) && array_key_exists( $f['field'], $standard_fields ) ) {
 							$type = $standard_fields[ $f['field'] ]['Type'];
 					} else {
 							$type = 'Character';

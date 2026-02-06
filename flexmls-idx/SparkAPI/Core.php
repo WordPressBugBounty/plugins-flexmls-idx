@@ -80,6 +80,8 @@ class Core {
 		$this->user_agent 	  = ( isset( $_SERVER['HTTP_USER_AGENT'] ) ) ? $_SERVER['HTTP_USER_AGENT'] : null;
 		$this->user_ip		  = ( isset( $_SERVER['REMOTE_ADDR'] ) ) ? $_SERVER['REMOTE_ADDR'] : null;
 
+		$this->last_error_code = null;
+		$this->last_error_mess = null;
 
 		$this->api_headers    = array(
 			'Accept-Encoding'       => 'gzip,deflate',
@@ -102,24 +104,42 @@ class Core {
 	 * $core->admin_notices_api_connection_error();
 	 */
 	public function admin_notices_api_connection_error() {
-		$support_link    = admin_url( 'admin.php?page=fmc_admin_settings&tab=support' );
-		$error_message   = __( 'There was an error connecting to the FlexMLS® IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message,', 'fmcdomain' );
-		$contact_support = __( 'contact support', 'fmcdomain' );
+		// Check for specific error code 1010 (Plugin Key Disabled)
+		if ( $this->last_error_code == 1010 ) {
+			printf(
+				'<div class="notice notice-error">
+					<p>Your Flexmls&reg; IDX Plugin Key has been disabled.
+					<ul style="list-style-type: square; padding-left: 25px;">
+					<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
+					please <a href="%s">contact support</a>
+					<p>or</p></li>
+					<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
+					</ul>
+					</p>
+				</div>',
+				admin_url( 'admin.php?page=fmc_admin_intro&tab=support' )
+			);
+		} else {
+			$support_link    = admin_url( 'admin.php?page=fmc_admin_settings&tab=support' );
+			$error_message   = __( 'There was an error connecting to the FlexMLS® IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message,', 'fmcdomain' );
+			$contact_support = __( 'contact support', 'fmcdomain' );
 
-		printf(
-			'<div class="notice notice-error">
-            <p>%s <a href="%s">%s</a>.</p>
-        </div>',
-			esc_textarea( $error_message ),
-			esc_url( $support_link ),
-			esc_textarea( $contact_support )
-		);
+			printf(
+				'<div class="notice notice-error">
+				<p>%s <a href="%s">%s</a>.</p>
+			</div>',
+				esc_textarea( $error_message ),
+				esc_url( $support_link ),
+				esc_textarea( $contact_support )
+			);
+		}
 	}
 
 	/**
 	 * Clear cache.
 	 *
 	 * This function clears the cache by deleting transient options related to FlexMLS IDX API.
+	 * It uses WordPress Transients API for compatibility with object caching systems (Memcached/Redis).
 	 * It also generates a new authentication token and stores it in the cache.
 	 *
 	 * @param bool $force Whether to force clear the cache or not.
@@ -132,27 +152,196 @@ class Core {
 	 * $core->clear_cache(true);  // Clears the cache and forces cache clearance
 	 */
 	public function clear_cache( $force = false ) {
-		global $wpdb;
-
-		$transient_query = "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s LIMIT 250";
-		$prepared_query  = $wpdb->prepare( $transient_query, '_transient_fmc%', '_transient_timeout_fmc%' );
-		$wpdb->query( $prepared_query );
+		// Clear FMC widget cache transients using the existing tracker
+		$cache_tracker = get_transient( 'fmc_cache_tracker' );
+		if ( is_array( $cache_tracker ) ) {
+			foreach ( $cache_tracker as $cache_item_name => $value ) {
+				delete_transient( 'fmc_cache_' . $cache_item_name );
+			}
+			// Clear the tracker itself
+			delete_transient( 'fmc_cache_tracker' );
+		}
+		// Also use pattern-based deletion as fallback
+		$this->delete_transients_by_pattern( 'fmc_cache_' );
 
 		if ( $force ) {
-			$wpdb->query( $wpdb->prepare( $transient_query, '_transient_flexmls_query_%', '_transient_timeout_flexmls_query_%' ) );
+			// Force clear all flexmls_query transients
+			$this->delete_transients_by_pattern( 'flexmls_query_' );
 			delete_option( 'fmc_db_cache_key' );
 		} else {
+			// Only clear expired flexmls_query transients
+			// WordPress handles expiration automatically, but we can clean up tracked ones
+			$this->cleanup_expired_transients( 'flexmls_query_' );
+		}
+
+		// Periodically clean up the tracking array to remove orphaned entries
+		// This helps prevent the tracking array from growing indefinitely
+		$this->cleanup_tracking_array();
+
+		delete_transient( 'flexmls_auth_token' );
+		$this->generate_auth_token();
+		return true;
+	}
+
+	/**
+	 * Delete transients by pattern using WordPress Transients API.
+	 *
+	 * This method is compatible with object caching systems (Memcached/Redis).
+	 * It uses a tracking system to store transient names for bulk operations.
+	 *
+	 * @param string $pattern The transient name pattern to match (without 'transient_' prefix).
+	 * @return int Number of transients deleted.
+	 */
+	private function delete_transients_by_pattern( $pattern ) {
+		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		$deleted_count     = 0;
+
+		if ( ! is_array( $tracked_transients ) ) {
+			$tracked_transients = array();
+		}
+
+		// Delete tracked transients matching the pattern
+		foreach ( $tracked_transients as $transient_name => $transient_pattern ) {
+			if ( strpos( $transient_name, $pattern ) === 0 ) {
+				delete_transient( $transient_name );
+				unset( $tracked_transients[ $transient_name ] );
+				$deleted_count++;
+			}
+		}
+
+		// Update the tracking option
+		if ( $deleted_count > 0 ) {
+			update_option( 'fmc_tracked_transients', $tracked_transients );
+		}
+
+		// Fallback: If we're not using object cache, we can still query the database
+		// This is a safety net for sites not using persistent object caching
+		if ( ! wp_using_ext_object_cache() ) {
+			global $wpdb;
+			$transient_query = "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s LIMIT 250";
+			$prepared_query  = $wpdb->prepare( $transient_query, '_transient_' . $wpdb->esc_like( $pattern ) . '%', '_transient_timeout_' . $wpdb->esc_like( $pattern ) . '%' );
+			$wpdb->query( $prepared_query );
+		}
+
+		return $deleted_count;
+	}
+
+	/**
+	 * Clean up expired transients.
+	 *
+	 * WordPress automatically handles transient expiration, but this method
+	 * helps clean up tracked transients that may have expired.
+	 *
+	 * @param string $pattern The transient name pattern to match.
+	 * @return int Number of expired transients cleaned up.
+	 */
+	private function cleanup_expired_transients( $pattern ) {
+		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		$cleaned_count      = 0;
+
+		if ( ! is_array( $tracked_transients ) ) {
+			return 0;
+		}
+
+		// Check each tracked transient and remove if expired
+		foreach ( $tracked_transients as $transient_name => $transient_pattern ) {
+			if ( strpos( $transient_name, $pattern ) === 0 ) {
+				// Try to get the transient - if it returns false, it's expired or doesn't exist
+				$value = get_transient( $transient_name );
+				if ( false === $value ) {
+					// Transient is expired or doesn't exist, remove from tracking
+					unset( $tracked_transients[ $transient_name ] );
+					$cleaned_count++;
+				}
+			}
+		}
+
+		// Update the tracking option if we cleaned anything
+		if ( $cleaned_count > 0 ) {
+			update_option( 'fmc_tracked_transients', $tracked_transients );
+		}
+
+		// Fallback for non-object-cache environments: clean up expired transients from database
+		if ( ! wp_using_ext_object_cache() ) {
+			global $wpdb;
 			$sql = "DELETE a, b FROM $wpdb->options a, $wpdb->options b
                 WHERE a.option_name LIKE %s
                 AND a.option_name NOT LIKE %s
                 AND b.option_name = CONCAT( '_transient_timeout_', SUBSTRING( a.option_name, 12 ) )
                 AND b.option_value < %d";
-			$wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( '_transient_flexmls_query_' ) . '%', $wpdb->esc_like( '_transient_timeout_flexmls_query_' ) . '%', time() ) );
+			$wpdb->query( $wpdb->prepare( $sql, $wpdb->esc_like( '_transient_' . $pattern ) . '%', $wpdb->esc_like( '_transient_timeout_' . $pattern ) . '%', time() ) );
 		}
 
-		delete_transient( 'flexmls_auth_token' );
-		$this->generate_auth_token();
-		return true;
+		return $cleaned_count;
+	}
+
+	/**
+	 * Track a transient name for later bulk operations.
+	 *
+	 * This helps us manage transients when using object caching systems
+	 * where we can't query the database directly.
+	 *
+	 * @param string $transient_name The full transient name (without 'transient_' prefix).
+	 * @param string $pattern The pattern this transient belongs to (for grouping).
+	 * @return void
+	 */
+	public function track_transient( $transient_name, $pattern = 'flexmls_query_' ) {
+		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+
+		if ( ! is_array( $tracked_transients ) ) {
+			$tracked_transients = array();
+		}
+
+		// Store the transient name with its pattern for easy lookup
+		$tracked_transients[ $transient_name ] = $pattern;
+
+		// Limit the size of the tracking array to prevent it from growing too large
+		// Keep only the most recent 1000 transients
+		if ( count( $tracked_transients ) > 1000 ) {
+			// Remove oldest entries (simple FIFO approach)
+			$tracked_transients = array_slice( $tracked_transients, -1000, null, true );
+		}
+
+		update_option( 'fmc_tracked_transients', $tracked_transients );
+	}
+
+	/**
+	 * Clean up the tracking array by removing entries for transients that no longer exist.
+	 *
+	 * This helps prevent the tracking array from growing indefinitely and
+	 * removes orphaned entries that reference expired or deleted transients.
+	 *
+	 * @return int Number of orphaned entries removed.
+	 */
+	private function cleanup_tracking_array() {
+		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		$cleaned_count      = 0;
+
+		if ( ! is_array( $tracked_transients ) || empty( $tracked_transients ) ) {
+			return 0;
+		}
+
+		// Sample a subset of tracked transients to check (to avoid performance issues)
+		// Check up to 100 entries per cleanup cycle
+		$sample_size = min( 100, count( $tracked_transients ) );
+		$sample_keys = array_slice( array_keys( $tracked_transients ), 0, $sample_size, true );
+
+		foreach ( $sample_keys as $transient_name ) {
+			// Check if the transient still exists
+			$value = get_transient( $transient_name );
+			if ( false === $value ) {
+				// Transient doesn't exist or is expired, remove from tracking
+				unset( $tracked_transients[ $transient_name ] );
+				$cleaned_count++;
+			}
+		}
+
+		// Update the tracking option if we cleaned anything
+		if ( $cleaned_count > 0 ) {
+			update_option( 'fmc_tracked_transients', $tracked_transients );
+		}
+
+		return $cleaned_count;
 	}
 
 	/**
@@ -209,6 +398,16 @@ class Core {
 			$auth_token = $decoded_response;
 			set_transient( 'flexmls_auth_token', $auth_token, 15 * MINUTE_IN_SECONDS );
 			return $auth_token;
+		}
+
+		// Preserve error code and message from API response before returning false
+		if ( is_array( $decoded_response ) && isset( $decoded_response['D'] ) ) {
+			if ( isset( $decoded_response['D']['Code'] ) ) {
+				$this->last_error_code = $decoded_response['D']['Code'];
+			}
+			if ( isset( $decoded_response['D']['Message'] ) ) {
+				$this->last_error_mess = $decoded_response['D']['Message'];
+			}
 		}
 
 		// Record the failure timestamp
@@ -623,7 +822,10 @@ class Core {
 
 		// Handle valid JSON.
 		if ( isset( $json['D']['Success'] ) && $json['D']['Success'] && 'GET' === strtoupper( $request['method'] ) ) {
-			set_transient( 'flexmls_query_' . $request['transient_name'], $json, $request['cache_duration'] );
+			$transient_name = 'flexmls_query_' . $request['transient_name'];
+			set_transient( $transient_name, $json, $request['cache_duration'] );
+			// Track this transient for later bulk operations (compatible with object caching)
+			$this->track_transient( $transient_name, 'flexmls_query_' );
 		}
 
 		return $json;
@@ -726,16 +928,25 @@ class Core {
 		$options    = get_option( 'fmc_settings' );
 		$auth_token = get_transient( 'flexmls_auth_token' );
 
+		if ( ! is_array( $options ) ) {
+			$options = array();
+		}
+		if ( ! is_array( $request ) ) {
+			return $request;
+		}
+
 		$request['cacheable_query_string'] = build_query( $request['params'] );
 		$params                            = $request['params'];
 
-		$security_string = $options['api_secret'] . 'ApiKey' . $options['api_key'];
+		$api_secret   = isset( $options['api_secret'] ) ? $options['api_secret'] : '';
+		$api_key      = isset( $options['api_key'] ) ? $options['api_key'] : '';
+		$security_string = $api_secret . 'ApiKey' . $api_key;
 
 		$post_body       = $this->get_post_body( $request );
 		$is_auth_request = ( 'session' === $request['service'] );
 
 		if ( $is_auth_request ) {
-			$params['ApiKey'] = $options['api_key'];
+			$params['ApiKey'] = $api_key;
 		} else {
 			$params           = $this->prepare_params_for_non_auth_request( $params, $auth_token );
 			$security_string .= 'ServicePath' . rawurldecode( '/' . $this->api_version . '/' . $request['service'] );
@@ -789,7 +1000,10 @@ class Core {
 	 * $core->prepare_params_for_non_auth_request( $params, $security_string, $auth_token, $request );
 	 */
 	private function prepare_params_for_non_auth_request( $params, $auth_token ) {
-		$params['AuthToken'] = $auth_token ? $auth_token['D']['Results'][0]['AuthToken'] : '';
+		$params['AuthToken'] = '';
+		if ( is_array( $auth_token ) && isset( $auth_token['D']['Results'][0]['AuthToken'] ) ) {
+			$params['AuthToken'] = $auth_token['D']['Results'][0]['AuthToken'];
+		}
 		return $params;
 	}
 

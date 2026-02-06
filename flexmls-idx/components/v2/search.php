@@ -139,7 +139,10 @@ class fmcSearch extends fmcSearch_v1 {
 		}
 
 		$idx_link_details = flexmlsConnect::get_idx_link_details($my_link);
-		$detailed_search_url = flexmlsConnect::make_destination_link($idx_link_details['Uri']);
+		$detailed_search_url = '';
+		if ( is_array($idx_link_details) && isset($idx_link_details['Uri']) ) {
+			$detailed_search_url = flexmlsConnect::make_destination_link($idx_link_details['Uri']);
+		}
 
 
 		// set border radius code
@@ -169,7 +172,7 @@ class fmcSearch extends fmcSearch_v1 {
 			$submit_return .= "<input type='hidden' name='query' value='' />";
 		} else {
 			// include the link if it's a Saved Search - added 1-29-2013 by Brandon Medenwald (WP-137)
-			if ($idx_link_details['LinkType'] == "SavedSearch") {
+			if ( is_array($idx_link_details) && isset($idx_link_details['LinkType']) && $idx_link_details['LinkType'] == "SavedSearch") {
 				$submit_return .= "<input type='hidden' name='SavedSearch' class='flexmls_connect__link
 					flexmls_connect__search_v2_submit' value='{$idx_link_details['SearchId']}' />";
 			}

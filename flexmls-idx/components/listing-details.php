@@ -29,8 +29,10 @@ class fmcListingDetails extends fmcWidget {
   function schedule_showing($attr = array()) {
     global $fmc_api;
     $api_my_account = $fmc_api->GetMyAccount();
-
-    $send_email=($api_my_account['Emails'][0]['Address']);
+    if ( ! is_array( $api_my_account ) ) {
+      die( 'Unable to load account.' );
+    }
+    $send_email = isset( $api_my_account['Emails'][0]['Address'] ) ? $api_my_account['Emails'][0]['Address'] : '';
     $mytest = flexmlsConnect::wp_input_get_post('flexmls_connect__important');
 
     //This is our bot blocker... if it is set, then pretend like everything went okay
@@ -38,7 +40,7 @@ class fmcListingDetails extends fmcWidget {
       exit("SUCCESS");
     }
 
-    $action = $api_my_account['UserType'];
+    $action = isset( $api_my_account['UserType'] ) ? $api_my_account['UserType'] : '';
 
     if ($action=="Mls"){
         if (flexmlsConnect::is_not_blank_or_restricted(flexmlsConnect::wp_input_get_post('flexmls_connect__to'))){
@@ -96,8 +98,10 @@ class fmcListingDetails extends fmcWidget {
   function contact($attr = array()) {
     global $fmc_api;
     $api_my_account = $fmc_api->GetMyAccount();
-
-    $send_email=($api_my_account['Emails'][0]['Address']);
+    if ( ! is_array( $api_my_account ) ) {
+      die( 'Unable to load account.' );
+    }
+    $send_email = isset( $api_my_account['Emails'][0]['Address'] ) ? $api_my_account['Emails'][0]['Address'] : '';
     $mytest = flexmlsConnect::wp_input_get_post('flexmls_connect__important');
 
     //This is our bot blocker... if it is set, then pretend like everything went okay
@@ -105,7 +109,7 @@ class fmcListingDetails extends fmcWidget {
       exit("SUCCESS");
     }
 
-    $action = $api_my_account['UserType'];
+    $action = isset( $api_my_account['UserType'] ) ? $api_my_account['UserType'] : '';
 
     if ($action=="Mls"){
         if (flexmlsConnect::is_not_blank_or_restricted(flexmlsConnect::wp_input_get_post('flexmls_connect__to_agent'))){
@@ -166,8 +170,9 @@ class fmcListingDetails extends fmcWidget {
   function jelly($args, $settings, $type) {
     global $fmc_api;
 
+    $listing_id = isset( $settings['listing'] ) ? trim( (string) $settings['listing'] ) : '';
     $custom_page = new flexmlsConnectPageListingDetails($fmc_api);
-    $custom_page->pre_tasks('-mls_'. trim($settings['listing']) );
+    $custom_page->pre_tasks( '-mls_' . $listing_id );
     /* if($settings['integration'] == 'elementor'){
       return $custom_page->generate_page(false);
     } else {

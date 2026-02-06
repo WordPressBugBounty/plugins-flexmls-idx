@@ -19,10 +19,10 @@
   ">
 
   <?php if ($destination == "remote") { ?>
-    <form action='<?php echo $_SERVER['REQUEST_URI'] ?>' method='post' <?php echo $this_target ?> >
+    <form action='<?php echo $_SERVER['REQUEST_URI'] ?>' method='post' <?php echo $this_target ?> role="search" aria-label="Property search form">
   <?php } else { ?>
     <form action="<?php echo flexmlsConnect::make_nice_tag_url('search'); ?>" method='get'
-      <?php echo $this_target; ?> >
+      <?php echo $this_target; ?> role="search" aria-label="Property search form">
   <?php } ?>
 
     <?php // title ?>
@@ -42,8 +42,8 @@
 
     <?php if ($location_search == "on") { ?>
       <div class='flexmls_connect__search_field'>
-        <label>Location</label>
-        <select class="flexmlsLocationSearch" data-portal-slug="<?= $portal_slug ?>" multiple="true">
+        <label for="location-search-<?php echo $rand; ?>">Location</label>
+        <select class="flexmlsLocationSearch" id="location-search-<?php echo $rand; ?>" data-portal-slug="<?= $portal_slug ?>" multiple="true" aria-describedby="location-help-<?php echo $rand; ?>" data-select2-accessible="true">
           <?php
             foreach ($location_fields as $field => $value) {
               $option_value = $field . '_' . stripslashes($value);
@@ -53,6 +53,7 @@
             }
           ?>
         </select>
+        <div id="location-help-<?php echo $rand; ?>" class="sr-only">Select one or more locations to search for properties</div>
       </div>
     <?php
         $search_fields[] = "Location";
@@ -84,8 +85,8 @@
 
       <div class='flexmls_connect__search_field flexmls_connect__search_new_sort_by
         flexmls_connect__search_new_field_group'>
-        <label>Sort By</label>
-        <select name='OrderBy' size='1'>
+        <label for="sort-by-<?php echo $rand; ?>">Sort By</label>
+        <select name='OrderBy' id="sort-by-<?php echo $rand; ?>" size='1'>
           <option value='-ListPrice'>List price (High to Low)</option>
           <option value='ListPrice'>List price (Low to High)</option>
           <option value='-BedsTotal'># Bedrooms</option>

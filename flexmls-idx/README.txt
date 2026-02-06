@@ -2,9 +2,9 @@
 Tags: flexmls, IDX, MLS search
 Contributors: flexmls
 Requires at least: 5.0
-Tested up to: 6.8.3
+Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 3.15.5
+Stable tag: 3.15.11
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,40 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+
+= 3.15.11 =
+Efficiency Update
+* Improves cache handling for object cache compatibility
+* Shows active and deactivated plugins in the admin support area
+* Adds defensive checks for settings and API data to avoid errors when data is missing
+
+= 3.15.10 =
+Efficiency Update
+* Improved URL validation and sanitization for search referral links
+* Added array checks for API field handling to prevent errors with unexpected data types
+* Updated cookie handling for modern PHP compatibility and enhanced cookie security
+* Refactored listing details page code and enhanced OpenGraph tag implementation for better social media sharing
+
+= 3.15.9 =
+Efficiency Update
+* Improved HTML rendering compatibility in the legacy IDX Search widget
+
+= 3.15.8 =
+Efficiency Update
+* Improved the handling and presentation of input fields for better usability
+* Improved validation for redirection URLs to enhance security
+
+= 3.15.7 =
+Efficiency Update
+* Removed Limit URL paramteter applying to IDX Slideshow Listing Links
+* Refactored IDX Display Requirements
+* Resolving Elementor Error with Contact Me widget
+
+= 3.15.6 =
+Efficiency Update
+* Improving canonical link priorirty for listing detail pages
+* More PHP warnings resolved
+
 = 3.15.5 =
 Efficiency Update
 * Adjustments made to the nginx description, testing procedures, and configuration steps.

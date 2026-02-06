@@ -13,7 +13,8 @@
 </div>
 
 <div class="sort-by-wrapper">
-	<select name='OrderBy' class='flex_orderby'>
+	<label for="sort-by-filter-<?php echo $rand ?? ''; ?>">Sort by</label>
+	<select name='OrderBy' id="sort-by-filter-<?php echo $rand ?? ''; ?>" class='flex_orderby'>
 		<option value='' disabled>Sort by</option>
 		<?php
 			$sort_options = array(

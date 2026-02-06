@@ -17,8 +17,33 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     add_filter( 'wpseo_canonical', array( $this, 'wpseo_canonical' ), 0 );
     add_filter( 'wp_robots', array($this, 'wp_robots_noindex_listing'), 0 );
     
+    // Handle other SEO plugins
+    add_filter( 'rank_math/frontend/canonical', array( $this, 'rankmath_canonical' ), 0 );
+    add_filter( 'aioseo_canonical_url', array( $this, 'aioseo_canonical' ), 0 );
+    add_filter( 'the_seo_framework_meta_canonical', array( $this, 'seo_framework_canonical' ), 0 );
+    add_filter( 'seopress_canonical', array( $this, 'seopress_canonical' ), 0 );
+    
     add_action('wp_head', array($this, 'wp_meta_description_tag'), 0 );
     add_action('wp_head', array($this, 'open_graph_tags'), 0 );
+    
+    // Prevent SEO plugins from outputting OpenGraph tags on listing detail pages
+    add_filter( 'wpseo_frontend_presenters', array( $this, 'filter_presenters' ), 10 );
+    
+    // Rank Math - Disable OpenGraph tags
+    add_action( 'rank_math/head', array( $this, 'disable_rankmath_opengraph' ), 0 );
+    
+    // All in One SEO - Disable OpenGraph tags
+    add_filter( 'aioseo_facebook_tags', array( $this, 'disable_aioseo_facebook_tags' ), 10 );
+    add_filter( 'aioseo_twitter_tags', array( $this, 'disable_aioseo_twitter_tags' ), 10 );
+    
+    // SEOPress - Disable OpenGraph and Twitter tags
+    $this->setup_seopress_disabling();
+    
+    // The SEO Framework - Disable OpenGraph tags
+    add_filter( 'the_seo_framework_og_output', array( $this, 'disable_seo_framework_opengraph' ), 10 );
+    
+    // Jetpack - Disable OpenGraph tags
+    add_filter( 'jetpack_enable_open_graph', array( $this, 'disable_jetpack_opengraph' ), 10 );
 
   }
 
@@ -43,7 +68,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
     preg_match('/mls\_(.*?)$/', $tag, $matches);
 
-    $id_found = $matches[1];
+    $id_found = (isset($matches[1])) ? $matches[1] : '';
 
     $filterstr = "ListingId Eq '{$id_found}'";
 
@@ -95,15 +120,14 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         $page = flexmlsConnect::get_no_listings_page_number();
         $page_data = get_post($page);
         remove_filter('the_content', array('flexmlsConnectPage', 'custom_post_content'));
-        echo apply_filters('the_content', $page_data->post_content);
+        return apply_filters('the_content', $page_data->post_content);
       } else {
-        echo "This listing is no longer available.";
+        return "This listing is no longer available.";
       }
-      return;
     }
 
     $standard_fields_plus = $this->api->GetStandardFields();
-    $standard_fields_plus = $standard_fields_plus[0];
+    $standard_fields_plus = (is_array($standard_fields_plus) && isset($standard_fields_plus[0])) ? $standard_fields_plus[0] : array();
     // $custom_fields = $fmc_api->GetCustomFields();
 
 
@@ -111,19 +135,22 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
     // set some variables
     $record =& $this->listing_data;
+    if ( ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
+      return '<p>This listing is missing required data.</p>';
+    }
     $sf =& $record['StandardFields'];
     $listing_address = flexmlsConnect::format_listing_street_address($record);
-    $first_line_address = htmlspecialchars($listing_address[0]);
-    $second_line_address = htmlspecialchars($listing_address[1]);
-    $one_line_address = htmlspecialchars($listing_address[2]);
-    $one_line_address_add_slashes = addslashes($listing_address[2]);
+    $first_line_address = (isset($listing_address[0])) ? htmlspecialchars($listing_address[0]) : '';
+    $second_line_address = (isset($listing_address[1])) ? htmlspecialchars($listing_address[1]) : '';
+    $one_line_address = (isset($listing_address[2])) ? htmlspecialchars($listing_address[2]) : '';
+    $one_line_address_add_slashes = (isset($listing_address[2])) ? addslashes($listing_address[2]) : '';
     $one_line_without_zip_address = flexmlsSearchUtil::one_line_without_zip_address( $record );
     $mls_fields_to_suppress = flexmlsSearchUtil::mls_fields_to_suppress( $sf );
 
     $compList = flexmlsConnect::mls_required_fields_and_values("Detail",$record);
 
     $custom_fields = array();
-    if (is_array($record["CustomFields"][0]["Main"])) {
+    if (isset($record["CustomFields"]) && is_array($record["CustomFields"]) && isset($record["CustomFields"][0]) && is_array($record["CustomFields"][0]["Main"])) {
       foreach ($record["CustomFields"][0]["Main"] as $data) {
         foreach ($data as $group_name => $fields) {
           foreach ($fields as $field) {
@@ -152,7 +179,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       }
     }
 
-    if (isset($record["CustomFields"][0]["Details"]) and is_array($record["CustomFields"][0]["Details"])) {
+    if (isset($record["CustomFields"]) && is_array($record["CustomFields"]) && isset($record["CustomFields"][0]) && isset($record["CustomFields"][0]["Details"]) && is_array($record["CustomFields"][0]["Details"])) {
       foreach ($record["CustomFields"][0]["Details"] as $data) {
         foreach ($data as $group_name => $fields)
           foreach ($fields as $field)
@@ -164,7 +191,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
     $MlsFieldOrder = $this->api->GetFieldOrder($sf["PropertyType"]);
     $property_features_values = array();
-    if( $MlsFieldOrder ){
+    if( is_array($MlsFieldOrder) && !empty($MlsFieldOrder) ){
       foreach ($MlsFieldOrder as $field){
         foreach ($field as $name => $key){
           foreach ($key as $property){
@@ -336,9 +363,6 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     echo "<div class='flexmls_connect__sr_detail' title='{$one_line_address} - MLS# {$sf['ListingId']}'>";
 
 
-    if ($sf['StateOrProvince'] == 'NY') {
-      echo "<p>{$compList[0][0]} {$compList[0][1]}</p>";
-    }
 
     echo "<hr class='flexmls_connect__sr_divider'>";
     echo "<div class='flexmls_connect__sr_address'>";
@@ -396,6 +420,12 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       echo "<button class='print_click' onclick='flexmls_connect.print(this);'><img src='{$fmc_plugin_url}/assets/images/print.png'align='absmiddle' alt='Print' title='Print' /> Print</button>";
 
       $api_my_account = $this->api->GetMyAccount();
+      $api_prefs = $this->api->GetPreferences();
+      if (!is_array($api_prefs) || !isset($api_prefs['RequiredFields']) || !is_array($api_prefs['RequiredFields'])) {
+        $api_prefs['RequiredFields'] = array();
+      }
+      $phone_req = in_array('phone', $api_prefs['RequiredFields']);
+      $address_req = in_array('address', $api_prefs['RequiredFields']);
 
       if (isset($api_my_account['Name']) && isset($api_my_account['Emails'][0]['Address'])) : ?>
         <button onclick="flexmls_connect.scheduleShowing({
@@ -404,7 +434,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
           'subject': '<?php echo $one_line_address_add_slashes; ?> - MLS# <?php echo addslashes($sf['ListingId']); ?>',
           'agentName': '<?php echo addslashes($api_my_account['Name'])?>',
           'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
-          'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>'
+          'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
+          'phoneRequired': <?php echo $phone_req ? 'true' : 'false'; ?>,
+          'addressRequired': <?php echo $address_req ? 'true' : 'false'; ?>
           <?php if( isset($options['contact_disclaimer']) ) : ?>
 			  ,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'
 		      <?php endif; ?>
@@ -417,7 +449,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         'subject': '<?php echo $one_line_address_add_slashes; ?> - MLS# <?php echo addslashes($sf['ListingId'])?> ',
         'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
         'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
-        'id': '<?php echo addslashes($sf['ListingId']); ?>'
+        'id': '<?php echo addslashes($sf['ListingId']); ?>',
+        'phoneRequired': <?php echo $phone_req ? 'true' : 'false'; ?>,
+        'addressRequired': <?php echo $address_req ? 'true' : 'false'; ?>
         <?php if( isset($options['contact_disclaimer']) ) : ?>
 			  ,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'
 		    <?php endif; ?>
@@ -439,13 +473,16 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     echo "<div class='flexmls_connect__hidden3'></div>";
 
     // Photos
-    if (count($sf['Photos']) >= 1) {
+    if (isset($sf['Photos']) && is_array($sf['Photos']) && count($sf['Photos']) >= 1) {
     $main_photo_url = $sf['Photos'][0]['Uri640'];
     $main_photo_caption = htmlspecialchars($sf['Photos'][0]['Caption'], ENT_QUOTES);
 
       //set alt value
       if(!empty($main_photo_caption)){
         $main_photo_alt = $main_photo_caption;
+      }
+      elseif(!empty($sf['Photos'][0]['Name'])){
+        $main_photo_alt = htmlspecialchars($sf['Photos'][0]['Name'], ENT_QUOTES);
       }
       elseif(!empty($one_line_address)){
         $main_photo_alt = $one_line_address;
@@ -488,6 +525,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
           if(!empty($p['Caption'])){
             $img_alt_attr = htmlspecialchars($p['Caption'], ENT_QUOTES);
           }
+          elseif(!empty($p['Name'])){
+            $img_alt_attr = htmlspecialchars($p['Name'], ENT_QUOTES);
+          }
           elseif(!empty($one_line_address)){
             $img_alt_attr = $one_line_address;
           }
@@ -521,7 +561,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
 
     // Open Houses
-    if ($count_openhouses > 0) {
+    if ($count_openhouses > 0 && isset($sf['OpenHouses']) && is_array($sf['OpenHouses']) && isset($sf['OpenHouses'][0])) {
       $this_o = $sf['OpenHouses'][0];
       echo "<div class='flexmls_connect__sr_openhouse'><em>Open House</em> (". $this_o['Date'] ." - ". $this_o['StartTime'] ." - ". $this_o['EndTime'] .")</div>";
     }
@@ -750,19 +790,56 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
 
       echo "  <hr class='flexmls_connect__sr_divider'>";
+
+      // Compliance information
+      echo "<div class='flexmls_connect__ld_compliance'>";
+      fmcSearchResults::compliance_label( $record, "Detail" );
+      echo "</div>";
+
+      // Office information
+      if ( flexmlsConnect::mls_requires_office_name_in_listing_details() ) {
+        $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of ' : 'Listing Office: ';
+        echo "<div class='flexmls_connect__ld_office_name'>";
+        echo "<span class='flexmls_connect__bold_label'>" . esc_html( $listing_office_label ) . "</span>";
+        echo esc_html( $sf["ListOfficeName"] );
+        echo "</div>";
+      }
+
+      // Agent information
+      if ( flexmlsConnect::mls_requires_agent_name_in_listing_details() ) {
+        echo "<div class='flexmls_connect__ld_agent_info'>";
+        echo "<span class='flexmls_connect__bold_label'>Listing Agent: </span>";
+        echo esc_html( $sf["ListAgentName"] );
+
+        if ( flexmlsConnect::mls_requires_agent_phone_in_listing_details() ) {
+          $phone_number = flexmlsConnect::get_agent_phone_with_fallback( $sf, 'detail' );
+          if ( ! empty( $phone_number ) ) {
+            echo "<br/>" . esc_html( $phone_number );
+          }
+        }
+
+        if ( flexmlsConnect::mls_requires_agent_email_in_listing_details() ) {
+          echo " | " . esc_html( $sf["ListAgentEmail"] );
+        }
+        echo "</div>";
+      }
+
     // disclaimer
       echo "  <div class='flexmls_connect__idx_disclosure_text'>";
 
   if ($sf['StateOrProvince'] != 'NY'){
       foreach ($compList as $reqs){
-          if (flexmlsConnect::is_not_blank_or_restricted($reqs[1])){
-              if ($reqs[0] == 'LOGO'){
-                  echo "<img style='padding-bottom: 5px' src='{$reqs[1]}' alt='{$one_line_address} - MLS# {$sf['ListingId']}' title='{$one_line_address} - MLS# {$sf['ListingId']}' />";
+          if (is_array($reqs) && isset($reqs[1]) && flexmlsConnect::is_not_blank_or_restricted($reqs[1])){
+              if (isset($reqs[0]) && $reqs[0] == 'LOGO'){
+                  // Skip logo display here - handled by compliance section
                   continue;
                 }
+              // Skip office and agent info if already handled by dedicated sections
+              if (isset($reqs[0]) && $reqs[0] != 'Listing Office:' && $reqs[0] != 'Listing Courtesy of' && $reqs[0] != 'Listing Agent:') {
                 echo "<p>{$reqs[0]} {$reqs[1]}</p>";
               }
           }
+      }
   }
 ?>
   <?php if ( array_key_exists( 'CompensationDisclaimer', $sf ) ) : ?>
@@ -809,51 +886,45 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   }
 
   function browse_next_url() {
+    if ( ! is_array( $this->listing_data ) || ! isset( $this->listing_data['StandardFields']['ListingId'] ) ) {
+      return '';
+    }
     $link_criteria = $this->search_criteria;
     $link_criteria['id'] = $this->listing_data['StandardFields']['ListingId'];
     return flexmlsConnect::make_nice_tag_url('next-listing', $link_criteria, $this->type);
   }
 
   function browse_previous_url() {
+    if ( ! is_array( $this->listing_data ) || ! isset( $this->listing_data['StandardFields']['ListingId'] ) ) {
+      return '';
+    }
     $link_criteria = $this->search_criteria;
     $link_criteria['id'] = $this->listing_data['StandardFields']['ListingId'];
     return flexmlsConnect::make_nice_tag_url('prev-listing', $link_criteria,$this->type);
   }
 
   function wp_meta_description_tag() {
-
-      $description = isset($this->listing_data['StandardFields']['PublicRemarks']) ? $this->listing_data['StandardFields']['PublicRemarks'] : get_bloginfo('description');
-
-      echo "<meta name='description' content='" . substr($description, 0, 160) . "'>";
-
+    $description = get_bloginfo('description');
+    if ( is_array( $this->listing_data ) && isset( $this->listing_data['StandardFields']['PublicRemarks'] ) && flexmlsConnect::is_not_blank_or_restricted( $this->listing_data['StandardFields']['PublicRemarks'] ) ) {
+      $description = $this->listing_data['StandardFields']['PublicRemarks'];
+    }
+    echo "<meta name='description' content='" . esc_attr( substr( $description, 0, 160 ) ) . "'>";
   }
 
   function wp_robots_noindex_listing($robots) {
-
-    $link_criteria_mls_status = $this->listing_data['StandardFields']['StandardStatus'] ?? '';
-    
+    if ( ! isset( $this->listing_data ) || ! is_array( $this->listing_data ) ) {
+      $robots['noindex'] = true;
+      $robots['nofollow'] = true;
+      return $robots;
+    }
+    $link_criteria_mls_status = isset( $this->listing_data['StandardFields']['StandardStatus'] ) ? $this->listing_data['StandardFields']['StandardStatus'] : '';
     if ( $link_criteria_mls_status == 'Closed' && get_option( 'blog_public' ) != 0 ) {
       $robots['noindex'] = true;
       $robots['nofollow'] = true;
-      
       return $robots;
-  
-    }  
-    
-    elseif ( ! isset( $this->listing_data ) ) {
-
-      $robots['noindex'] = true;
-      $robots['nofollow'] = true;
-
-      return $robots;
-
-  } else {
-
-      return $robots;
-
+    }
+    return $robots;
   }
-
-}
 
   /**
    * Adds lines to $this->$property_detail_values. The line will only be added
@@ -896,42 +967,351 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     return $title;
   }
 
+  function wpseo_canonical() {
+    // Disable the Yoast canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+    return false;
+  }
+
+  function rankmath_canonical() {
+    // Disable RankMath canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+    return false;
+  }
+
+  function aioseo_canonical() {
+    // Disable All in One SEO canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+    return false;
+  }
+
+  function seo_framework_canonical() {
+    // Disable The SEO Framework canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+    return false;
+  }
+
+  function seopress_canonical() {
+    // Disable SEOPress canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+    return false;
+  }
+
   function open_graph_tags() {
     $site_name = get_bloginfo('name');
     $title = flexmlsConnect::make_nice_address_title($this->listing_data);
-    $thumbnail = ( isset($this->listing_data['StandardFields']['Photos']) ) ? $this->listing_data['StandardFields']['Photos'][0]['Uri1280'] : '';
-    $description = ( isset($this->listing_data['StandardFields']['PublicRemarks']) ) ? substr($this->listing_data['StandardFields']['PublicRemarks'], 0, 140) : '';
+    $sf = ( is_array($this->listing_data) && isset($this->listing_data['StandardFields']) && is_array($this->listing_data['StandardFields']) )
+      ? $this->listing_data['StandardFields']
+      : [];
+    
+    // Get the primary listing image
+    $thumbnail = '';
+    $thumbnail_alt = '';
+    if ( isset($this->listing_data['StandardFields']['Photos']) && is_array($this->listing_data['StandardFields']['Photos']) && isset($this->listing_data['StandardFields']['Photos'][0]) ) {
+      $thumbnail = $this->listing_data['StandardFields']['Photos'][0]['Uri1280'];
+      // Use photo caption, name, or address as alt text
+      if ( !empty($this->listing_data['StandardFields']['Photos'][0]['Caption']) ) {
+        $thumbnail_alt = esc_attr($this->listing_data['StandardFields']['Photos'][0]['Caption']);
+      } elseif ( !empty($this->listing_data['StandardFields']['Photos'][0]['Name']) ) {
+        $thumbnail_alt = esc_attr($this->listing_data['StandardFields']['Photos'][0]['Name']);
+      } else {
+        $thumbnail_alt = esc_attr($title);
+      }
+    }
+    
+    $description = ( isset($sf['PublicRemarks']) ) ? substr($sf['PublicRemarks'], 0, 200) : '';
     $url = flexmlsConnect::make_nice_address_url($this->listing_data);
+    
+    // Get locale (default to en_US, but can be filtered)
+    $locale = apply_filters( 'flexmls_opengraph_locale', get_locale() );
+    // Ensure locale format is correct (e.g., en_US instead of en_US.UTF-8)
+    if ( strpos( $locale, '.' ) !== false ) {
+      $locale = substr( $locale, 0, strpos( $locale, '.' ) );
+    }
+    // Convert to format like en_US (underscore, not hyphen)
+    $locale = str_replace( '-', '_', $locale );
+    
+    // Get listing price for OpenGraph price tags
+    $price_amount = '';
+    $price_currency = 'USD'; // Default to USD, can be filtered
+    $price_currency = apply_filters( 'flexmls_opengraph_price_currency', $price_currency );
+    
+    if ( isset( $sf['CurrentPricePublic'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['CurrentPricePublic'] ) ) {
+      $price_amount = preg_replace( '/[^0-9]/', '', $sf['CurrentPricePublic'] );
+    } elseif ( isset( $sf['ListPrice'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['ListPrice'] ) ) {
+      $price_amount = preg_replace( '/[^0-9]/', '', $sf['ListPrice'] );
+    } elseif ( isset( $sf['ClosePrice'] ) && isset( $sf['MlsStatus'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['ClosePrice'] ) && $sf['MlsStatus'] == 'Closed' ) {
+      $price_amount = preg_replace( '/[^0-9]/', '', $sf['ClosePrice'] );
+    }
 
     echo "<!-- Flexmls® IDX WordPress Plugin - OpenGraph Tags for Listing Detail pages -->" . PHP_EOL;
-    echo "<meta property='og:site_name' content='{$site_name}' />" . PHP_EOL;
-    echo "<meta property='og:title' content='{$title}' />" . PHP_EOL;
-    echo "<meta property='og:image' content='{$thumbnail}' />" . PHP_EOL;
-    echo "<meta property='og:description' content=\"{$description}\" />" . PHP_EOL;
-    echo "<meta property='og:url' content='{$url}' />" . PHP_EOL;
+    
+    // Essential OpenGraph tags
+    echo "<meta property='og:site_name' content='" . esc_attr($site_name) . "' />" . PHP_EOL;
+    echo "<meta property='og:title' content='" . esc_attr($title) . "' />" . PHP_EOL;
+    echo "<meta property='og:description' content=\"" . esc_attr($description) . "\" />" . PHP_EOL;
+    echo "<meta property='og:url' content='" . esc_url($url) . "' />" . PHP_EOL;
     echo "<meta property='og:type' content='website' />" . PHP_EOL;
+    echo "<meta property='og:locale' content='" . esc_attr($locale) . "' />" . PHP_EOL;
+    
+    // Image tags with enhanced metadata
+    if ( !empty($thumbnail) ) {
+      echo "<meta property='og:image' content='" . esc_url($thumbnail) . "' />" . PHP_EOL;
+      echo "<meta property='og:image:secure_url' content='" . esc_url($thumbnail) . "' />" . PHP_EOL;
+      if ( !empty($thumbnail_alt) ) {
+        echo "<meta property='og:image:alt' content='" . $thumbnail_alt . "' />" . PHP_EOL;
+      }
+      // Recommended image dimensions for optimal display (1200x630 is ideal, but we'll use 1280 which is close)
+      echo "<meta property='og:image:width' content='1280' />" . PHP_EOL;
+      echo "<meta property='og:image:height' content='720' />" . PHP_EOL;
+    }
+    
+    // Price information (very useful for real estate listings)
+    if ( !empty($price_amount) ) {
+      echo "<meta property='product:price:amount' content='" . esc_attr($price_amount) . "' />" . PHP_EOL;
+      echo "<meta property='product:price:currency' content='" . esc_attr($price_currency) . "' />" . PHP_EOL;
+    }
+    
+    // Twitter Card tags
     echo "<meta name='twitter:card' content='summary_large_image' />" . PHP_EOL;
-    echo "<meta name='twitter:image' content='{$thumbnail}' />" . PHP_EOL;
-    echo "<meta name='twitter:description' content=\"{$description}\" />" . PHP_EOL;
-    echo "<meta name='twitter:title' content='{$title}' />" . PHP_EOL;
+    echo "<meta name='twitter:title' content='" . esc_attr($title) . "' />" . PHP_EOL;
+    echo "<meta name='twitter:description' content=\"" . esc_attr($description) . "\" />" . PHP_EOL;
+    if ( !empty($thumbnail) ) {
+      echo "<meta name='twitter:image' content='" . esc_url($thumbnail) . "' />" . PHP_EOL;
+      if ( !empty($thumbnail_alt) ) {
+        echo "<meta name='twitter:image:alt' content='" . $thumbnail_alt . "' />" . PHP_EOL;
+      }
+    }
+    
+    // Optional Twitter tags (can be set via filters if needed)
+    $twitter_site = apply_filters( 'flexmls_twitter_site', '' );
+    if ( !empty($twitter_site) ) {
+      echo "<meta name='twitter:site' content='" . esc_attr($twitter_site) . "' />" . PHP_EOL;
+    }
+    
+    $twitter_creator = apply_filters( 'flexmls_twitter_creator', '' );
+    if ( !empty($twitter_creator) ) {
+      echo "<meta name='twitter:creator' content='" . esc_attr($twitter_creator) . "' />" . PHP_EOL;
+    }
+    
     echo "<!-- / Flexmls® IDX WordPress Plugin -->" . PHP_EOL;
   }
 
-function filter_presenters( $filter ) {
-    if (($key = array_search('Yoast\WP\SEO\Presenters\Twitter\Image_Presenter', $filter)) !== false) {
-      unset($filter[$key]);
-    }
-    if (($key = array_search('Yoast\WP\SEO\Presenters\Open_Graph\Image_Presenter', $filter)) !== false) {
-      unset($filter[$key]);
-    }
-    if (($key = array_search('Yoast\WP\SEO\Presenters\Twitter\Description_Presenter', $filter)) !== false) {
-      unset($filter[$key]);
-    }
-    if (($key = array_search('Yoast\WP\SEO\Presenters\Open_Graph\Site_Name_Presenter', $filter)) !== false) {
-      unset($filter[$key]);
+  function filter_presenters( $presenters ) {
+    if ( ! $this->is_listing_detail_page() ) {
+      return $presenters;
     }
 
-    return $filter;
+    // Filter out all OpenGraph and Twitter Card presenters from Yoast
+    if ( is_array( $presenters ) ) {
+      foreach ( $presenters as $key => $presenter ) {
+        // Check if presenter is an OpenGraph presenter
+        if ( is_object( $presenter ) && (
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Title_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Description_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Image_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Url_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Type_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Site_Name_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Open_Graph\Locale_Presenter ||
+          strpos( get_class( $presenter ), 'Yoast\WP\SEO\Presenters\Open_Graph' ) !== false
+        ) ) {
+          unset( $presenters[ $key ] );
+        }
+        // Check if presenter is a Twitter Card presenter
+        elseif ( is_object( $presenter ) && (
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Twitter\Card_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Twitter\Title_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Twitter\Description_Presenter ||
+          $presenter instanceof \Yoast\WP\SEO\Presenters\Twitter\Image_Presenter ||
+          strpos( get_class( $presenter ), 'Yoast\WP\SEO\Presenters\Twitter' ) !== false
+        ) ) {
+          unset( $presenters[ $key ] );
+        }
+      }
+    }
+
+    return $presenters;
+  }
+
+  /**
+   * Check if we're on a listing detail page
+   * 
+   * @return bool True if on listing detail page, false otherwise
+   */
+  private function is_listing_detail_page() {
+    global $fmc_special_page_caught;
+    return ( isset( $fmc_special_page_caught['type'] ) && $fmc_special_page_caught['type'] === 'listing-details' ) ||
+           isset( $this->listing_data );
+  }
+
+  /**
+   * Setup SEOPress OpenGraph and Twitter tag disabling
+   */
+  private function setup_seopress_disabling() {
+    // Try multiple hooks to ensure we catch SEOPress actions early enough
+    $hooks = array(
+      array( 'init', 999 ),
+      array( 'template_redirect', 0 ),
+      array( 'wp', 0 ),
+    );
+    foreach ( $hooks as $hook ) {
+      add_action( $hook[0], array( $this, 'remove_seopress_social_actions' ), $hook[1] );
+    }
+    
+    // Filter individual SEOPress social meta tag values
+    $seopress_filters = array(
+      'seopress_social_og_title',
+      'seopress_social_og_desc',
+      'seopress_social_og_image',
+      'seopress_social_og_url',
+      'seopress_social_og_site_name',
+      'seopress_social_og_locale',
+      'seopress_social_og_type',
+      'seopress_social_og_author',
+      'seopress_social_og_publisher',
+      'seopress_social_fb_pages',
+      'seopress_social_fb_admins',
+      'seopress_social_fb_app_id',
+      'seopress_social_twitter_card',
+      'seopress_social_twitter_site',
+      'seopress_social_twitter_creator',
+      'seopress_social_twitter_title',
+      'seopress_social_twitter_desc',
+      'seopress_social_twitter_image',
+    );
+    foreach ( $seopress_filters as $filter ) {
+      add_filter( $filter, array( $this, 'disable_seopress_opengraph' ), 999 );
+    }
+    
+    // Additional filters to completely disable SEOPress social output
+    $disable_filters = array(
+      'seopress_social_twitter' => '__return_false',
+      'seopress_social_og' => '__return_false',
+      'seopress_disable_twitter' => '__return_true',
+      'seopress_disable_og' => '__return_true',
+    );
+    foreach ( $disable_filters as $filter => $callback ) {
+      add_filter( $filter, $callback, 999 );
+    }
+    
+    // Hook into template output to remove SEOPress tags as last resort
+    add_action( 'template_redirect', array( $this, 'start_seopress_output_buffer' ), 999 );
+  }
+
+  /**
+   * Disable Rank Math OpenGraph tags on listing detail pages
+   */
+  function disable_rankmath_opengraph() {
+    if ( ! $this->is_listing_detail_page() ) {
+      return;
+    }
+    
+    remove_all_actions( 'rank_math/opengraph/facebook' );
+    remove_all_actions( 'rank_math/opengraph/twitter' );
+  }
+
+  /**
+   * Disable All in One SEO Facebook OpenGraph tags on listing detail pages
+   */
+  function disable_aioseo_facebook_tags( $facebookMeta ) {
+    return $this->is_listing_detail_page() ? array() : $facebookMeta;
+  }
+
+  /**
+   * Disable All in One SEO Twitter Card tags on listing detail pages
+   */
+  function disable_aioseo_twitter_tags( $twitterMeta ) {
+    return $this->is_listing_detail_page() ? array() : $twitterMeta;
+  }
+
+  /**
+   * Remove SEOPress social meta tag actions on listing detail pages
+   */
+  function remove_seopress_social_actions() {
+    if ( ! $this->is_listing_detail_page() ) {
+      return;
+    }
+    
+    // Remove SEOPress OpenGraph and Twitter Card actions with various priorities
+    // SEOPress may use different priorities, so we try common ones
+    $priorities = array( 1, 10, 99, 100 );
+    foreach ( $priorities as $priority ) {
+      remove_action( 'wp_head', 'seopress_social_og', $priority );
+      remove_action( 'wp_head', 'seopress_social_twitter', $priority );
+      remove_action( 'wp_head', 'seopress_social_facebook', $priority );
+    }
+    
+    // Also try removing by class method if SEOPress uses object-oriented approach
+    if ( class_exists( 'SEOPress\Actions\Social\TwitterCard' ) ) {
+      remove_action( 'wp_head', array( 'SEOPress\Actions\Social\TwitterCard', 'twitter_card' ), 1 );
+    }
+    if ( class_exists( 'SEOPress\Actions\Social\OpenGraph' ) ) {
+      remove_action( 'wp_head', array( 'SEOPress\Actions\Social\OpenGraph', 'opengraph' ), 1 );
+    }
+    
+    // Remove all actions that might output Twitter or OpenGraph tags
+    global $wp_filter;
+    if ( isset( $wp_filter['wp_head'] ) ) {
+      foreach ( $wp_filter['wp_head']->callbacks as $priority => $callbacks ) {
+        foreach ( $callbacks as $callback ) {
+          $function = isset( $callback['function'] ) ? $callback['function'] : null;
+          if ( is_string( $function ) && (
+            strpos( $function, 'seopress_social_twitter' ) !== false ||
+            strpos( $function, 'seopress_social_og' ) !== false ||
+            strpos( $function, 'seopress_social_facebook' ) !== false
+          ) ) {
+            remove_action( 'wp_head', $function, $priority );
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Start output buffering to remove SEOPress social tags from final HTML
+   */
+  function start_seopress_output_buffer() {
+    if ( ! $this->is_listing_detail_page() ) {
+      return;
+    }
+    
+    ob_start( array( $this, 'remove_seopress_tags_from_output' ) );
+  }
+
+  /**
+   * Remove SEOPress Twitter Card tags from output buffer
+   */
+  function remove_seopress_tags_from_output( $buffer ) {
+    // Remove SEOPress Twitter Card meta tags that might have slipped through
+    $patterns = array(
+      '/<meta\s+name=["\']twitter:card["\'][^>]*\/?>/i',
+      '/<meta\s+name=["\']twitter:site["\'][^>]*\/?>/i',
+      '/<meta\s+name=["\']twitter:creator["\'][^>]*\/?>/i',
+      '/<meta\s+name=["\']twitter:title["\'][^>]*\/?>/i',
+    );
+    
+    foreach ( $patterns as $pattern ) {
+      $buffer = preg_replace( $pattern, '', $buffer );
+    }
+    
+    return $buffer;
+  }
+
+  /**
+   * Disable SEOPress OpenGraph tags on listing detail pages
+   */
+  function disable_seopress_opengraph( $value ) {
+    return $this->is_listing_detail_page() ? false : $value;
+  }
+
+  /**
+   * Disable The SEO Framework OpenGraph tags on listing detail pages
+   */
+  function disable_seo_framework_opengraph( $output ) {
+    return $this->is_listing_detail_page() ? '' : $output;
+  }
+
+  /**
+   * Disable Jetpack OpenGraph tags on listing detail pages
+   */
+  function disable_jetpack_opengraph( $enabled ) {
+    return $this->is_listing_detail_page() ? false : $enabled;
   }
 
 	function iframe_from_html_or_url( $html_or_url ) {

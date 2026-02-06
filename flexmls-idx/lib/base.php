@@ -179,26 +179,30 @@ class flexmlsConnect {
     $return = "";
 
     if (is_array($args)) {
-      $return .= $args['before_widget'];
-      $return .= $args['before_title'];
+      $return .= isset($args['before_widget']) ? $args['before_widget'] : '';
+      $return .= isset($args['before_title']) ? $args['before_title'] : '';
       $return .= isset($settings['title']) ? $settings['title'] : '';
-      $return .= $args['after_title'];
+      $return .= isset($args['after_title']) ? $args['after_title'] : '';
     }
 
-    if ($api->last_error_code == 1500) {
+    $last_error_code = isset($api->last_error_code) ? $api->last_error_code : null;
+    if ($last_error_code == 1500) {
       $message = "This widget requires a subscription to Flexmls&reg; IDX in order to work.  <a href=''>Buy Now</a>.";
     }
+    elseif ($last_error_code == 1010) {
+      $message = "This widget is unavailable because your Flexmls&reg; IDX Plugin Key has been disabled. Please contact the Flexmls IDX Consultant Team: <a href='tel:8663209977'>(866)320-9977</a> or <a href='mailto:idxsales@fbsdata.com'>Email</a>.";
+    }
     elseif ($detailed == true) {
-      $message = "There was an issue communicating with the Flexmls&reg; IDX API services required to generate this widget.  Please refresh the page or try again later.  Error code: ".$api->last_error_code;
+      $message = "There was an issue communicating with the Flexmls&reg; IDX API services required to generate this widget.  Please refresh the page or try again later.  Error code: ".$last_error_code;
     }
     else {
-      $message = "This widget is temporarily unavailable.  Please refresh the page or try again later.  Error code: ".$api->last_error_code;
+      $message = "This widget is temporarily unavailable.  Please refresh the page or try again later.  Error code: ".$last_error_code;
     }
 
     $return .= $message;
 
     if (is_array($args)) {
-      $return .= $args['after_widget'];
+      $return .= isset($args['after_widget']) ? $args['after_widget'] : '';
     }
 
     return $return;
@@ -334,8 +338,10 @@ class flexmlsConnect {
 
   static function get_destination_link() {
     $options = get_option('fmc_settings');
-    $permalink = get_permalink($options['destlink']);
-    return $permalink;
+    if ( ! is_array( $options ) || empty( $options['destlink'] ) ) {
+      return false;
+    }
+    return get_permalink( $options['destlink'] );
   }
 
 
@@ -398,9 +404,7 @@ class flexmlsConnect {
 
   static function get_destination_window_pref() {
     $fmc_settings = get_option( 'fmc_settings' );
-    return $fmc_settings[ 'destwindow' ];
-    //$options = new Fmc_Settings;
-	//return $options->destwindow();
+    return ( is_array( $fmc_settings ) && array_key_exists( 'destwindow', $fmc_settings ) ) ? $fmc_settings['destwindow'] : '';
   }
 
   static function get_destination_pref() {
@@ -671,7 +675,7 @@ class flexmlsConnect {
       // or protection is keeping PHP from knowing what $_GET is
 
       $full_requested_url = (preg_match('/^HTTP\//', $_SERVER['SERVER_PROTOCOL'])) ? "http" : "https";
-      $full_requested_url .= "://". $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+      $full_requested_url .= "://" . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '') . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '');
 
       $query_string = parse_url($full_requested_url, PHP_URL_QUERY);
       $query_parts = explode("&", $query_string ?? '');
@@ -737,8 +741,10 @@ class flexmlsConnect {
 
 
   static function format_listing_street_address($data) {
-
-    $listing = $data['StandardFields'] ?? [];
+    if ( ! is_array( $data ) ) {
+      return array( '', '', '' );
+    }
+    $listing = isset( $data['StandardFields'] ) && is_array( $data['StandardFields'] ) ? $data['StandardFields'] : array();
     $first_line_address = ( isset($listing['UnparsedFirstLineAddress']) && flexmlsConnect::is_not_blank_or_restricted($listing['UnparsedFirstLineAddress'])) ? $listing['UnparsedFirstLineAddress'] : "";
     $second_line_address = "";
 
@@ -806,10 +812,11 @@ class flexmlsConnect {
   }
 
   static function make_nice_address_url($data, $params = array(), $type='fmc_tag') {
-    
-    $address = ( isset($data) ) ? flexmlsConnect::format_listing_street_address($data) : '';
-
-    $return = ( !empty($address) ) ? $address[0] .'-'. $address[1] .'-mls_'. $data['StandardFields']['ListingId'] : '';
+    if ( ! is_array( $data ) || ! isset( $data['StandardFields']['ListingId'] ) ) {
+      return '';
+    }
+    $address = flexmlsConnect::format_listing_street_address($data);
+    $return = ( ! empty( $address ) && isset( $address[0], $address[1] ) ) ? $address[0] . '-' . $address[1] . '-mls_' . $data['StandardFields']['ListingId'] : '';
     $return = preg_replace('/[^\w]/', '-', $return);
 
     while (preg_match('/\-\-/', $return)) {
@@ -839,10 +846,11 @@ class flexmlsConnect {
   }
 
   static function make_nice_address_title($data) {
-    
-    $address = ( isset($data) ) ? flexmlsConnect::format_listing_street_address($data) : '';
-
-    $return = ( !empty($address) ) ? $address[0] .', '. $address[1] .' (MLS# '. $data['StandardFields']['ListingId'] .')' : '';
+    if ( ! is_array( $data ) || ! isset( $data['StandardFields']['ListingId'] ) ) {
+      return '';
+    }
+    $address = flexmlsConnect::format_listing_street_address($data);
+    $return = ( ! empty( $address ) && isset( $address[0], $address[1] ) ) ? $address[0] . ', ' . $address[1] . ' (MLS# ' . $data['StandardFields']['ListingId'] . ')' : '';
     $return = flexmlsConnect::clean_spaces_and_trim($return);
 
     return $return;
@@ -924,6 +932,9 @@ class flexmlsConnect {
     global $fmc_api;
 
     $api_system_info = $fmc_api->GetSystemInfo();
+    if ( ! is_array( $api_system_info ) || empty( $api_system_info['Configuration'][0]['IdxDisclaimer'] ) ) {
+      return '';
+    }
     return trim( $api_system_info['Configuration'][0]['IdxDisclaimer'] );
   }
 
@@ -935,32 +946,129 @@ class flexmlsConnect {
   static function message_me($subject, $body, $from_email){
     global $fmc_api;
     $my_account = $fmc_api->GetMyAccount();
+    if ( ! is_array( $my_account ) || ! isset( $my_account['Id'] ) ) {
+      return false;
+    }
     $sender = $fmc_api->GetContacts(null, array("_select" => "Id", "_filter" => "PrimaryEmail Eq '{$from_email}'"));
+    if ( ! is_array( $sender ) || ! isset( $sender[0]['Id'] ) ) {
+      return false;
+    }
     return $fmc_api->AddMessage(array(
-    'Type'       => 'General',
-    'Subject'    => $subject,
-    'Body'       => $body,
-    'Recipients' => array($my_account['Id']),
-    'SenderId'   => $sender[0]['Id']
+      'Type'       => 'General',
+      'Subject'    => $subject,
+      'Body'       => $body,
+      'Recipients' => array($my_account['Id']),
+      'SenderId'   => $sender[0]['Id']
     ));
   }
 
   static function mls_requires_office_name_in_search_results() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Summary"]["DisplayCompliance"]);
-
-    return (in_array("ListOfficeName",$compList));
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance']
+      : array();
+    return in_array( 'ListOfficeName', $compList );
   }
 
   static function mls_requires_agent_name_in_search_results() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance']
+      : array();
+    return in_array( 'ListAgentName', $compList );
+  }
+
+  static function mls_requires_agent_phone_in_search_results() {
+    global $fmc_api;
+    $api_system_info = $fmc_api->GetSystemInfo();
     $mlsId = $api_system_info["MlsId"];
     $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Summary"]["DisplayCompliance"]);
-  
+
+    return (in_array("ListAgentPhone", $compList));
+  }
+
+  static function mls_requires_agent_email_in_search_results() {
+    global $fmc_api;
+    $api_system_info = $fmc_api->GetSystemInfo();
+    $mlsId = $api_system_info["MlsId"];
+    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Summary"]["DisplayCompliance"]);
+
+    return (in_array("ListAgentEmail", $compList));
+  }
+
+  // Similar methods for Detail view
+  static function mls_requires_agent_name_in_listing_details() {
+    global $fmc_api;
+    $api_system_info = $fmc_api->GetSystemInfo();
+    $mlsId = $api_system_info["MlsId"];
+    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+
     return (in_array("ListAgentName", $compList));
+  }
+
+  static function mls_requires_agent_phone_in_listing_details() {
+    global $fmc_api;
+    $api_system_info = $fmc_api->GetSystemInfo();
+    $mlsId = $api_system_info["MlsId"];
+    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+
+    // Check for both ListMemberPhone (detail view) and ListAgentPhone (fallback)
+    return (in_array("ListMemberPhone", $compList) || in_array("ListAgentPhone", $compList));
+  }
+
+  static function mls_requires_agent_email_in_listing_details() {
+    global $fmc_api;
+    $api_system_info = $fmc_api->GetSystemInfo();
+    $mlsId = $api_system_info["MlsId"];
+    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+
+    return (in_array("ListMemberEmail", $compList));
+  }
+
+  static function mls_requires_office_name_in_listing_details() {
+    global $fmc_api;
+    $api_system_info = $fmc_api->GetSystemInfo();
+    $mlsId = $api_system_info["MlsId"];
+    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+
+    return (in_array("ListOfficeName", $compList));
+  }
+
+  /**
+   * Get agent phone with fallback to preferred phone and office phone if agent phone is blank/restricted
+   * Uses the same logic for both search results and listing details
+   *
+   * @param array $sf StandardFields array
+   * @param string $context 'search' or 'detail' - for future use if needed
+   * @return string Phone number or empty string
+   */
+  static function get_agent_phone_with_fallback( $sf, $context = 'search' ) {
+    // Array of phone fields in priority order
+    $phone_fields = array(
+      'ListAgentPhone',
+      'ListAgentPreferredPhone', 
+      'ListOfficePhone'
+    );
+    
+    // Loop through phone fields and return the first valid one
+    foreach ( $phone_fields as $field ) {
+      if ( isset( $sf[$field] ) && flexmlsConnect::is_not_blank_or_restricted( $sf[$field] ) ) {
+        return $sf[$field];
+      }
+    }
+    
+    // Return empty string if none are available
+    return '';
   }
 
   static function mls_required_fields_and_values($type, &$record){
@@ -968,31 +1076,38 @@ class flexmlsConnect {
     //$record GetListings(params)[0]
     global $fmc_plugin_url;
     global $fmc_api;
+    if ( ! is_array( $record ) || ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
+      return array();
+    }
+    $sf = $record['StandardFields'];
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"][$type]['DisplayCompliance']);
-    $sf = $record["StandardFields"];
-
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return array();
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View'][$type]['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View'][$type]['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View'][$type]['DisplayCompliance']
+      : array();
 
     //Get Adresses
     //Since these fields take a considerable amount of time to get, check if they are required from the compliance list beforehand.
     $OfficeAddress = '';
-    if (in_array('ListOfficeAddress',$compList)){
-        $OfficeInfo = $fmc_api->GetAccountsByOffice($sf["ListOfficeId"]);
-        $OfficeAddress = ($OfficeInfo[0]["Addresses"][0]["Address"]);
+    if ( in_array( 'ListOfficeAddress', $compList ) && isset( $sf['ListOfficeId'] ) ) {
+      $OfficeInfo = $fmc_api->GetAccountsByOffice( $sf['ListOfficeId'] );
+      $OfficeAddress = ( is_array( $OfficeInfo ) && isset( $OfficeInfo[0]['Addresses'][0]['Address'] ) ) ? $OfficeInfo[0]['Addresses'][0]['Address'] : '';
     }
 
     $AgentAddress = '';
-    if (in_array('ListMemberAddress',$compList)){
-        $AgentInfo  = $fmc_api->GetAccount($sf["ListAgentId"]);
-        $AgentAddress = ($AgentInfo["Addresses"][0]["Address"]);
-          }
+    if ( in_array( 'ListMemberAddress', $compList ) && isset( $sf['ListAgentId'] ) ) {
+      $AgentInfo = $fmc_api->GetAccount( $sf['ListAgentId'] );
+      $AgentAddress = ( is_array( $AgentInfo ) && isset( $AgentInfo['Addresses'][0]['Address'] ) ) ? $AgentInfo['Addresses'][0]['Address'] : '';
+    }
 
-          $CoAgentAddress = '';
-    if (in_array('CoListAgentAddress',$compList)){
-      $CoAgentInfo  = $fmc_api->GetAccount($sf["CoListAgentId"]);
-      $CoAgentAddress = ($CoAgentInfo["Addresses"][0]["Address"]);
-          }
+    $CoAgentAddress = '';
+    if ( in_array( 'CoListAgentAddress', $compList ) && isset( $sf['CoListAgentId'] ) ) {
+      $CoAgentInfo = $fmc_api->GetAccount( $sf['CoListAgentId'] );
+      $CoAgentAddress = ( is_array( $CoAgentInfo ) && isset( $CoAgentInfo['Addresses'][0]['Address'] ) ) ? $CoAgentInfo['Addresses'][0]['Address'] : '';
+    }
 
     //Names
     $AgentName = "";
@@ -1028,14 +1143,25 @@ class flexmlsConnect {
     $LastModifiedDate = flexmlsConnect::format_date("F - d - Y", $sf["ModificationTimestamp"]);
 
     $logo="";
-    if ($api_system_info['Configuration'][0]['IdxLogoSmall']){
-      $logo = $api_system_info['Configuration'][0]['IdxLogoSmall'];
-    }
-    elseif ($api_system_info['Configuration'][0]['IdxLogo']){
-        $logo = $api_system_info['Configuration'][0]['IdxLogo'];
-    }
-    else{
-      $logo = "IDX";
+    // Only set logo if IDXLogo is required in the compliance settings
+    if (in_array('IDXLogo', $compList)) {
+      if ($type == 'Summary') {
+        if (isset($api_system_info['Configuration'][0]['IdxLogoSmall']) && !empty($api_system_info['Configuration'][0]['IdxLogoSmall'])) {
+          $logo = $api_system_info['Configuration'][0]['IdxLogoSmall'];
+        } else {
+          $logo = "IDX";
+        }
+      }
+      elseif ($type == 'Detail') {
+        if (isset($api_system_info['Configuration'][0]['IdxLogo']) && !empty($api_system_info['Configuration'][0]['IdxLogo'])) {
+          $logo = $api_system_info['Configuration'][0]['IdxLogo'];
+        } else {
+          $logo = "IDX";
+        }
+      }
+      else {
+        $logo = "IDX";
+      }
     }
 
     $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of' : 'Listing Office:';
@@ -1091,9 +1217,9 @@ class flexmlsConnect {
    * @return string Cleaned string
    */
   static function clean_comma_list($var) {
-
+    $var = ( $var !== null && $var !== '' ) ? (string) $var : '';
     $return = "";
-    if ( strpos($var, ',') !== false ) {
+    if ( $var !== '' && strpos( $var, ',' ) !== false ) {
       // $var contains a comma so break it apart into a list...
       $list = explode(",", $var);
       // trim the extra spaces and weird characters from the beginning and end of each item in the list...
@@ -1278,7 +1404,21 @@ class flexmlsConnect {
 	}
 
   static function translate_tiny_code($tiny_id){
-    $t_id = (string) flexmlsConnect::bc_base_convert($tiny_id,36,10);
+    $tiny_id = trim( (string) $tiny_id );
+    $base36  = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $valid   = ( $tiny_id !== '' && strlen( $tiny_id ) <= 64 );
+    if ( $valid ) {
+      for ( $i = 0; $i < strlen( $tiny_id ); $i++ ) {
+        if ( strpos( $base36, $tiny_id[ $i ] ) === false ) {
+          $valid = false;
+          break;
+        }
+      }
+    }
+    if ( ! $valid ) {
+      return '20000000';
+    }
+    $t_id = (string) flexmlsConnect::bc_base_convert( $tiny_id, 36, 10 );
     $prefix = "20";
     if ( $t_id[0]=='9' && strlen($t_id) == 18){
       $prefix="19";

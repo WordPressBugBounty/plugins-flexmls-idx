@@ -43,8 +43,8 @@ class flexmlsAPI_Core {
     public $api_headers = array(
         'Accept-Encoding' => "gzip,deflate",
         'Content-Type' => "application/json",
-        'User-Agent' => "Flexmls WordPress Plugin/3.15.5",
-        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.15.5"
+        'User-Agent' => "Flexmls WordPress Plugin/3.15.11",
+        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.15.11"
     );
 
 
@@ -59,9 +59,24 @@ class flexmlsAPI_Core {
     }
 
     static function admin_notices_api_connection_error(){
-        echo '	<div class="notice notice-error">
-					<p>There was an error connecting to the Flexmls&reg; IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message, please <a href="' . admin_url( 'admin.php?page=fmc_admin_settings&tab=support' ) . '">contact support</a>.</p>
-				</div>';
+        global $fmc_api;
+        // Check for specific error code 1010 (Plugin Key Disabled)
+        if ( isset( $fmc_api ) && $fmc_api->last_error_code == 1010 ) {
+            echo '	<div class="notice notice-error">
+						<p>Your Flexmls&reg; IDX Plugin Key has been disabled.
+						<ul style="list-style-type: square; padding-left: 25px;">
+						<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
+						please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
+						<p>or</p></li>
+						<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
+						</ul>
+						</p>
+					</div>';
+        } else {
+            echo '	<div class="notice notice-error">
+						<p>There was an error connecting to the Flexmls&reg; IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message, please <a href="' . admin_url( 'admin.php?page=fmc_admin_settings&tab=support' ) . '">contact support</a>.</p>
+					</div>';
+        }
     }
 
     function SetApplicationName( $name ){
@@ -527,8 +542,10 @@ class flexmlsAPI_Core {
         $response = $this->return_all_results( $this->MakeAPICall("GET", "connect/prefs", '24h') );
 
         $records = array();
-        foreach ($response as $pref) {
-            $records[$pref['Name']] = $pref['Value'];
+        if (is_array($response)) {
+            foreach ($response as $pref) {
+                $records[$pref['Name']] = $pref['Value'];
+            }
         }
 
         return $records;

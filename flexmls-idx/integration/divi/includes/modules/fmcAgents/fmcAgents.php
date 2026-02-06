@@ -28,7 +28,7 @@ class FMCD_fmcAgents extends FMCD_module {
              'option_category' => 'basic_option',
              'description'     => esc_html__( '', 'fmcd-divi' ),
              'toggle_slug'     => 'flexmls_basic',
-             'default' => $api_my_account['UserType']
+             'default' => ( is_array( $api_my_account ) && isset( $api_my_account['UserType'] ) ) ? $api_my_account['UserType'] : ''
           ),
           'search_type' => array(
              'label'           => esc_html__( 'Show Offices or Agents by default', 'fmcd-divi' ),

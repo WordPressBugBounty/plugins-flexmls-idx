@@ -133,7 +133,10 @@ class fmcSearch_v1 extends fmcWidget {
     }
 
     $idx_link_details = flexmlsConnect::get_idx_link_details($my_link);
-    $detailed_search_url = flexmlsConnect::make_destination_link($idx_link_details['Uri']);
+    $detailed_search_url = '';
+    if ( is_array($idx_link_details) && isset($idx_link_details['Uri']) ) {
+      $detailed_search_url = flexmlsConnect::make_destination_link($idx_link_details['Uri']);
+    }
 
 
     // set border radius code
@@ -191,7 +194,7 @@ class fmcSearch_v1 extends fmcWidget {
       $submit_return .= "<input type='hidden' name='query' value='' />";
     } else {
       // include the link if it's a Saved Search - added 1-29-2013 by Brandon Medenwald (WP-137)
-      if ($idx_link_details['LinkType'] == "SavedSearch") {
+      if ( is_array($idx_link_details) && isset($idx_link_details['LinkType']) && $idx_link_details['LinkType'] == "SavedSearch") {
         $submit_return .= "<input type='hidden' name='SavedSearch' class='flexmls_connect__link
           flexmls_connect__search_new_submit' value='{$idx_link_details['SearchId']}' />";
       }
@@ -280,13 +283,15 @@ class fmcSearch_v1 extends fmcWidget {
     foreach ($setting_fields as $name => $details) {
 
       if ($details['output'] == "text") {
-        $instance[$name] = strip_tags($new_instance[$name]);
+        $instance[$name] = isset($new_instance[$name]) ? strip_tags($new_instance[$name]) : ($instance[$name] ?? '');
       }
       elseif ($details['output'] == "list") {
-        $instance[$name] = implode(",", array_map('strip_tags', $new_instance[$name]) );
+        $instance[$name] = (isset($new_instance[$name]) && is_array($new_instance[$name]))
+          ? implode(",", array_map('strip_tags', $new_instance[$name]))
+          : ($instance[$name] ?? '');
       }
       elseif ($details['output'] == "enabler") {
-        $instance[$name] = ( $new_instance[$name] == "on" ) ? "on" : "off";
+        $instance[$name] = (isset($new_instance[$name]) && $new_instance[$name] == "on") ? "on" : "off";
       }
 
     }
@@ -316,7 +321,7 @@ class fmcSearch_v1 extends fmcWidget {
     global $fmc_api;
 
     $api_standard_fields = $fmc_api->GetStandardFields();
-    $api_standard_fields = $api_standard_fields[0];
+    $api_standard_fields = (is_array($api_standard_fields) && isset($api_standard_fields[0]) && is_array($api_standard_fields[0])) ? $api_standard_fields[0] : array();
 
     $search_conditions = array();
 
@@ -345,7 +350,7 @@ class fmcSearch_v1 extends fmcWidget {
     // fetch other interesting values from the provided submission.
     // mainly to catch location search values and the selected property types
     foreach ($query_parts as $part_key => $part_value) {
-      if ( array_key_exists($part_key, $api_standard_fields) and !empty($part_value) ) {
+      if ( is_array($api_standard_fields) && array_key_exists($part_key, $api_standard_fields) and !empty($part_value) ) {
         $search_conditions[$part_key] = stripslashes($part_value);
       }
     }
@@ -380,21 +385,25 @@ class fmcSearch_v1 extends fmcWidget {
     );
 
     $standard_fields = $fmc_api->GetStandardFields();
-    $standard_fields = $standard_fields[0];
+    $standard_fields = (is_array($standard_fields) && isset($standard_fields[0]) && is_array($standard_fields[0])) ? $standard_fields[0] : array();
 
-    if (array_key_exists('BathsTotal', $standard_fields)) {
+    if (is_array($standard_fields) && array_key_exists('BathsTotal', $standard_fields)) {
       if (array_key_exists('MlsVisible', $standard_fields['BathsTotal']) and empty($standard_fields['BathsTotal']['MlsVisible'])) {
         $fields_to_catch['Baths'] = "BathsFull";
       }
     }
 
-    $query = stripslashes($_POST['query']);
-    $my_link = stripslashes($_POST['link']);
+    $query = isset($_POST['query']) ? stripslashes($_POST['query']) : '';
+    $my_link = isset($_POST['link']) ? stripslashes($_POST['link']) : '';
 
     $query_conditions = array();
     $std_query_conditions = array();
 
     // break the 'query' value apart and start saving the operators and values separately
+    // Ensure query is a string before exploding
+    if ( empty($query) || !is_string($query) ) {
+      $query = '';
+    }
     $conds = explode("&", $query);
     foreach ($conds as $c) {
       $key = "";
@@ -413,7 +422,19 @@ class fmcSearch_v1 extends fmcWidget {
       }
 
       // break the key/value apart based on the operator found
-      list($key, $value) = explode($operator, $c, 2);
+      $exploded = explode($operator, $c, 2);
+      
+      // Ensure we have at least 2 elements (key and value)
+      if (count($exploded) < 2) {
+        continue; // Skip this condition if it's malformed
+      }
+      
+      list($key, $value) = $exploded;
+      
+      // Ensure value is not null before processing
+      if ($value === null) {
+        $value = '';
+      }
 
       $vals = explode(",", $value);
       $vals = array_map( array('flexmlsConnect', 'strip_quotes') , $vals);
@@ -834,19 +855,23 @@ class fmcSearch_v1 extends fmcWidget {
     <div class='flexmls_connect__search_field' data-connect-type='number'
       data-connect-field='<?php echo $data_connect_field; ?>'>
 
-      <label class='flexmls_connect__search_new_label' for='<?php echo $field_for; ?>'>
+      <label class='flexmls_connect__search_new_label' for='<?php echo $min_input_id; ?>'>
         <?php echo $field_label; ?>
       </label>
 
-      <input type='text' class='text' value="<?php echo $min_input_value; ?>" name="<?php echo $min_input_name; ?>"
-        id="<?php echo $min_input_id; ?>" data-connect-default="<?php echo $min_data_connect_default; ?>"
-        <?php echo $min_input_js; ?> />
+      <div class="flexmls_connect__min_max_wrapper">
+        <input type='text' class='text' value="<?php echo $min_input_value; ?>" name="<?php echo $min_input_name; ?>"
+          id="<?php echo $min_input_id; ?>" data-connect-default="<?php echo $min_data_connect_default; ?>"
+          aria-label="Minimum <?php echo strtolower($field_label); ?>" placeholder="Min"
+          <?php echo $min_input_js; ?> />
 
-      <span class='flexmls_connect__search_new_to'>to</span>
+        <span class='flexmls_connect__search_new_to' aria-hidden="true">to</span>
 
-      <input type='text' class='text' value="<?php echo $max_input_value; ?>" name="<?php echo $max_input_name; ?>"
-        id="<?php echo $max_input_id; ?>" data-connect-default="<?php echo $max_data_connect_default; ?>"
-        <?php echo $max_input_js; ?> />
+        <input type='text' class='text' value="<?php echo $max_input_value; ?>" name="<?php echo $max_input_name; ?>"
+          id="<?php echo $max_input_id; ?>" data-connect-default="<?php echo $max_data_connect_default; ?>"
+          aria-label="Maximum <?php echo strtolower($field_label); ?>" placeholder="Max"
+          <?php echo $max_input_js; ?> />
+      </div>
 
     </div>
 

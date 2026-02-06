@@ -52,12 +52,20 @@ class fmcWidget extends WP_Widget {
 		}
 		else {
 			$return = $this->jelly($args, $instance, $type);
-			$cache_set_result = set_transient('fmc_cache_'. $cache_item_name, $return, $widget_info['max_cache_time']);
+			$transient_name = 'fmc_cache_' . $cache_item_name;
+			$cache_set_result = set_transient($transient_name, $return, $widget_info['max_cache_time']);
 
-			// update transient item which tracks cache items
+			// update transient item which tracks cache items (existing system)
 			$cache_tracker = get_transient('fmc_cache_tracker');
+			if ( ! is_array( $cache_tracker ) ) {
+				$cache_tracker = array();
+			}
 			$cache_tracker[ $cache_item_name ] = true;
 			set_transient('fmc_cache_tracker', $cache_tracker, 60*60*24*7);
+
+			// Also track in the new system for object cache compatibility
+			$spark = new \SparkAPI\Core();
+			$spark->track_transient( $transient_name, 'fmc_cache_' );
 		}
 
 		return $return;

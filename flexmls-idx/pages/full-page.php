@@ -59,7 +59,17 @@ class flexmlsConnectPage {
 
 
       if ( !empty($fmc_special_page_caught['page-url']) ) {
+        // Remove WordPress default canonical
         remove_action('wp_head', 'rel_canonical');
+        
+        // Remove other SEO plugin canonical actions
+        remove_action('wp_head', 'wpseo_canonical');
+        remove_action('wp_head', 'rank_math_canonical');
+        remove_action('wp_head', 'aioseo_canonical');
+        remove_action('wp_head', 'the_seo_framework_canonical');
+        remove_action('wp_head', 'seopress_canonical');
+        
+        // Add our custom canonical
         add_action('wp_head', array('flexmlsConnectPage', 'rel_canonical') );
       }
     }
@@ -77,7 +87,17 @@ class flexmlsConnectPage {
 
 
       if ( !empty($fmc_special_page_caught['page-url']) ) {
+        // Remove WordPress default canonical
         remove_action('wp_head', 'rel_canonical');
+        
+        // Remove other SEO plugin canonical actions
+        remove_action('wp_head', 'wpseo_canonical');
+        remove_action('wp_head', 'rank_math_canonical');
+        remove_action('wp_head', 'aioseo_canonical');
+        remove_action('wp_head', 'the_seo_framework_canonical');
+        remove_action('wp_head', 'seopress_canonical');
+        
+        // Add our custom canonical
         add_action('wp_head', array('flexmlsConnectPage', 'rel_canonical') );
       }
     }

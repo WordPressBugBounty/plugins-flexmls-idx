@@ -49,11 +49,7 @@
             ];
 
             foreach ($swichers as $value) {
-                if($props[$value]=='yes'){
-                    $props[$value] = 'on';
-                } else {
-                    $props[$value] = 'off';
-                }
+                $props[$value] = ( isset( $props[$value] ) && $props[$value] === 'yes' ) ? 'on' : 'off';
             }
 
             $props['width'] = $props['width_']['size'];

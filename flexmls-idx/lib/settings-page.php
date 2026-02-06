@@ -100,9 +100,10 @@ class flexmlsConnectSettings {
     if(count($input) > 0) {
       global $fmc_api;
       $api_property_fields = $fmc_api->GetStandardFields();
+      $api_property_fields = (is_array($api_property_fields) && isset($api_property_fields[0]) && is_array($api_property_fields[0])) ? $api_property_fields[0] : array();
 
       foreach ($input as $field_id => $display_name) {
-        if(in_array($field_id, array_keys($api_property_fields[0]))) {
+        if(is_array($api_property_fields) && in_array($field_id, array_keys($api_property_fields))) {
           $valid_fields[$field_id] = sanitize_text_field($display_name);
         }
       }

@@ -219,7 +219,7 @@ class fmcSearchResults_v1 extends fmcWidget {
         $vars["source_options"]['company'] = "My Company's Listings";
       }
       $vars["source_options"]['agent'] = "Specific agent";
-      $vars["office_roster"] = $fmc_api->GetAccountsByOffice( $api_my_account['Id'] );
+      $vars["office_roster"] = ( is_array( $api_my_account ) && isset( $api_my_account['Id'] ) ) ? $fmc_api->GetAccountsByOffice( $api_my_account['Id'] ) : array();
     }
 
     if ( flexmlsConnect::is_company() ) {

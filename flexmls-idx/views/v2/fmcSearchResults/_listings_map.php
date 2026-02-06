@@ -2,9 +2,13 @@
 if ( empty( $settings ) ) { $settings = []; } ?>
 <div class="flexmls-map-wrapper" <?php echo (array_key_exists('default_view', $settings) && $settings['default_view'] == 'map' || $map_parameter_set) ? '' : 'style="display:none;"'; ?>>
 	<?php
-		$results_component = new fmcSearchResults;
-		$pure_conditions = $results_component->get_pure_conditions( $settings );
-		$results_component->load_search_results( 'shortcode', $pure_conditions );
-		$results_component->render_map($search_results);
+		// Check if API is available and class exists before using it
+		$options = get_option( 'fmc_settings' );
+		if ( ! empty( $options['api_key'] ) && ! empty( $options['api_secret'] ) && class_exists( 'fmcSearchResults' ) ) {
+			$results_component = new fmcSearchResults;
+			$pure_conditions = $results_component->get_pure_conditions( $settings );
+			$results_component->load_search_results( 'shortcode', $pure_conditions );
+			$results_component->render_map($search_results);
+		}
 	?>
 </div>

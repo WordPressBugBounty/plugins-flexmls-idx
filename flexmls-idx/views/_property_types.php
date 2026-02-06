@@ -1,13 +1,13 @@
 <?php if ($property_types_selected[0] != ''): ?>
 
-  <div class='flexmls_connect__search_field flexmls_connect__search_new_property_type
+  <fieldset class='flexmls_connect__search_field flexmls_connect__search_new_property_type
     flexmls_connect__search_new_field_group'>
 
+    <legend class='flexmls_connect__search_new_label'>Property Type</legend>
 
     <?php
       if ($property_type_enabled == "on" and count($good_prop_types) > 0):
     ?>
-      <label class='flexmls_connect__search_new_label'>Property Type</label>
     <?php
       foreach ($good_prop_types as $type):
         if(is_array($user_selected_property_types) && in_array($type, $user_selected_property_types))
@@ -15,10 +15,11 @@
         else
           $checked = '';
     ?>
-        <input type='checkbox' name='PropertyType[]' value='<?php echo $type; ?>'
-          class='flexmls_connect__search_new_checkboxes' <?php echo $checked; ?> >
-        <?php echo flexmlsConnect::nice_property_type_label($type); ?>
-        <br>
+        <div class="flexmls_connect__checkbox_wrapper">
+          <input type='checkbox' name='PropertyType[]' value='<?php echo $type; ?>'
+            class='flexmls_connect__search_new_checkboxes' id="property-type-<?php echo $type; ?>-<?php echo $rand; ?>" <?php echo $checked; ?> >
+          <label for="property-type-<?php echo $type; ?>-<?php echo $rand; ?>"><?php echo flexmlsConnect::nice_property_type_label($type); ?></label>
+        </div>
     <?php
       endforeach;
     else:
@@ -30,9 +31,9 @@
     <?php //  property sub type ?>
 
     <?php foreach ($property_sub_types as $property_code => $sub_types): ?>
-      <div id="flexmls_connect__search_new_subtypes_for_<?php echo $property_code; ?>"
+      <fieldset id="flexmls_connect__search_new_subtypes_for_<?php echo $property_code; ?>"
         class="flexmls_connect__search_new_subtypes">
-        <label class='flexmls_connect__search_new_label'>Property Sub Types</label>
+        <legend class='flexmls_connect__search_new_label'>Property Sub Types</legend>
         <?php foreach ($sub_types as $sub_type): ?>
             <?php
                 /* WP-542: Unchecking criteria from IDX Search Widget In Search Results Doesn't Stay */
@@ -48,10 +49,12 @@
                     $checked = '';
                 }
             ?>
-          <input type='checkbox' name='PropertySubType[]' value='<?php echo $sub_type["Value"]; ?>' class='flexmls_connect__search_new_checkboxes' <?php echo $checked; ?>>
-          <?php echo $sub_type["Name"]; ?><br>
+          <div class="flexmls_connect__checkbox_wrapper">
+            <input type='checkbox' name='PropertySubType[]' value='<?php echo $sub_type["Value"]; ?>' class='flexmls_connect__search_new_checkboxes' id="property-subtype-<?php echo $sub_type["Value"]; ?>-<?php echo $rand; ?>" <?php echo $checked; ?>>
+            <label for="property-subtype-<?php echo $sub_type["Value"]; ?>-<?php echo $rand; ?>"><?php echo $sub_type["Name"]; ?></label>
+          </div>
         <?php endforeach;  ?>
-      </div>
+      </fieldset>
     <?php endforeach; ?>
-  </div>
+  </fieldset>
 <?php endif; ?>

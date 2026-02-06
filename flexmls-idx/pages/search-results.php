@@ -14,13 +14,19 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 	protected $type;
 	protected $order_by;
 	public $title;
-  public $default_page_size;
+  	public $default_page_size;
 
 	function __construct( $api, $type = 'fmc_tag' ){
 		parent::__construct($api);
 		$this->type = $type;
 
 		add_filter( 'wpseo_canonical', array( $this, 'wpseo_canonical' ) );
+		
+		// Handle other SEO plugins
+		add_filter( 'rank_math/frontend/canonical', array( $this, 'rankmath_canonical' ), 0 );
+		add_filter( 'aioseo_canonical_url', array( $this, 'aioseo_canonical' ), 0 );
+		add_filter( 'the_seo_framework_meta_canonical', array( $this, 'seo_framework_canonical' ), 0 );
+		add_filter( 'seopress_canonical', array( $this, 'seopress_canonical' ), 0 );
 
 	}
 
@@ -54,6 +60,24 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 		// WP-716: Add preload tags
 		add_action( 'wp_head', array( $this, 'wp_head' ) );
+
+		// Check if API credentials are available
+		$options = get_option( 'fmc_settings' );
+		if ( empty( $options['api_key'] ) || empty( $options['api_secret'] ) ) {
+			// API key is disabled, set empty results to allow page to load
+			$this->title = !empty($this->title) ? $this->title : "";
+			$this->search_data = array();
+			$this->total_pages = 0;
+			$this->current_page = 1;
+			$this->total_rows = 0;
+			$this->page_size = 10;
+			$this->search_criteria = array();
+			$fmc_special_page_caught['type'] = "search-results";
+			$fmc_special_page_caught['page-title'] = "Property Search";
+			$fmc_special_page_caught['post-title'] = "Property Search";
+			$fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_tag_url('search') .'?'. $_SERVER['QUERY_STRING'];
+			return;
+		}
 
 		list($params, $cleaned_raw_criteria, $context) = $this->parse_search_parameters_into_api_request();
 
@@ -118,10 +142,14 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 		self::purge_saved_searches_cache();
 
+		$saved_search_url = '';
+		if ( is_array( $result ) && isset( $result[0]['Id'] ) ) {
+			$saved_search_url = flexmlsConnect::make_nice_tag_url( 'search', array( 'SavedSearch' => $result[0]['Id'] ) );
+		}
 		echo json_encode( array(
 			'result' => $result,
-			'saved_search_url' => flexmlsConnect::make_nice_tag_url( 'search', array( 'SavedSearch' => $result[0][ 'Id' ] )
-		) ) );
+			'saved_search_url' => $saved_search_url,
+		) );
 
 		wp_die();
 	}
@@ -151,6 +179,12 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 		if ( $this->uses_v2_template() ) {
 			global $fmc_plugin_dir;
+			
+			// Ensure the component file is loaded before the view tries to use it
+			if ( ! class_exists( 'fmcSearchResults' ) ) {
+				require_once( FMC_PLUGIN_DIR . 'components/v2/search-results.php' );
+			}
+			
 			ob_start();
 
 			add_filter( 'flexmls_searchable_fields', [ 'flexmlsSearchUtil', 'remove_saved_search_from_searchable_fields' ] );
@@ -304,6 +338,9 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 				$markers      = array();
 				$result_count = 0;
 				foreach ( $this->search_data as $record ) {
+					if ( ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
+						continue;
+					}
 					$result_count ++;
 					$fields = $record['StandardFields'];
 
@@ -312,8 +349,8 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					}
 
 					$listing_address          = flexmlsConnect::format_listing_street_address( $record );
-					$first_line_address       = htmlspecialchars( $listing_address[0] );
-					$second_line_address      = htmlspecialchars( $listing_address[1] );
+					$first_line_address       = isset( $listing_address[0] ) ? htmlspecialchars( $listing_address[0] ) : '';
+					$second_line_address      = isset( $listing_address[1] ) ? htmlspecialchars( $listing_address[1] ) : '';
 					$link_to_details_criteria = is_array($this->search_criteria) ? $this->search_criteria : array();
 
 					$this_result_overall_index = ( $this->page_size * ( $this->current_page - 1 ) ) + $result_count;
@@ -366,13 +403,16 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 		$result_count = 0;
 
 		foreach ($this->search_data as $record) {
+			if ( ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
+				continue;
+			}
 			$result_count++;
 			// Establish some variables
 			$listing_address = flexmlsConnect::format_listing_street_address($record);
-			$first_line_address = htmlspecialchars($listing_address[0]);
-			$second_line_address = htmlspecialchars($listing_address[1]);
-			$one_line_address = htmlspecialchars($listing_address[2]);
-			$one_line_address_add_slashes = addslashes($listing_address[2]);
+			$first_line_address = isset( $listing_address[0] ) ? htmlspecialchars( $listing_address[0] ) : '';
+			$second_line_address = isset( $listing_address[1] ) ? htmlspecialchars( $listing_address[1] ) : '';
+			$one_line_address = isset( $listing_address[2] ) ? htmlspecialchars( $listing_address[2] ) : '';
+			$one_line_address_add_slashes = isset( $listing_address[2] ) ? addslashes( $listing_address[2] ) : '';
 			$link_to_details_criteria = is_array($this->search_criteria) ? $this->search_criteria : array();
 
 			$this_result_overall_index = ($this->page_size * ($this->current_page - 1)) + $result_count;
@@ -507,6 +547,13 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			echo "<div style='display:none;color:green;font-weight:bold;text-align:right;padding:5px'
 				id='flexmls_connect__success_message{$sf['ListingId']}'></div>";
 
+			$api_prefs = $this->api->GetPreferences();
+			if (!is_array($api_prefs) || !isset($api_prefs['RequiredFields']) || !is_array($api_prefs['RequiredFields'])) {
+				$api_prefs['RequiredFields'] = array();
+			}
+			$phone_req = in_array('phone', $api_prefs['RequiredFields']);
+			$address_req = in_array('address', $api_prefs['RequiredFields']);
+
 			echo "<div class='flexmls_connect__sr_details_buttons'>";
 				echo "<button href='{$link_to_details}'>View Details</button>";
 				?>
@@ -515,7 +562,9 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					'subject': '<?php echo addslashes($one_line_address_add_slashes); ?> - MLS# <?php echo addslashes($sf['ListingId'])?> ',
 					'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
 					'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
-					'listingId': '<?php echo addslashes($sf['ListingId']); ?>'
+					'listingId': '<?php echo addslashes($sf['ListingId']); ?>',
+					'phoneRequired': <?php echo $phone_req ? 'true' : 'false'; ?>,
+					'addressRequired': <?php echo $address_req ? 'true' : 'false'; ?>
 					<?php if( isset($options['contact_disclaimer']) ) : ?>
 					,'disclaimer': '<?php echo esc_js(flexmlsConnect::get_contact_disclaimer()); ?>'
 					<?php endif; ?>
@@ -617,7 +666,25 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 						$detail_count++;
 						continue;
 					}
+					// Replace Agent Email line with email and phone (no label)
+					if ($reqs[0] == 'Agent Email:') {
+						$agent_info_parts = array();
+						
+						// Add email
+						$agent_info_parts[] = esc_html( $sf["ListAgentEmail"] );
+						
+						// Add phone if required
+						if ( flexmlsConnect::mls_requires_agent_phone_in_search_results() ) {
+							$phone_number = flexmlsConnect::get_agent_phone_with_fallback( $sf, 'search' );
+							if ( ! empty( $phone_number ) ) {
+								$agent_info_parts[] = esc_html( $phone_number );
+							}
+						}
+						
+						echo "<div class='flexmls_connect__zebra'><span class='flexmls_connect__field_value'>" . implode( ' | ', $agent_info_parts ) . "</span></div>";
+					} else {
           echo  "<div class='flexmls_connect__zebra'><span class='flexmls_connect__field_label'>{$reqs[0]} </span><span class='flexmls_connect__field_value'>{$reqs[1]}</span></div>";
+					}
 					$detail_count++;
 				}
 			}
@@ -627,6 +694,8 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			echo "</div></div>";
 			// end flexmls_connect__sr_listing_facts_container
 			echo "</div>";
+
+
 		}
 
 		echo "<hr class='flexmls_connect__sr_divider'>";
@@ -717,6 +786,31 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			$link = add_query_arg( 'view', 'map', flexmlsConnect::make_nice_tag_url( 'search', $page_conditions ) );
 		}
 			return $link;
+	}
+
+	function wpseo_canonical() {
+		// Disable the Yoast canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+		return false;
+	}
+
+	function rankmath_canonical() {
+		// Disable RankMath canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+		return false;
+	}
+
+	function aioseo_canonical() {
+		// Disable All in One SEO canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+		return false;
+	}
+
+	function seo_framework_canonical() {
+		// Disable The SEO Framework canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+		return false;
+	}
+
+	function seopress_canonical() {
+		// Disable SEOPress canonical tag. We add our own in flexmlsConnectPage::rel_canonical()
+		return false;
 	}
 
 }

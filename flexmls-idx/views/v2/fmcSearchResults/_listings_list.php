@@ -1,3 +1,4 @@
+
 <div class="flexmls-listings-list-wrapper flexmls-widthchange-wrapper">
 	<?php if ( ! empty( $this->search_data ) ) : ?>
 		<?php
@@ -31,7 +32,18 @@
 		?>
 			<a href="<?php echo esc_url( $link_to_details ); ?>" class="flexmls-listing">
 				<?php $main_photo = fmcSearchResults::main_photo_from_collection( $sf['Photos'] ); ?>
-				<div class="flexmls-image-wrapper" style="background-image: url('<?php echo esc_url( $main_photo['Uri640'] ); ?>');">
+				<?php
+				// Create accessible label for the background image
+				$image_aria_label = '';
+				if ( !empty( $main_photo['caption'] ) ) {
+					$image_aria_label = $main_photo['caption'];
+				} elseif ( !empty( $one_line_address ) ) {
+					$image_aria_label = "Property photo for " . $one_line_address;
+				} else {
+					$image_aria_label = "Property photo for listing #" . $sf['ListingId'];
+				}
+				?>
+				<div class="flexmls-image-wrapper" role="img" aria-label="<?php echo esc_attr( $image_aria_label ); ?>" style="background-image: url('<?php echo esc_url( $main_photo['Uri640'] ); ?>');">
 				<?php if ( $sf['OnMarketDate'] ) : ?>	
 					<?php if ( strtotime( $sf['OnMarketDate'] ) > strtotime( '-7 days' ) ) : ?>
 						<span class="new-listing-tag">New Listing</span>
@@ -111,6 +123,20 @@
 							<span class="flexmls-agent-name">
 								<span class="flexmls-bold-label">Listing Agent: </span>
 								<?php echo esc_html( $sf["ListAgentName"] ); ?>
+
+									<?php if ( flexmlsConnect::mls_requires_agent_phone_in_search_results() ) : ?>
+										<?php 
+										$phone_number = flexmlsConnect::get_agent_phone_with_fallback( $sf, 'search' );
+										if ( ! empty( $phone_number ) ) {
+											echo "<br/>" . esc_html( $phone_number );
+										}
+										?>
+									<?php endif; ?>
+
+									<?php if ( flexmlsConnect::mls_requires_agent_email_in_search_results() ) : ?>
+										<?php echo " |  " . esc_html( $sf["ListAgentEmail"] ); ?>
+									<?php endif; ?>
+								
 							</span>
 						</div>
 					<?php endif; ?>

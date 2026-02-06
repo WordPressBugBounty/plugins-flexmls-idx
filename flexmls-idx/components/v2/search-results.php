@@ -103,7 +103,8 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				if($search_results){ 
 					$this->search_data = $search_results;
 				}
-				foreach ( $this->search_data as $record ) {
+				if (is_array($this->search_data)) {
+					foreach ( $this->search_data as $record ) {
 					$result_count ++;
 					$fields = $record['StandardFields'];
 
@@ -156,6 +157,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 						'bedrooms'  => esc_html( $fields['BedsTotal'] ),
 						'bathrooms' => esc_html( $fields['BathsTotal'] ),
 					);
+				}
 				}
 
 				$map = new flexmlsListingMap( $markers );
@@ -305,7 +307,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 
 		if ($link) {
 			$link_details = $fmc_api->GetIDXLinkFromTinyId($link);
-			if ($link_details['LinkType'] == "SavedSearch") {
+			if ( is_array($link_details) && isset($link_details['LinkType']) && $link_details['LinkType'] == "SavedSearch") {
 					$pure_conditions['SavedSearch'] = $link_details['SearchId'];
 				}
 		}
@@ -545,8 +547,8 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 		return $vars;
 	}
 
-	static function compliance_label( $record ) {
-		$compList = flexmlsConnect::mls_required_fields_and_values( "Summary", $record );
+	static function compliance_label( $record, $type = "Summary" ) {
+		$compList = flexmlsConnect::mls_required_fields_and_values( $type, $record );
 		foreach ( $compList as $reqs ) :
 			if ( flexmlsConnect::is_not_blank_or_restricted($reqs[1]) ) :
 				if ( $reqs[0]=='LOGO' ) :
@@ -684,6 +686,9 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 		global $fmc_api;
 		$agent_options = [];
 		$api_my_account = $fmc_api->GetMyAccount();
+		if ( ! is_array( $api_my_account ) || ! isset( $api_my_account['OfficeId'] ) ) {
+			return $agent_options;
+		}
 		$office_roster = $fmc_api->GetAccountsByOffice( $api_my_account['OfficeId'] );
 
 		if ( ! empty( $office_roster ) ) {

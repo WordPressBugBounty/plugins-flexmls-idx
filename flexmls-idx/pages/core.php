@@ -29,7 +29,7 @@ class flexmlsConnectPageCore {
 
         // pull StandardFields from the API to verify searchability prior to searching
         $result = $fmc_api->GetStandardFields();
-        $this->standard_fields = $result[0] ?? '';
+        $this->standard_fields = (is_array($result) && isset($result[0]) && is_array($result[0])) ? $result[0] : array();
 
         $account_mls_id = $this->account->MlsId ?? '';
 
@@ -292,7 +292,7 @@ class flexmlsConnectPageCore {
 
             if ( array_key_exists( 'type', $f ) ) {
                 $type = $f['type'];
-            } elseif ( array_key_exists( $f['field'], $this->standard_fields ) ) {
+            } elseif ( is_array( $this->standard_fields ) && array_key_exists( $f['field'], $this->standard_fields ) ) {
                 $type = $this->standard_fields[ $f['field'] ]['Type'];
             } else {
                 $type = 'Character';
@@ -514,12 +514,14 @@ class flexmlsConnectPageCore {
                         $this->no_more = true;
                     }
 
-                    $this->browse_list[(string) $this_result_overall_index] = array(
-                        'Index' => $this_result_overall_index,
-                        'Id' => $record['Id'],
-                        'ListingId' => $record['StandardFields']['ListingId'],
-                        'Uri' => flexmlsConnect::make_nice_address_url($record, $link_to_details_criteria, $this->type)
-                    );
+                    if ( isset( $record['Id'] ) && isset( $record['StandardFields']['ListingId'] ) ) {
+                        $this->browse_list[(string) $this_result_overall_index] = array(
+                            'Index' => $this_result_overall_index,
+                            'Id' => $record['Id'],
+                            'ListingId' => $record['StandardFields']['ListingId'],
+                            'Uri' => flexmlsConnect::make_nice_address_url($record, $link_to_details_criteria, $this->type)
+                        );
+                    }
 
                 }
 

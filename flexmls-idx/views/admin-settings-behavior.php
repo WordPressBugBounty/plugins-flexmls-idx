@@ -3,12 +3,22 @@
 defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 $fmc_settings = get_option( 'fmc_settings' );
+if ( ! is_array( $fmc_settings ) ) {
+	$fmc_settings = array();
+}
 
-$fmc_settings[ 'multiple_summaries' ] = ( 1 == $fmc_settings[ 'multiple_summaries' ] ) ? 1 : 0;
-$fmc_settings[ 'contact_notifications' ] = ( 1 == $fmc_settings[ 'contact_notifications' ] ) ? 1 : 0;
-$fmc_settings[ 'allow_sold_searching' ] = ( 1 == $fmc_settings[ 'allow_sold_searching' ] ) ? 1 : 0;
+$fmc_settings[ 'default_titles' ] = isset( $fmc_settings[ 'default_titles' ] ) ? $fmc_settings[ 'default_titles' ] : 1;
+$fmc_settings[ 'multiple_summaries' ] = ( isset( $fmc_settings[ 'multiple_summaries' ] ) && 1 == $fmc_settings[ 'multiple_summaries' ] ) ? 1 : 0;
+$fmc_settings[ 'contact_notifications' ] = ( isset( $fmc_settings[ 'contact_notifications' ] ) && 1 == $fmc_settings[ 'contact_notifications' ] ) ? 1 : 0;
+$fmc_settings[ 'allow_sold_searching' ] = ( isset( $fmc_settings[ 'allow_sold_searching' ] ) && 1 == $fmc_settings[ 'allow_sold_searching' ] ) ? 1 : 0;
 $fmc_settings[ 'neigh_template' ] = isset( $fmc_settings[ 'neigh_template' ] ) ? $fmc_settings[ 'neigh_template' ] : '';
 $fmc_settings[ 'destwindow' ] = isset( $fmc_settings[ 'destwindow' ] ) ? $fmc_settings[ 'destwindow' ] : '';
+$fmc_settings[ 'listlink' ] = isset( $fmc_settings[ 'listlink' ] ) ? $fmc_settings[ 'listlink' ] : '';
+$fmc_settings[ 'listpref' ] = isset( $fmc_settings[ 'listpref' ] ) ? $fmc_settings[ 'listpref' ] : 'listpref';
+$fmc_settings[ 'destlink' ] = isset( $fmc_settings[ 'destlink' ] ) ? $fmc_settings[ 'destlink' ] : '';
+$fmc_settings[ 'destpref' ] = isset( $fmc_settings[ 'destpref' ] ) ? $fmc_settings[ 'destpref' ] : 'own';
+$fmc_settings[ 'permabase' ] = isset( $fmc_settings[ 'permabase' ] ) ? $fmc_settings[ 'permabase' ] : 'idx';
+$fmc_settings[ 'default_link' ] = isset( $fmc_settings[ 'default_link' ] ) ? $fmc_settings[ 'default_link' ] : '';
 $fmc_settings[ 'select2_turn_off' ] = isset( $fmc_settings[ 'select2_turn_off' ] ) ? $fmc_settings[ 'select2_turn_off' ] : 0;
 //added
 $fmc_settings[ 'chartkick_turn_off' ] = isset( $fmc_settings[ 'chartkick_turn_off' ] ) ? $fmc_settings[ 'chartkick_turn_off' ] : 0;
@@ -105,6 +115,7 @@ add_thickbox();
 								'nopaging' => true,
 								'post_type' => 'page'
 							) );
+							$all_public_pages = is_array( $all_public_pages ) ? $all_public_pages : array();
 							foreach( $all_public_pages as $template ): ?>
 								<option value="<?php echo $template->ID; ?>" <?php selected( $template->ID, $fmc_settings[ 'listlink' ] ); ?>><?php
 									echo $template->post_title;
@@ -160,7 +171,7 @@ add_thickbox();
 				<td>
 					<p>
 						<label for="destpref_own"><input type="radio" name="fmc_settings[destpref]" id="destpref_own" value="own" <?php checked( $fmc_settings[ 'destpref' ], 'own' ); ?>> Separate from WordPress</label><br />
-						<label for="destpref_page"><input type="radio" name="fmc_settings[destpref]" id="destpref_page" value="page" <?php checked( $fmc_settings[ 'destpref' ], 'page' ); ?>> Framed on this page:</label> <select name="fmc_settings[destlink]">
+						<label for="destpref_page"><input type="radio" name="fmc_settings[destpref]" id="destpref_page" value="page" <?php checked( $fmc_settings[ 'destpref' ], 'page' ); ?>> Framed on this page:</label> <select name="fmc_settings[destlink]" id="fmc_settings_destlink">
 							<?php foreach( $all_public_pages as $template ): ?>
 								<option value="<?php echo $template->ID; ?>" <?php selected( $template->ID, $fmc_settings[ 'destlink' ] ); ?>><?php
 									echo $template->post_title;
@@ -170,6 +181,15 @@ add_thickbox();
 								?></option>
 							<?php endforeach; ?>
 						</select>
+						<?php
+						$destlink_id = isset( $fmc_settings[ 'destlink' ] ) && is_numeric( $fmc_settings[ 'destlink' ] ) ? (int) $fmc_settings[ 'destlink' ] : 0;
+						if ( $destlink_id > 0 ) {
+							$edit_url = admin_url( 'post.php?post=' . $destlink_id . '&action=edit' );
+							printf( ' <a href="%s" id="fmc-destlink-edit" data-edit-base="%s">Edit page</a>', esc_url( $edit_url ), esc_attr( admin_url( 'post.php?post=' ) ) );
+						} else {
+							echo ' <a href="#" id="fmc-destlink-edit" style="display:none;" data-edit-base="' . esc_attr( admin_url( 'post.php?post=' ) ) . '">Edit page</a>';
+						}
+						?>
 					</p>
 					<hr />
 					<p><label for="destwindow_new"><input type="checkbox" name="fmc_settings[destwindow]" id="destwindow_new" value="new" <?php checked( $fmc_settings[ 'destwindow' ], 'new' ); ?>> Open links in a new tab or window</label></p>
@@ -200,7 +220,7 @@ add_thickbox();
 					?>
 				</td>
 			</tr>
-			<tr>
+			<tr id="fmc-setting-permalink-base">
 				<th scope="row">
 					<label for="permabase">Permalink Base</label>
 				</th>
@@ -232,6 +252,9 @@ add_thickbox();
 				$SparkPropertyTypes = new \SparkAPI\PropertyTypes();
 				$property_types = $SparkPropertyTypes->get_property_types();
 				$property_types_letters = array();
+				if ( ! is_array( $property_types ) ) {
+					$property_types = array();
+				}
 				foreach( $property_types as $label => $name ){
 					$value_to_show = $name;
 					if( isset( $fmc_settings[ 'property_type_label_' . $label ] ) ){
@@ -266,7 +289,7 @@ add_thickbox();
 						$SparkFields = new \SparkAPI\StandardFields();
 						$property_fields = $SparkFields->get_standard_fields();
 
-						$json_fields = json_encode( $fmc_settings[ 'search_results_fields' ] );
+						$json_fields = json_encode( isset( $fmc_settings[ 'search_results_fields' ] ) && is_array( $fmc_settings[ 'search_results_fields' ] ) ? $fmc_settings[ 'search_results_fields' ] : array() );
 
 						// Template that will be populated with $jsonFields data through js
 						$json_template  = '<div id="flexmls_connect__field_{{field_id}}" class="flexmls_connect__admin_srf_row">';
@@ -323,6 +346,9 @@ add_thickbox();
     <p><?php wp_nonce_field( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
 </form>
 
+<style>
+	tr.flexmls-setting-highlight { background-color: #f0f6fc; outline: 1px solid #2271b1; transition: background-color 0.5s ease-out; }
+</style>
 <script>
 jQuery(document).ready(function($) {
 	var originalPermabase = '<?php echo esc_js( $fmc_settings[ 'permabase' ] ); ?>';
@@ -330,6 +356,30 @@ jQuery(document).ready(function($) {
 	var nginxConfigTextarea = null;
 	var currentValuesContainer = null;
 	
+	// Update "Edit page" link when destination page dropdown changes
+	$('#fmc_settings_destlink').on('change', function() {
+		var link = $('#fmc-destlink-edit');
+		var base = link.data('edit-base');
+		var id = $(this).val();
+		if (base && id) {
+			link.attr('href', base + id + '&action=edit').show();
+		} else {
+			link.attr('href', '#').hide();
+		}
+	});
+
+	// Scroll to and highlight Permalink Base section when linked from Support page
+	if (window.location.hash === '#fmc-setting-permalink-base') {
+		setTimeout(function() {
+			var row = $('#fmc-setting-permalink-base');
+			if (row.length) {
+				row[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+				row.addClass('flexmls-setting-highlight');
+				setTimeout(function() { row.removeClass('flexmls-setting-highlight'); }, 12000);
+			}
+		}, 100);
+	}
+
 	// Auto-expand nginx guidance section if URL contains the anchor
 	if (window.location.hash === '#nginx-configuration-guidance') {
 		// Wait a moment for the page to fully load, then expand the nginx guidance

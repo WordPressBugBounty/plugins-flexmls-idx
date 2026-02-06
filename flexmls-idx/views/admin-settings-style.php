@@ -3,11 +3,14 @@
 defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 $fmc_settings = get_option( 'fmc_settings' );
-$search_listing_template_version = $fmc_settings['search_listing_template_version'];
-$market_stat_version = isset($fmc_settings['market_stat_version']) ? $fmc_settings['market_stat_version'] : 'v1';
-$search_listing_template_primary_color = $fmc_settings['search_listing_template_primary_color'];
-$search_listing_template_heading_font = $fmc_settings['search_listing_template_heading_font'];
-$search_listing_template_body_font = $fmc_settings['search_listing_template_body_font'];
+if ( ! is_array( $fmc_settings ) ) {
+	$fmc_settings = array();
+}
+$search_listing_template_version = isset( $fmc_settings['search_listing_template_version'] ) ? $fmc_settings['search_listing_template_version'] : 'v1';
+$market_stat_version = isset( $fmc_settings['market_stat_version'] ) ? $fmc_settings['market_stat_version'] : 'v1';
+$search_listing_template_primary_color = isset( $fmc_settings['search_listing_template_primary_color'] ) ? $fmc_settings['search_listing_template_primary_color'] : '';
+$search_listing_template_heading_font = isset( $fmc_settings['search_listing_template_heading_font'] ) ? $fmc_settings['search_listing_template_heading_font'] : '';
+$search_listing_template_body_font = isset( $fmc_settings['search_listing_template_body_font'] ) ? $fmc_settings['search_listing_template_body_font'] : '';
 
 add_thickbox();
 
