@@ -36,6 +36,77 @@ $known_plugin_conflicts = array(
 
 $known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-conflict-tag">Known issues</span>';
 
+// Plugins that minify CSS/JS — show a notice that our plugin's assets should be excluded from their minification.
+$minification_plugins = array(
+	'autoptimize/autoptimize.php'       => 'Autoptimize',
+	'wp-rocket/wp-rocket.php'           => 'WP Rocket',
+	'w3-total-cache/w3-total-cache.php' => 'W3 Total Cache',
+	'litespeed-cache/litespeed-cache.php' => 'LiteSpeed Cache',
+	'wp-optimize/wp-optimize.php'       => 'WP-Optimize',
+	'nitropack/nitropack.php'           => 'NitroPack',
+	'perfmatters/perfmatters.php'       => 'Perfmatters',
+	'fast-velocity-minify/fvm.php'      => 'Fast Velocity Minify',
+);
+
+$fmc_asset_paths_for_minify_exclude = array(
+	'assets/js/admin.js',
+	'assets/js/main.js',
+	'assets/js/portal.js',
+	'assets/js/map.js',
+	'assets/js/integration.js',
+	'assets/js/flex_gtb.js',
+	'assets/css/style.css',
+	'assets/css/style_admin.css',
+);
+
+// Check if an update is available and how many versions behind (for version display messaging).
+$fmc_plugin_basename = plugin_basename( FMC_PLUGIN_DIR . 'flexmls_connect.php' );
+$fmc_update_info     = null;
+$fmc_versions_behind = null;
+$latest              = null;
+
+// Prefer WordPress update transient (used when plugin slug matches repo, e.g. flexmls-idx).
+$update_plugins = get_site_transient( 'update_plugins' );
+$canonical_slug = 'flexmls-idx/flexmls_connect.php';
+foreach ( array( $fmc_plugin_basename, $canonical_slug ) as $slug ) {
+	if ( ! empty( $update_plugins->response[ $slug ] ) && ! empty( $update_plugins->response[ $slug ]->new_version ) ) {
+		$latest = $update_plugins->response[ $slug ]->new_version;
+		break;
+	}
+}
+
+// Fallback: when developing from a different folder (e.g. wordpress-idx-plugin), transient has no entry.
+// Fetch latest version from WordPress.org API and cache it.
+if ( $latest === null ) {
+	$latest = get_transient( 'fmc_latest_version_from_api' );
+	if ( $latest === false ) {
+		$api_url = 'https://api.wordpress.org/plugins/info/1.2/?action=plugin_information&request[slug]=flexmls-idx&request[fields][version]=1';
+		$response = wp_remote_get( $api_url, array( 'timeout' => 5 ) );
+		if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
+			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			if ( ! empty( $body['version'] ) ) {
+				$latest = $body['version'];
+				set_transient( 'fmc_latest_version_from_api', $latest, 12 * HOUR_IN_SECONDS );
+			}
+		}
+	}
+}
+
+if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
+	$fmc_update_info = $latest;
+	// Parse semver (major.minor.patch) to approximate "versions behind" for messaging.
+	$cur_parts    = array_map( 'intval', explode( '.', FMC_PLUGIN_VERSION . '.0' ) );
+	$latest_parts = array_map( 'intval', explode( '.', $latest . '.0' ) );
+	$cur_parts    = array_slice( $cur_parts, 0, 3 );
+	$latest_parts = array_slice( $latest_parts, 0, 3 );
+	$fmc_versions_behind = ( $latest_parts[0] - $cur_parts[0] ) * 10000
+		+ ( $latest_parts[1] - $cur_parts[1] ) * 100
+		+ ( isset( $latest_parts[2] ) && isset( $cur_parts[2] ) ? $latest_parts[2] - $cur_parts[2] : 0 );
+	if ( $fmc_versions_behind < 0 ) {
+		$fmc_versions_behind = 0;
+	}
+}
+
 ?>
 
 <div class="support-content">
@@ -64,12 +135,27 @@ $known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-confli
 	</div>
 
 	<div class="installation-info">
-		<h3 class="bg-blue-head">Installation Information <button type="button" class="button button-secondary" id="flexmls-copy-installation-info" style="margin-left: 10px; vertical-align: middle;">Copy to clipboard</button></h3>
+		<h3 class="bg-blue-head">Installation Information <button type="button" class="button button-secondary" id="flexmls-copy-installation-info" style="background-color: #fff; color: var(--wp-admin-theme-color); margin-left: 10px; vertical-align: middle;">Copy to clipboard</button></h3>
 		<div class="content" id="flexmls-installation-info-content">
 			<p><strong>Website URL:</strong> <?php echo home_url(); ?></p>
 			<p><strong>WordPress URL:</strong> <?php echo site_url(); ?></p>
 			<p><strong>WordPress Version:</strong> <?php echo $wp_version; ?></p>
-			<p><strong>Flexmls&reg; IDX Plugin Version:</strong> <?php echo FMC_PLUGIN_VERSION; ?></p>
+			<p><strong>Flexmls&reg; IDX Plugin Version:</strong> <?php
+			if ( $fmc_update_info === null ) {
+				// Current or update check not available — show version only.
+				echo esc_html( FMC_PLUGIN_VERSION );
+			} elseif ( $fmc_versions_behind >= 3 ) {
+				// 3 or more versions behind — advise to update with link and latest version.
+				echo esc_html( FMC_PLUGIN_VERSION );
+				$plugins_url = admin_url( 'plugins.php' );
+				?><br><span class="flexmls-version-update-advice flexmls-version-update-advice--urgent">Please update to the latest version (<?php echo esc_html( $fmc_update_info ); ?>) by going to the <a href="<?php echo esc_url( $plugins_url ); ?>">Plugins</a> page and updating to <?php echo esc_html( $fmc_update_info ); ?>.</span><?php
+			} else {
+				// 1–2 versions behind — gentle notice in orange.
+				echo esc_html( FMC_PLUGIN_VERSION );
+				?><br><span class="flexmls-version-update-advice flexmls-version-update-advice--minor">Newer versions are available (latest: <?php echo esc_html( $fmc_update_info ); ?>).</span><?php
+			}
+			?></p>
+			<p><strong>Plugin Key:</strong> <?php echo isset( $options['api_key'] ) && $options['api_key'] !== '' ? esc_html( $options['api_key'] ) : '—'; ?></p>
 			<p><strong>Web Server:</strong> <?php 
 				$server_software = $_SERVER[ 'SERVER_SOFTWARE' ];
 				// Check if nginx is detected and add link to nginx configuration guidance
@@ -133,6 +219,27 @@ $known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-confli
 			<?php global $wpdb; ?>
 			<p><strong>MySQL / MariaDB Version:</strong> <?php echo $wpdb->db_version() ? esc_html( $wpdb->db_version() ) : 'N/A'; ?></p>
 			<p><strong>Object Cache (Redis/Memcached):</strong> <?php echo wp_using_ext_object_cache() ? 'Yes' : 'No'; ?></p>
+			<?php
+			// Test if the database user can delete transients (required for plugin cache cleanup).
+			$fmc_cap_check_key   = 'fmc_cap_check_' . time();
+			set_transient( $fmc_cap_check_key, '1', 60 );
+			$fmc_cap_check_set   = ( get_transient( $fmc_cap_check_key ) === '1' );
+			$fmc_cap_check_gone  = delete_transient( $fmc_cap_check_key );
+			$fmc_db_can_delete   = $fmc_cap_check_set && $fmc_cap_check_gone;
+			$fmc_db_delete_unknown = $fmc_cap_check_set === false;
+			?>
+			<p><strong>Database user can delete transients (cache cleanup):</strong> <?php
+				if ( $fmc_db_can_delete ) {
+					echo 'Yes';
+				} elseif ( $fmc_db_delete_unknown ) {
+					echo 'Could not determine';
+				} else {
+					echo 'No';
+				}
+			?></p>
+			<?php if ( ! $fmc_db_can_delete ) : ?>
+			<p style="color: #c00; font-size: 14px;">Your database user may not have permission to delete from the options table. The plugin's cache cleanup cannot remove old transients, which can lead to database bloat. Ask your hosting provider to grant the WordPress database user SELECT, INSERT, UPDATE, and DELETE on the database.</p>
+			<?php endif; ?>
 			<p><strong>Multisite:</strong> <?php echo is_multisite() ? 'Yes' : 'No'; ?></p>
 			<p><strong>WP_DEBUG:</strong> <?php echo ( defined( 'WP_DEBUG' ) && WP_DEBUG ) ? 'Yes' : 'No'; ?></p>
 			<?php if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) : ?>
@@ -169,17 +276,22 @@ $known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-confli
 			<?php if ( ! empty( $active_plugins ) ): ?>
 				<ul class="flexmls-list-active-plugins">
 					<?php foreach( $active_plugins as $plugin_file => $active_plugin ): ?>
-						<?php
-							printf(
-								'<li><a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a>%s</li>',
-								$active_plugin[ 'PluginURI' ],
-								$active_plugin[ 'Name' ],
-								$active_plugin[ 'Version' ],
-								$active_plugin[ 'AuthorURI' ],
-								$active_plugin[ 'Author' ],
-								in_array( $plugin_file, $known_plugin_conflicts ) ? $known_plugin_conflicts_tag : ''
-							);
-						?>
+						<li>
+							<?php
+								printf(
+									'<a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a>%s',
+									esc_url( $active_plugin[ 'PluginURI' ] ),
+									esc_html( $active_plugin[ 'Name' ] ),
+									esc_html( $active_plugin[ 'Version' ] ),
+									esc_url( $active_plugin[ 'AuthorURI' ] ),
+									esc_html( $active_plugin[ 'Author' ] ),
+									in_array( $plugin_file, $known_plugin_conflicts ) ? $known_plugin_conflicts_tag : ''
+								);
+							?>
+							<?php if ( isset( $minification_plugins[ $plugin_file ] ) ) : ?>
+								<br><span class="flexmls-minify-notice description" style="display: inline-block; margin-top: 0.35em;">You do not need to minify our CSS/JS in <?php echo esc_html( $minification_plugins[ $plugin_file ] ); ?>. Our plugin already minifies its own assets. Exclude our files from <?php echo esc_html( $minification_plugins[ $plugin_file ] ); ?>'s minification settings to avoid conflicts. Our asset paths: <code><?php echo esc_html( implode( ', ', $fmc_asset_paths_for_minify_exclude ) ); ?></code>.</span>
+							<?php endif; ?>
+						</li>
 					<?php endforeach; ?>
 				</ul>
 			<?php else: ?>

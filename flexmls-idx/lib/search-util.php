@@ -457,6 +457,7 @@ class flexmlsSearchUtil {
 						dataType: 'json',
 						data: {
 							action: 'flexmls_connect_save_search',
+							nonce: ( typeof fmcAjax !== 'undefined' && fmcAjax.nonce ) ? fmcAjax.nonce : '',
 							name: $( '.flexmls_connect_search_name' ).val(),
 							filter: <?php echo json_encode( $filter_param ); ?>
 						},
@@ -496,29 +497,77 @@ class flexmlsSearchUtil {
 		<?php
 	}
 
-	public static function close_map_javascript() {
+	/**
+	 * Output script for Open/Close Map button. When $lazy_load_config is provided, the map
+	 * and Google Maps API are not loaded until the user clicks "Open Map" (avoids API billing until then).
+	 *
+	 * @param array|null $lazy_load_config Optional. When map is closed by default: array( 'maps_url' => '...', 'map_js_url' => '...' ).
+	 */
+	public static function close_map_javascript( $lazy_load_config = null ) {
+		$lazy_load = is_array( $lazy_load_config ) && ! empty( $lazy_load_config['maps_url'] ) && ! empty( $lazy_load_config['map_js_url'] );
 		?>
 		<script type="text/javascript">
 			jQuery( function ( $ ) {
-				var $button = $( '.close-map-button' ),
-				    $map = $( '.flexmls-map-wrapper' );
+				var lazyLoad = <?php echo $lazy_load ? 'true' : 'false'; ?>,
+				    lazyConfig = <?php echo $lazy_load ? wp_json_encode( $lazy_load_config ) : 'null'; ?>;
 
-				if ( $map.is( ':visible' ) ) {
-					$map.data( 'first-open', 1 );
-				}
+				$( document ).on( 'click', '.close-map-button', function ( e ) {
+					e.preventDefault();
+					var $button = $( this );
+					var $widget = $button.closest( '.flexmls_connect__search_results_v2' );
+					var $map = $widget.find( '.flexmls-map-wrapper' ).first();
 
-				$button.on( 'click', function () {
 					if ( $map.is( ':visible' ) ) {
 						$map.slideUp();
 						$button.text( 'Open Map' );
 					} else {
+						if ( lazyLoad && ! window.fmcGmapsLoaded && lazyConfig ) {
+							if ( typeof window.fmcGmapsWhenReady === 'undefined' ) {
+								window.fmcGmapsQueue = [];
+								window.fmcGmapsWhenReady = function ( f ) {
+									if ( window.fmcGmapsLoaded ) { f(); } else { window.fmcGmapsQueue.push( f ); }
+								};
+								window.fmcGmapsReady = function () {
+									window.fmcGmapsLoaded = true;
+									window.fmcGmapsQueue.forEach( function ( f ) { f(); } );
+									window.fmcGmapsQueue = [];
+									if ( window.fmcGmapsLazyCallback ) {
+										window.fmcGmapsLazyCallback();
+										window.fmcGmapsLazyCallback = null;
+									}
+								};
+							}
+							window.fmcGmapsLazyCallback = function () {
+								var s = document.createElement( 'script' );
+								s.src = lazyConfig.map_js_url;
+								s.async = true;
+								document.head.appendChild( s );
+							};
+							var g = document.createElement( 'script' );
+							g.src = lazyConfig.maps_url;
+							g.async = true;
+							document.head.appendChild( g );
+							lazyLoad = false;
+						}
 						$map.slideDown( 400, function () {
 							if ( ! $map.data( 'first-open' ) ) {
-								window.idxMap.fitBounds( window.idxBounds );
+								var mapEl = $map.find( '[id^="idx-map-"]' ).get( 0 );
+								var mapId = mapEl ? mapEl.id : null;
+								if ( mapId && window.idxMaps && window.idxMaps[ mapId ] && window.idxBoundsById && window.idxBoundsById[ mapId ] ) {
+									window.idxMaps[ mapId ].fitBounds( window.idxBoundsById[ mapId ] );
+								} else if ( window.idxMap && window.idxBounds ) {
+									window.idxMap.fitBounds( window.idxBounds );
+								}
 								$map.data( 'first-open', 1 );
 							}
 						} );
 						$button.text( 'Close Map' );
+					}
+				} );
+
+				$( '.flexmls-map-wrapper' ).each( function () {
+					if ( $( this ).is( ':visible' ) ) {
+						$( this ).data( 'first-open', 1 );
 					}
 				} );
 			} );

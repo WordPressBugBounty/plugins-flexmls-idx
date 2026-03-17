@@ -86,7 +86,7 @@ class fmcWidget extends WP_Widget {
   }
 
 	function shortcode_generate() {
-
+			flexmls_verify_ajax_nonce();
 			$shortcode = $this->get_shortcode_string();
 			$response = array(
 					'body' => $shortcode
@@ -111,7 +111,7 @@ class fmcWidget extends WP_Widget {
 			$is_slideshow_widget = ($widget_info['shortcode'] == "idx_slideshow") ? true : false;
 
 			foreach ($_REQUEST as $k => $v) {
-					if ($k == "action") {
+					if ( $k === 'action' || $k === 'nonce' || $k === 'fmc_render_token' ) {
 							continue;
 					}
 

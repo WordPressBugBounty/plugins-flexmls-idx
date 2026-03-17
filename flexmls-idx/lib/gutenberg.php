@@ -80,6 +80,7 @@ function flex_mls_gtb_cgb_editor_assets() {
     $arr = array(
         'ajaxurl' => admin_url( 'admin-ajax.php' ),
         'pluginurl' => plugins_url( '', dirname( __FILE__ ) ),
+        'nonce' => wp_create_nonce( 'fmc_ajax' ),
         'htmlListingDetails' => $htmlListingDetails,
         'htmlPhotos' => $htmlPhotos,
         'htmlMarketStats' => $htmlMarketStats,
@@ -280,7 +281,9 @@ function FlexMlsCallback($attributes )
     ob_start();
     if(isset($attributes['sendData'])) {
         $url = admin_url('admin-ajax.php');
-        $attributes['sendData'];
+        // Internal cURL has no cookies; use one-time token so shortcode_generate nonce check passes.
+        $attributes['sendData']['fmc_render_token'] = bin2hex( random_bytes( 16 ) );
+        set_transient( 'fmc_render_' . $attributes['sendData']['fmc_render_token'], 1, 60 );
 
         $ch = curl_init();
 

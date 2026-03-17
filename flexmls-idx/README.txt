@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 3.15.11
+Stable tag: 3.16
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,18 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.16 =
+Improvements and New Features
+* V2 listing template: Listing details were redesigned with a "More Information" section and a clearer property features grid
+* Improved the reliability of the media gallery under specific loading conditions in V1 listing template
+* IDX and portal pages send a header to help with search engine bot whitelisting in firewalls (e.g. Cloudflare)
+* Plugin assets are protected from being re-minified by other plugins; Support tab can warn when a minify plugin is detected
+* AJAX requests now use a security token (nonce)
+* Support/Intro screen in the admin was updated
+* SourceMLS.org verification badge is shown on listing detail pages
+* Google Maps loads asynchronously with improved callback handling for better performance and stability
+* Map markers use the standard Google Maps Marker API for better compatibility
+
 
 = 3.15.11 =
 Efficiency Update

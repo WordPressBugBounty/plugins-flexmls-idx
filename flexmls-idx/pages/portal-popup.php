@@ -83,6 +83,7 @@ class flexmlsPortalPopup{
   }
 
   static function no_thanks(){
+    flexmls_verify_ajax_nonce();
     //Cookie values must be deleted in javascript
     ob_clean();
     exit('SUCCESS');

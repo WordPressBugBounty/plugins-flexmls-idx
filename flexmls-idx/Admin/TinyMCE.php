@@ -43,6 +43,7 @@ class TinyMCE {
 	}
 
 	public static function tinymce_shortcodes_generate(){
+		flexmls_verify_ajax_nonce();
 		$shortcode_to_use = sanitize_text_field( $_POST[ 'shortcode_to_use' ] );
 
 		$params = array();

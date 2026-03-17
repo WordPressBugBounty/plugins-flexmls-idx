@@ -8,7 +8,7 @@ if ( empty( $settings ) ) { $settings = []; } ?>
 			$results_component = new fmcSearchResults;
 			$pure_conditions = $results_component->get_pure_conditions( $settings );
 			$results_component->load_search_results( 'shortcode', $pure_conditions );
-			$results_component->render_map($search_results);
+			$results_component->render_map( $search_results, $settings, $map_parameter_set );
 		}
 	?>
 </div>

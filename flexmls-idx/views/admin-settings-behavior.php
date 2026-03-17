@@ -11,6 +11,8 @@ $fmc_settings[ 'default_titles' ] = isset( $fmc_settings[ 'default_titles' ] ) ?
 $fmc_settings[ 'multiple_summaries' ] = ( isset( $fmc_settings[ 'multiple_summaries' ] ) && 1 == $fmc_settings[ 'multiple_summaries' ] ) ? 1 : 0;
 $fmc_settings[ 'contact_notifications' ] = ( isset( $fmc_settings[ 'contact_notifications' ] ) && 1 == $fmc_settings[ 'contact_notifications' ] ) ? 1 : 0;
 $fmc_settings[ 'allow_sold_searching' ] = ( isset( $fmc_settings[ 'allow_sold_searching' ] ) && 1 == $fmc_settings[ 'allow_sold_searching' ] ) ? 1 : 0;
+$fmc_settings[ 'listing_detail_expand_sections' ] = isset( $fmc_settings[ 'listing_detail_expand_sections' ] ) ? (int) $fmc_settings[ 'listing_detail_expand_sections' ] : 0;
+$fmc_settings[ 'listing_detail_show_more_info' ] = isset( $fmc_settings[ 'listing_detail_show_more_info' ] ) ? (int) $fmc_settings[ 'listing_detail_show_more_info' ] : 1;
 $fmc_settings[ 'neigh_template' ] = isset( $fmc_settings[ 'neigh_template' ] ) ? $fmc_settings[ 'neigh_template' ] : '';
 $fmc_settings[ 'destwindow' ] = isset( $fmc_settings[ 'destwindow' ] ) ? $fmc_settings[ 'destwindow' ] : '';
 $fmc_settings[ 'listlink' ] = isset( $fmc_settings[ 'listlink' ] ) ? $fmc_settings[ 'listlink' ] : '';
@@ -137,6 +139,30 @@ add_thickbox();
 						<label for="allow_sold_searching_y"><input type="radio" name="fmc_settings[allow_sold_searching]" id="allow_sold_searching_y" value="1" <?php checked( $fmc_settings[ 'allow_sold_searching' ], 1 ); ?>> Yes, allow visitors to search for sold & pending listings</label><br />
 						<label for="allow_sold_searching_n"><input type="radio" name="fmc_settings[allow_sold_searching]" id="allow_sold_searching_n" value="0" <?php checked( $fmc_settings[ 'allow_sold_searching' ], 0 ); ?>> No, do not allow searches for sold & pending listings</label>
 					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="listing_detail_expand_sections_y">Expand all listing detail page sections by default</label>
+				</th>
+				<td>
+					<p>
+						<label for="listing_detail_expand_sections_y"><input type="radio" name="fmc_settings[listing_detail_expand_sections]" id="listing_detail_expand_sections_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_expand_sections' ], 1 ); ?>> Yes, show all sections expanded</label><br />
+						<label for="listing_detail_expand_sections_n"><input type="radio" name="fmc_settings[listing_detail_expand_sections]" id="listing_detail_expand_sections_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_expand_sections' ], 0 ); ?>> No, show other sections collapsed (users can expand each)</label>
+					</p>
+					<p class="description">Address Information, Location Tax &amp; Legal, General Property Information, and Property Features are always expanded. When set to No, remaining sections (e.g. Contract Information, Kitchen Features) start collapsed to reduce scrolling.</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="listing_detail_show_more_info_y">Show &quot;More Information&quot; section on listing detail pages</label>
+				</th>
+				<td>
+					<p>
+						<label for="listing_detail_show_more_info_y"><input type="radio" name="fmc_settings[listing_detail_show_more_info]" id="listing_detail_show_more_info_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_show_more_info' ], 1 ); ?>> Yes, show the More Information section</label><br />
+						<label for="listing_detail_show_more_info_n"><input type="radio" name="fmc_settings[listing_detail_show_more_info]" id="listing_detail_show_more_info_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_show_more_info' ], 0 ); ?>> No, hide the More Information section</label>
+					</p>
+					<p class="description">When No, the expandable &quot;More Information&quot; block is not displayed on listing detail pages.</p>
 				</td>
 			</tr>
 		</tbody>

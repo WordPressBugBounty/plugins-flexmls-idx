@@ -48,8 +48,18 @@
 			<?php endif; ?>
 		<?php endif; ?>
 <?php if( isset( $options['google_maps_api_key'] ) && $options['google_maps_api_key'] && $this->total_rows != 0 ) : ?>
-		<div class="flexmls-btn flexmls-btn-secondary flexmls-btn-sm close-map-button"><?php echo ( ! empty( $settings ) && $settings['default_view'] == 'map' ) || $map_parameter_set ? 'Close' : 'Open'; ?> Map
-		<?php flexmlsSearchUtil::close_map_javascript(); ?>
+		<?php
+		$map_open_by_default = ( ! empty( $settings['default_view'] ) && $settings['default_view'] == 'map' ) || $map_parameter_set;
+		$map_lazy_load_config = null;
+		if ( ! $map_open_by_default && empty( $options['google_maps_no_enqueue'] ) ) {
+			$map_lazy_load_config = array(
+				'maps_url'   => 'https://maps.googleapis.com/maps/api/js?key=' . $options['google_maps_api_key'] . '&libraries=marker&loading=async&callback=fmcGmapsReady',
+				'map_js_url' => plugins_url( 'assets/js/map.js', FMC_PLUGIN_DIR . 'flexmls_connect.php' ),
+			);
+		}
+		?>
+		<div class="flexmls-btn flexmls-btn-secondary flexmls-btn-sm close-map-button"><?php echo $map_open_by_default ? 'Close' : 'Open'; ?> Map
+		<?php flexmlsSearchUtil::close_map_javascript( $map_lazy_load_config ); ?>
 		</div>
 <?php endif; ?>
 	</div>

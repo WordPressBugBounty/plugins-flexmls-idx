@@ -134,6 +134,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 	}
 
 	public static function save_user_search() {
+		flexmls_verify_ajax_nonce();
 		$api = new flexmlsConnectPortalUser(null, null);
 		$result = $api->CreateSavedSearch( json_encode( [ "D" => [
 			"Name" => stripslashes( $_POST['name'] ),

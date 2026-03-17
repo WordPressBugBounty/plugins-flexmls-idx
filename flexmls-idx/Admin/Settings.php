@@ -22,7 +22,7 @@ class Settings {
 
 				<!-- <div class="wp-badge">Version <?php // echo FMC_PLUGIN_VERSION; ?></div> -->
 				<h2 class="nav-tab-wrapper wp-clearfix">
-					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=api' ); ?>" class="nav-tab<?php echo ( 'api' == $tab ? ' nav-tab-active' : '' ); ?>">Account</a>
+					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=api' ); ?>" class="nav-tab<?php echo ( 'api' == $tab ? ' nav-tab-active' : '' ); ?>">Credentials</a>
 
 					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ); ?>" class="nav-tab<?php echo ( 'support' == $tab ? ' nav-tab-active' : '' ); ?>">Support</a>
 
@@ -271,7 +271,13 @@ class Settings {
 			$old_api_secret = $fmc_settings[ 'api_secret' ];
 
 			$new_api_key = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_key' ] );
-			$new_api_secret = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_secret' ] );
+			$new_api_secret = isset( $_POST[ 'fmc_settings' ][ 'api_secret' ] ) ? sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_secret' ] ) : '';
+			// When already connected, empty secret means "keep existing" (e.g. form locked or user left blank)
+			$SparkAPI = new \SparkAPI\Core();
+			$had_auth = (bool) $SparkAPI->generate_auth_token();
+			if ( $had_auth && '' === $new_api_secret ) {
+				$new_api_secret = $old_api_secret;
+			}
 
 			$fmc_settings[ 'api_key' ] = $new_api_key;
 			$fmc_settings[ 'api_secret' ] = $new_api_secret;
@@ -306,6 +312,8 @@ class Settings {
 					case 'contact_notifications':
 					case 'multiple_summaries':
 					case 'allow_sold_searching':
+					case 'listing_detail_expand_sections':
+					case 'listing_detail_show_more_info':
 						// Simple 1 or 0 values
 						$fmc_settings[ $key ] = ( 1 == $val ? 1 : 0 );
 						break;

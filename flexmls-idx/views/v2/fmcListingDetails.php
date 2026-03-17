@@ -177,7 +177,7 @@
 				<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf[$detail['field']] ) ) : ?>
 					<?php $value = array_key_exists( 'value', $detail ) ? $detail['value'] : $sf[$detail['field']]; ?>
 					<span class="flexmls-detail">
-						<span class="detail-label flexmls-primary-color-font flexmls-heading-font"><?php echo esc_html( $detail['label'] ); ?>:</span>
+						<span class="detail-label flexmls-heading-font"><?php echo esc_html( $detail['label'] ); ?>:</span>
 						<span class="detail-value"><?php echo esc_html( $value ); ?></span>
 					</span>
 				<?php endif; ?>
@@ -212,144 +212,300 @@
 	</div>
 	  
 	<div class="overview-section listing-section">
+		<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Overview</h2>
 		<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['PublicRemarks'] ) ) : ?>
-			<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Description</h2>
+			<h3 class="flexmls-title-large flexmls-heading-font overview-subhead">Description</h3>
 			<div class="flexmls-description">
-				<?php echo $sf['PublicRemarks']; ?> 
-				<?php if($sf['Supplement']) : ?>
-					<p><strong>Supplements: </strong><?php echo $sf['Supplement']; ?></p>
-				<?php endif; ?>
+				<?php echo $sf['PublicRemarks']; ?>
 			</div>
+			<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['Supplement'] ) ) : ?>
+				<?php
+					$supplement_full = $sf['Supplement'];
+					$supplement_plain = wp_strip_all_tags( $supplement_full );
+					$supplement_limit = 350;
+					$is_long = strlen( $supplement_plain ) > $supplement_limit;
+					$supplement_teaser = $is_long ? substr( $supplement_plain, 0, $supplement_limit ) : '';
+				?>
+				<div class="flexmls-supplement-wrapper">
+					<p class="flexmls-supplement">
+						<strong>Supplements:</strong>
+						<span class="flexmls-supplement-teaser"><?php echo $is_long ? esc_html( $supplement_teaser ) : $supplement_full; ?></span>
+						<?php if ( $is_long ) : ?>
+							<span class="flexmls-supplement-ellipsis">...</span>
+							<a href="#" class="flexmls-supplement-read-more" aria-expanded="false">(Read more)</a>
+							<span class="flexmls-supplement-full" style="display:none;"><?php echo $supplement_full; ?></span>
+						<?php endif; ?>
+					</p>
+				</div>
+			<?php endif; ?>
 		<?php endif; ?>
-		<?php if ( $sf['OpenHousesCount']  > 0 ) : ?>
-			<div class="open-houses-list-details">
-				<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Open Houses</h2>
-				<?php foreach($sf['OpenHouses'] as $OpenHouse) : 
-					$todayDate = date("d.m.Y H:i");
-					$match_date = date('d.m.Y H:i', strtotime($OpenHouse['Date']));
-					if($todayDate == $match_date) { 
-						$openingDay = 'Today, ';
-					} elseif(date("+1 day", strtotime($todayDate)) == $match_date) {
-						$openingDay = 'Tomorrow, ';
+		<?php if ( isset( $sf['OpenHousesCount'] ) && $sf['OpenHousesCount'] > 0 && ! empty( $sf['OpenHouses'] ) ) : ?>
+			<h3 class="flexmls-title-large flexmls-heading-font overview-subhead">Open Houses</h3>
+			<ul class="open-houses-list-details">
+				<?php foreach ( $sf['OpenHouses'] as $OpenHouse ) : ?>
+					<?php
+					$oh_date = isset( $OpenHouse['Date'] ) ? strtotime( $OpenHouse['Date'] ) : 0;
+					$today_start = strtotime( date( 'Y-m-d' ) );
+					$tomorrow_start = $today_start + 86400;
+					if ( $oh_date >= $today_start && $oh_date < $tomorrow_start ) {
+						$opening_day = 'Today';
+					} elseif ( $oh_date >= $tomorrow_start && $oh_date < $tomorrow_start + 86400 ) {
+						$opening_day = 'Tomorrow';
 					} else {
-						$openingDay = date('l, F d, ', strtotime($OpenHouse['Date']));
+						$opening_day = $oh_date ? date( 'l, F j', $oh_date ) : '';
 					}
-
+					$start_time = isset( $OpenHouse['StartTime'] ) ? $OpenHouse['StartTime'] : '';
+					$end_time   = isset( $OpenHouse['EndTime'] ) ? $OpenHouse['EndTime'] : '';
+					$time_part  = ( $start_time !== '' || $end_time !== '' ) ? ', ' . $start_time . ' - ' . $end_time : '';
 					?>
-					<div class="open-house-list-inner"><?php echo $openingDay.$OpenHouse['StartTime'].' - '.$OpenHouse['EndTime']; ?></div>
+					<li class="open-house-item"><?php echo esc_html( $opening_day . $time_part ); ?></li>
 				<?php endforeach; ?>
-			</div>
+			</ul>
 		<?php endif; ?>
 	</div>
 
+	<?php
+			$fmc_detail_options = get_option( 'fmc_settings' );
+			$expand_listing_detail_sections = isset( $fmc_detail_options['listing_detail_expand_sections'] ) ? (int) $fmc_detail_options['listing_detail_expand_sections'] : 0;
+			$show_more_info_section = isset( $fmc_detail_options['listing_detail_show_more_info'] ) ? (int) $fmc_detail_options['listing_detail_show_more_info'] : 1;
+	?>
 	<div class="listing-section more-information-toggle">
-		<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">More Information <span class="mls-id">MLS# <?php echo esc_html( $sf['ListingId'] ); ?></h2>
+		<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Listing Details <span class="mls-id">MLS# <?php echo esc_html( $sf['ListingId'] ); ?></span></h2>
 	</div>
 
-	<div class="features-section listing-section listing-more-information">
+	<div class="features-section listing-section listing-more-information" data-expand-sections="<?php echo $expand_listing_detail_sections ? '1' : '0'; ?>">
 		<div class="property-details">
 			<?php
-			// Create a merged array that includes all custom fields
+			// Labels already shown in hero/main-details/price-and-dates — do not repeat in Listing Details (SmartFrame-style)
+			$detail_labels_suppress = array(
+				'property type', 'propertytype', 'bedrooms', 'beds total', 'baths', 'baths total', 'square footage',
+				'lot size (sq. ft.)', 'lot size (sq. ft)', 'lot size', 'status', 'mls status', 'current price',
+				'list price', 'sold price', 'list date', 'on market date', 'last modified', 'listing date',
+				'geo lat', 'geo lon', 'selling member', 'selling member name',
+			);
+
+			$normalize_section = function( $name ) {
+				$n = trim( strtolower( (string) $name ) );
+				if ( in_array( $n, array( 'location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes' ), true ) ) {
+					return 'Location, Tax & Legal';
+				}
+				return $name;
+			};
+
+			// Parse a detail line "<b>Label:</b> value" or "Label: value" into [ 'label' => x, 'value' => y ]
+			$parse_detail_line = function( $line ) {
+				if ( preg_match( '/<b>\s*([^<]+)\s*:<\/b>\s*(.*)/s', trim( $line ), $m ) ) {
+					return array( 'label' => trim( $m[1] ), 'value' => trim( $m[2] ) );
+				}
+				if ( preg_match( '/^([^:]+):\s*(.*)$/s', trim( strip_tags( $line ) ), $m ) ) {
+					return array( 'label' => trim( $m[1] ), 'value' => trim( $m[2] ) );
+				}
+				return null;
+			};
+
+			$is_suppressed = function( $label ) use ( $detail_labels_suppress ) {
+				$key = trim( strtolower( (string) $label ) );
+				return in_array( $key, $detail_labels_suppress, true );
+			};
+
+			// Normalize boolean-like values (1/0, true/false) for display. Default: true/1 → "Yes", false/0 → "No".
+			// Filter flexmls_listing_detail_display_value( $display_value, $raw_value, $label, $section_name ) allows per-field override (e.g. "Yes", "1", "True").
+			$format_detail_value = function( $value, $label, $section_name ) {
+				$raw = $value;
+				if ( $value === true || $value === 1 || $value === '1' || $value === 'true' ) {
+					$value = 'Yes';
+				} elseif ( $value === false || $value === 0 || $value === '0' || $value === 'false' ) {
+					$value = 'No';
+				} else {
+					$value = (string) $value;
+				}
+				return apply_filters( 'flexmls_listing_detail_display_value', $value, $raw, $label, $section_name );
+			};
+
+			// Build section => list of [ 'label' => x, 'value' => y ], deduped by label, suppressed labels excluded
 			$all_property_details = array();
-			
-			// First, add all fields from $custom_fields
-			if (isset($custom_fields['Main']) && is_array($custom_fields['Main'])) {
-				foreach ($custom_fields['Main'] as $section_name => $section_fields) {
-					// Handle the location/tax/legal section name variations
-					$normalized_section_name = $section_name;
-					if (in_array(strtolower($section_name), ['location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes'])) {
-						$normalized_section_name = 'Location, Tax & Legal';
+
+			// 1) Add from property_detail_values (MLS field order) first
+			if ( ! empty( $this->property_detail_values ) && is_array( $this->property_detail_values ) ) {
+				foreach ( $this->property_detail_values as $section_name => $section_fields ) {
+					$norm = $normalize_section( $section_name );
+					if ( ! isset( $all_property_details[ $norm ] ) ) {
+						$all_property_details[ $norm ] = array();
 					}
-					
-					if (!isset($all_property_details[$normalized_section_name])) {
-						$all_property_details[$normalized_section_name] = array();
+					$seen_labels = array();
+					foreach ( $section_fields as $field_line ) {
+						$parsed = $parse_detail_line( $field_line );
+						if ( ! $parsed || $is_suppressed( $parsed['label'] ) ) {
+							continue;
+						}
+						$label_key = strtolower( $parsed['label'] );
+						if ( isset( $seen_labels[ $label_key ] ) ) {
+							continue;
+						}
+						$seen_labels[ $label_key ] = true;
+						$parsed['value'] = $format_detail_value( $parsed['value'], $parsed['label'], $norm );
+						$all_property_details[ $norm ][] = $parsed;
 					}
-					
-					foreach ($section_fields as $field_name => $field_value) {
-						if (is_array($field_value)) {
-							// Handle array values (like checkboxes)
-							$display_values = array();
-							foreach ($field_value as $val) {
-								if ($val === true || $val === 1) {
-									$display_values[] = $field_name;
-								} elseif ($val !== false && $val !== 0) {
-									$display_values[] = $val;
+				}
+			}
+
+			// 2) Add from custom_fields['Main'] only when label not already in section
+			if ( isset( $custom_fields['Main'] ) && is_array( $custom_fields['Main'] ) ) {
+				foreach ( $custom_fields['Main'] as $section_name => $section_fields ) {
+					$norm = $normalize_section( $section_name );
+					if ( ! isset( $all_property_details[ $norm ] ) ) {
+						$all_property_details[ $norm ] = array();
+					}
+					$seen_labels = array();
+					foreach ( $all_property_details[ $norm ] as $item ) {
+						$seen_labels[ strtolower( $item['label'] ) ] = true;
+					}
+					foreach ( $section_fields as $field_name => $field_value ) {
+						if ( $is_suppressed( $field_name ) ) {
+							continue;
+						}
+						$label_key = strtolower( trim( $field_name ) );
+						if ( isset( $seen_labels[ $label_key ] ) ) {
+							continue;
+						}
+						if ( is_array( $field_value ) ) {
+							$display_vals = array();
+							foreach ( $field_value as $val ) {
+								if ( $val === true || $val === 1 ) {
+									$display_vals[] = $format_detail_value( $val, $field_name, $norm );
+								} elseif ( $val !== false && $val !== 0 ) {
+									$display_vals[] = $format_detail_value( $val, $field_name, $norm );
 								}
 							}
-							if (!empty($display_values)) {
-								$all_property_details[$normalized_section_name][] = "<b>{$field_name}:</b> " . implode(', ', $display_values);
+							if ( ! empty( $display_vals ) ) {
+								$seen_labels[ $label_key ] = true;
+								$all_property_details[ $norm ][] = array( 'label' => $field_name, 'value' => implode( ', ', $display_vals ) );
 							}
 						} else {
-							// Handle single values
-							if ($field_value !== false && $field_value !== 0 && $field_value !== '') {
-								$all_property_details[$normalized_section_name][] = "<b>{$field_name}:</b> {$field_value}";
+							if ( $field_value !== false && $field_value !== 0 && $field_value !== '' ) {
+								$seen_labels[ $label_key ] = true;
+								$display_val = $format_detail_value( $field_value, $field_name, $norm );
+								$all_property_details[ $norm ][] = array( 'label' => $field_name, 'value' => $display_val );
 							}
 						}
 					}
 				}
 			}
-			
-			// Then, add fields from $this->property_detail_values (but avoid duplicates)
-			if ($this->property_detail_values && is_array($this->property_detail_values)) {
-				foreach ($this->property_detail_values as $section_name => $section_fields) {
-					// Handle the location/tax/legal section name variations
-					$normalized_section_name = $section_name;
-					if (in_array(strtolower($section_name), ['location, tax & legal', 'location tax legal', 'location, legal & taxes', 'location legal taxes'])) {
-						$normalized_section_name = 'Location, Tax & Legal';
-					}
-					
-					if (!isset($all_property_details[$normalized_section_name])) {
-						$all_property_details[$normalized_section_name] = array();
-					}
-					
-					foreach ($section_fields as $field_value) {
-						// Check if this field is already in the array to avoid duplicates
-						if (!in_array($field_value, $all_property_details[$normalized_section_name])) {
-							$all_property_details[$normalized_section_name][] = $field_value;
-						}
-					}
+
+			// Order sections: priority first (Address, Location Tax & Legal, General Property Info), then Property Features, then rest
+			$priority_section_order = array( 'Address Information', 'Location, Tax & Legal', 'General Property Information' );
+			$ordered_section_names = array();
+			foreach ( $priority_section_order as $pname ) {
+				if ( isset( $all_property_details[ $pname ] ) && ! empty( $all_property_details[ $pname ] ) ) {
+					$ordered_section_names[] = $pname;
 				}
 			}
-			
-			// Display all the merged property details
-			if (!empty($all_property_details)) : ?>
-				<?php foreach ($all_property_details as $section_name => $section_fields) : ?>
-					<?php if (!empty($section_fields)) : ?>
-						<div class="details-section">
-							<h3 class="detail-section-header flexmls-title-large flexmls-heading-font"><?php echo esc_html($section_name); ?></h3>
-							<div class="property-details-wrapper">
-								<?php foreach ($section_fields as $field_value) : ?>
-									<span class="detail-value"><?php echo $field_value; ?></span>
+			foreach ( array_keys( $all_property_details ) as $k ) {
+				if ( ! in_array( $k, $priority_section_order, true ) ) {
+					$ordered_section_names[] = $k;
+				}
+			}
+			// Build full display order with Property Features after General Property Information. Use placeholder for Property Features.
+			$full_display_order = array();
+			foreach ( $ordered_section_names as $name ) {
+				$full_display_order[] = $name;
+				if ( $name === 'General Property Information' && ! empty( $property_features_values ) ) {
+					$full_display_order[] = '_PropertyFeatures_';
+				}
+			}
+			if ( ! empty( $property_features_values ) && ! in_array( '_PropertyFeatures_', $full_display_order, true ) ) {
+				$full_display_order[] = '_PropertyFeatures_';
+			}
+			// First 6 = standalone expandable sections; rest = sub-sections under "More Information" (SmartFrame-style)
+			$first_six = array_slice( $full_display_order, 0, 6 );
+			$more_info_items = array_slice( $full_display_order, 6 );
+
+			// Output first 6 as standalone expandable sections
+			if ( ! empty( $all_property_details ) || ! empty( $property_features_values ) ) : ?>
+				<?php foreach ( $first_six as $section_name ) : ?>
+					<?php
+					if ( $section_name === '_PropertyFeatures_' ) {
+						?>
+				<div class="details-section flexmls-detail-section-toggle" data-initially-expanded="<?php echo $expand_listing_detail_sections ? '1' : '0'; ?>">
+					<h3 class="detail-section-header flexmls-title-large flexmls-heading-font flexmls-primary-color-font flexmls-detail-section-header">Property Features</h3>
+					<div class="flexmls-detail-section-body">
+					<div class="property-details-wrapper property-features-rows">
+						<?php foreach ( $property_features_values as $k => $v ) : ?>
+							<?php $value_str = implode( '; ', array_filter( $v ) ); ?>
+							<span class="detail-label flexmls-heading-font"><?php echo esc_html( $k ); ?>:</span>
+							<span class="detail-value"><?php echo esc_html( $value_str ); ?></span>
+						<?php endforeach; ?>
+					</div>
+					</div>
+				</div>
+						<?php
+						continue;
+					}
+					$section_rows = isset( $all_property_details[ $section_name ] ) ? $all_property_details[ $section_name ] : array();
+					if ( empty( $section_rows ) ) {
+						continue;
+					}
+					?>
+						<div class="details-section flexmls-detail-section-toggle" data-initially-expanded="<?php echo $expand_listing_detail_sections ? '1' : '0'; ?>">
+							<h3 class="detail-section-header flexmls-title-large flexmls-heading-font flexmls-primary-color-font flexmls-detail-section-header"><?php echo esc_html( $section_name ); ?></h3>
+							<div class="flexmls-detail-section-body">
+							<dl class="property-details-wrapper listing-detail-rows">
+								<?php foreach ( $section_rows as $row ) : ?>
+									<dt class="detail-label flexmls-heading-font"><?php echo esc_html( $row['label'] ); ?></dt>
+									<dd class="detail-value"><?php echo esc_html( $row['value'] ); ?></dd>
 								<?php endforeach; ?>
+							</dl>
 							</div>
 						</div>
-					<?php endif; ?>
 				<?php endforeach; ?>
-			<?php endif; ?>
 
-			<?php if ( ! empty( $property_features_values ) ) : ?>
-				<div class="details-section">
-					<h3 class="detail-section-header flexmls-title-large flexmls-heading-font">Property Features</h3>
-					<div class="property-details-wrapper">
-						<?php foreach ( $property_features_values as $k => $v ) : ?>
-							<?php
-								$value = "<b>".$k.": </b>";
-								foreach($v as $x){
-									$value .= $x."; ";
+			<?php
+			// "More Information" section: remaining sections as sub-sections (SmartFrame-style). Only output when Behavior setting allows.
+			if ( $show_more_info_section && ! empty( $more_info_items ) ) :
+				$more_info_expanded = $expand_listing_detail_sections ? '1' : '0';
+			?>
+				<div class="details-section details-section-more-info flexmls-detail-section-toggle" data-initially-expanded="<?php echo $more_info_expanded; ?>">
+					<h3 class="detail-section-header flexmls-title-large flexmls-heading-font flexmls-primary-color-font flexmls-detail-section-header">More Information</h3>
+					<div class="flexmls-detail-section-body">
+						<?php foreach ( $more_info_items as $section_name ) : ?>
+							<?php if ( $section_name === '_PropertyFeatures_' ) : ?>
+								<div class="details-subsection">
+									<h4 class="detail-subsection-header flexmls-heading-font flexmls-primary-color-font">Property Features</h4>
+									<div class="property-details-wrapper property-features-rows">
+										<?php foreach ( $property_features_values as $k => $v ) : ?>
+											<?php $value_str = implode( '; ', array_filter( $v ) ); ?>
+											<span class="detail-label flexmls-heading-font"><?php echo esc_html( $k ); ?>:</span>
+											<span class="detail-value"><?php echo esc_html( $value_str ); ?></span>
+										<?php endforeach; ?>
+									</div>
+								</div>
+							<?php else :
+								$section_rows = isset( $all_property_details[ $section_name ] ) ? $all_property_details[ $section_name ] : array();
+								if ( empty( $section_rows ) ) {
+									continue;
 								}
-								$value = trim($value,"; ");
 							?>
-							<span class="detail-value"><?php echo $value; ?></span>
+								<div class="details-subsection">
+									<h4 class="detail-subsection-header flexmls-heading-font flexmls-primary-color-font"><?php echo esc_html( $section_name ); ?></h4>
+									<dl class="property-details-wrapper listing-detail-rows">
+										<?php foreach ( $section_rows as $row ) : ?>
+											<dt class="detail-label flexmls-heading-font"><?php echo esc_html( $row['label'] ); ?></dt>
+											<dd class="detail-value"><?php echo esc_html( $row['value'] ); ?></dd>
+										<?php endforeach; ?>
+									</dl>
+								</div>
+							<?php endif; ?>
 						<?php endforeach; ?>
 					</div>
 				</div>
 			<?php endif; ?>
+			<?php endif; ?>
 
 			<?php $room_count = isset($room_values[0]) ? count($room_values[0]) : false; ?>
 			<?php if ( $room_count ) : ?>
-				<div class="details-section rooms-section">
-					<h3 class="property-details-wrapper flexmls-title-large flexmls-heading-font">Room Information</h3>
-
+				<div class="details-section rooms-section flexmls-detail-section-toggle" data-initially-expanded="<?php echo $expand_listing_detail_sections ? '1' : '0'; ?>">
+					<h3 class="detail-section-header flexmls-title-large flexmls-heading-font flexmls-primary-color-font flexmls-detail-section-header">Room Information</h3>
+					<div class="flexmls-detail-section-body">
 					<div class="property-details-wrapper">
 						<?php foreach ( $room_values[0] as $i => $room ) : ?>
 							<span class="detail-value">
@@ -364,6 +520,7 @@
 
 							</span>
 						<?php endforeach; ?>
+					</div>
 					</div>
 				</div>
 			<?php endif; ?>
@@ -441,6 +598,8 @@
 		<?php fmcSearchResults::compliance_label( $record, "Detail" ); ?>
 	</div>
 
+	<?php echo $this->render_source_mls_badge( $sf, 'source-mls-badge listing-section' ); ?>
+
 	<div class="disclosure-section listing-section">
 		<?php if ( $sf['StateOrProvince'] != 'NY' ) : ?>
 			<?php foreach ( $compList as $reqs ) : ?>
@@ -479,3 +638,60 @@
       </div>
 	</div>
 </div>
+<script>
+(function() {
+	var listingDetails = document.querySelector('.flexmls-listing-details.flexmls-v2-widget');
+	if (!listingDetails) return;
+	// Supplements "Read more" / "Read less"
+	listingDetails.querySelectorAll('.flexmls-supplement-read-more').forEach(function(link) {
+		link.addEventListener('click', function(e) {
+			e.preventDefault();
+			var wrapper = this.closest('.flexmls-supplement');
+			var teaser = wrapper.querySelector('.flexmls-supplement-teaser');
+			var ellipsis = wrapper.querySelector('.flexmls-supplement-ellipsis');
+			var full = wrapper.querySelector('.flexmls-supplement-full');
+			var expanded = this.getAttribute('aria-expanded') === 'true';
+			if (expanded) {
+				if (teaser) teaser.style.display = '';
+				if (ellipsis) ellipsis.style.display = '';
+				if (full) full.style.display = 'none';
+				this.textContent = '(Read more)';
+				this.setAttribute('aria-expanded', 'false');
+			} else {
+				if (teaser) teaser.style.display = 'none';
+				if (ellipsis) ellipsis.style.display = 'none';
+				if (full) full.style.display = '';
+				this.textContent = '(Read less)';
+				this.setAttribute('aria-expanded', 'true');
+			}
+		});
+	});
+	// Collapsible listing detail sections
+	var expandByDefault = listingDetails.querySelector('.features-section') && listingDetails.querySelector('.features-section').getAttribute('data-expand-sections') === '1';
+	listingDetails.querySelectorAll('.flexmls-detail-section-toggle').forEach(function(section) {
+		var initiallyExpanded = section.getAttribute('data-initially-expanded') === '1';
+		var header = section.querySelector('.flexmls-detail-section-header');
+		var body = section.querySelector('.flexmls-detail-section-body');
+		if (!header || !body) return;
+		if (!initiallyExpanded) {
+			section.classList.add('flexmls-detail-section-collapsed');
+			body.style.display = 'none';
+		}
+		header.setAttribute('tabIndex', '0');
+		header.setAttribute('role', 'button');
+		header.setAttribute('aria-expanded', initiallyExpanded ? 'true' : 'false');
+		header.addEventListener('click', function() {
+			var collapsed = section.classList.contains('flexmls-detail-section-collapsed');
+			section.classList.toggle('flexmls-detail-section-collapsed', !collapsed);
+			body.style.display = collapsed ? '' : 'none';
+			header.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
+		});
+		header.addEventListener('keydown', function(e) {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				header.click();
+			}
+		});
+	});
+})();
+</script>

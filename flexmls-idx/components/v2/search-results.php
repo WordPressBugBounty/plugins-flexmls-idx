@@ -89,7 +89,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 		return $this->render( $fmc_plugin_dir . "/views/admin/v2/settings.php", $this->admin_view_vars );
 	}
 
-	function render_map($search_results = "") {
+	function render_map( $search_results = "", $settings = array(), $map_parameter_set = false ) {
 		$options = get_option( 'fmc_settings' );
 
 		if ( isset ( $options['google_maps_api_key'] ) && $options['google_maps_api_key'] ) :
@@ -160,7 +160,9 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				}
 				}
 
-				$map = new flexmlsListingMap( $markers );
+				// Lazy-load map when default view is list (map closed): load API only when user clicks "Open Map".
+				$load_map_on_load = ( ! empty( $settings['default_view'] ) && $settings['default_view'] === 'map' ) || $map_parameter_set;
+				$map = new flexmlsListingMap( $markers, array( 'lazy_load' => ! $load_map_on_load ) );
 				$map->render_map();
 		endif;
 	}

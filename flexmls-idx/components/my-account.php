@@ -45,6 +45,7 @@ class fmcAccount extends fmcWidget {
   * - flexmls_cart_type (Type of cart to be added if not logged in)
   */
   function ajax_remove_listing_from_cart(){
+    flexmls_verify_ajax_nonce();
     ob_clean();
     global $fmc_api_portal;
 
@@ -70,6 +71,7 @@ class fmcAccount extends fmcWidget {
   * - flexmls_cart_type (Type of cart to be added if not logged in)
   */
   function ajax_add_listing_to_cart(){
+    flexmls_verify_ajax_nonce();
     ob_clean();
     global $fmc_api_portal;
 
@@ -87,6 +89,7 @@ class fmcAccount extends fmcWidget {
   }
 
 	function portal_clear_session_vars(){
+		flexmls_verify_ajax_nonce();
 		ob_clean();
 		global $fmc_api_portal;
 		if( $fmc_api_portal->log_out() ){

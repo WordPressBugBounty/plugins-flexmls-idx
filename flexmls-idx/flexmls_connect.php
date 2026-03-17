@@ -5,10 +5,10 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.15.11
+Version: 3.16
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.4
 */
 
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.15.11';
+const FMC_PLUGIN_VERSION = '3.16';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -70,6 +70,9 @@ class FlexMLS_IDX {
 		add_action( 'admin_enqueue_scripts', array( '\FlexMLS\Admin\Enqueue', 'admin_enqueue_scripts' ) );
 		add_action( 'admin_print_footer_scripts', array( '\FlexMLS\Admin\Enqueue', 'admin_print_footer_scripts' ) );
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
+		add_action( 'admin_menu', array( $this, 'admin_menu_fix_submenu_labels' ), 99 );
+		add_action( 'admin_init', array( $this, 'admin_init_redirect_clear_cache' ) );
+		add_filter( 'submenu_file', array( $this, 'admin_submenu_file' ), 10, 2 );
 		add_action( 'admin_notices', array( $this, 'admin_notices' ) );
 		add_action( 'flexmls_hourly_cache_cleanup', array( '\FlexMLS\Admin\Update', 'hourly_cache_cleanup' ) );
 		add_action( 'init', array( $this, 'rewrite_rules' ) );
@@ -77,6 +80,7 @@ class FlexMLS_IDX {
 		add_action( 'plugins_loaded', array( '\FlexMLS\Admin\Settings', 'update_settings' ), 9 );
 		add_action( 'plugins_loaded', array( $this, 'session_start' ) );
 		add_filter( 'redirect_canonical', array( $this, 'prevent_idx_redirects' ), 10, 2 );
+		add_action( 'send_headers', array( $this, 'send_idx_page_header' ) );
 		add_action( 'widgets_init', array( $this, 'widgets_init' ) );
 		//add_action( 'wp_ajax_fmcShortcodeContainer', array( 'flexmlsConnect', 'shortcode_container' ) );
 		add_action( 'wp_ajax_fmcShortcodeContainer', array( '\FlexMLS\Admin\TinyMCE', 'tinymce_shortcodes' ) );
@@ -87,6 +91,8 @@ class FlexMLS_IDX {
 		add_action( 'wp_ajax_fmcleadgen_submit', array( '\FlexMLS\Shortcodes\LeadGeneration', 'submit_lead' ) );
 		add_action( 'wp_ajax_nopriv_fmcleadgen_submit', array( '\FlexMLS\Shortcodes\LeadGeneration', 'submit_lead' ) );
 		add_action( 'wp_enqueue_scripts', array( '\FlexMLS\Admin\Enqueue', 'wp_enqueue_scripts' ) );
+		add_filter( 'script_loader_tag', array( '\FlexMLS\Admin\Enqueue', 'script_loader_tag_no_minify' ), 10, 3 );
+		add_filter( 'style_loader_tag', array( '\FlexMLS\Admin\Enqueue', 'style_loader_tag_no_minify' ), 10, 3 );
 
 		add_action( 'wp_ajax_flexmls_connect_save_search', array( 'flexmlsConnectPageSearchResults', 'save_user_search' ) );
 		add_action( 'wp_ajax_nopriv_flexmls_connect_save_search', array( 'flexmlsConnectPageSearchResults', 'save_user_search' ) );
@@ -100,13 +106,44 @@ class FlexMLS_IDX {
 	}
 
 	function admin_menu(){
-		$SparkAPI = new \SparkAPI\Core();
-		$auth_token = $SparkAPI->generate_auth_token();
+		$options = get_option( 'fmc_settings', array() );
+		$has_key = ! empty( $options['api_key'] ) && ! empty( $options['api_secret'] );
+
 		add_menu_page( 'Flexmls&reg; IDX', 'Flexmls&reg; IDX', 'edit_posts', 'fmc_admin_intro', array( '\FlexMLS\Admin\Settings', 'admin_menu_cb_intro' ), 'dashicons-location', 77 );
-		/*if( $auth_token ){
-			add_submenu_page( 'fmc_admin_intro', 'FlexMLS&reg; IDX: Add Neighborhood', 'Add Neighborhood', 'edit_pages', 'fmc_admin_neighborhood', array( '\FlexMLS\Admin\Settings', 'admin_menu_cb_neighborhood' ) );
-		}*/
-		add_submenu_page( 'fmc_admin_intro', 'Flexmls&reg; IDX: Settings', 'Settings', 'manage_options', 'fmc_admin_settings', array( '\FlexMLS\Admin\Settings', 'admin_menu_cb_settings' ) );
+
+		if ( $has_key ) {
+			add_submenu_page( 'fmc_admin_intro', 'Flexmls&reg; IDX: Settings', 'Settings', 'manage_options', 'fmc_admin_settings', array( '\FlexMLS\Admin\Settings', 'admin_menu_cb_settings' ) );
+			add_submenu_page( 'fmc_admin_intro', 'Clear Cache', 'Caching', 'manage_options', 'fmc_admin_cache', array( $this, 'admin_menu_cb_clear_cache' ) );
+		}
+	}
+
+	function admin_menu_fix_submenu_labels(){
+		global $submenu;
+		if ( ! isset( $submenu['fmc_admin_intro'][0][0] ) ) {
+			return;
+		}
+		$options = get_option( 'fmc_settings', array() );
+		$has_key = ! empty( $options['api_key'] ) && ! empty( $options['api_secret'] );
+		$submenu['fmc_admin_intro'][0][0] = $has_key ? 'Credentials' : 'Activate';
+	}
+
+	function admin_init_redirect_clear_cache(){
+		if ( isset( $_GET['page'] ) && 'fmc_admin_cache' === $_GET['page'] ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=fmc_admin_settings&tab=cache' ) );
+			exit;
+		}
+	}
+
+	function admin_menu_cb_clear_cache(){
+		wp_safe_redirect( admin_url( 'admin.php?page=fmc_admin_settings&tab=cache' ) );
+		exit;
+	}
+
+	function admin_submenu_file( $submenu_file, $parent_file ){
+		if ( 'fmc_admin_intro' === $parent_file && isset( $_GET['page'] ) && 'fmc_admin_settings' === $_GET['page'] && isset( $_GET['tab'] ) && 'cache' === $_GET['tab'] ) {
+			return 'fmc_admin_cache';
+		}
+		return $submenu_file;
 	}
 
 	function admin_notices(){
@@ -213,6 +250,26 @@ class FlexMLS_IDX {
 				wp_safe_redirect( $redirect_url );
 				exit;
 			}
+		}
+	}
+
+	/**
+	 * Send X-Flexmls-IDX: idx header on IDX page responses so WAFs can allowlist verified search engine bots for IDX paths.
+	 * See docs/search-engine-bot-whitelisting.md for customer guidance.
+	 */
+	function send_idx_page_header() {
+		if ( is_admin() || wp_doing_ajax() ) {
+			return;
+		}
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		if ( $request_uri === '' ) {
+			return;
+		}
+		$fmc_settings = get_option( 'fmc_settings' );
+		$permabase = is_array( $fmc_settings ) && isset( $fmc_settings['permabase'] ) ? $fmc_settings['permabase'] : 'idx';
+		$permabase = preg_quote( $permabase, '/' );
+		if ( preg_match( '/\/' . $permabase . '\//', $request_uri ) || preg_match( '/\/portal\//', $request_uri ) ) {
+			header( 'X-Flexmls-IDX: idx' );
 		}
 	}
 

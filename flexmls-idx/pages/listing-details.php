@@ -824,6 +824,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         echo "</div>";
       }
 
+    // SourceMLS.org verification badge
+    echo $this->render_source_mls_badge( $sf, 'flexmls_connect__source_mls_badge');
+
     // disclaimer
       echo "  <div class='flexmls_connect__idx_disclosure_text'>";
 
@@ -952,6 +955,37 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         $this->property_detail_values[$field_group][] = $line;
       }
     }
+  }
+
+  /**
+   * Renders the SourceMLS.org verification badge when SourceMLSURL is present.
+   *
+   * @param array $sf StandardFields from the listing record.
+   * @param string|null $wrapper_class Optional CSS class(es) for a wrapping div (e.g. for v2 template).
+   * @return string HTML for the badge, or empty string if not applicable.
+   */
+  function render_source_mls_badge( $sf, $wrapper_class = null ) {
+    if ( ! isset( $sf['SourceMLSURL'] ) || ! flexmlsConnect::is_not_blank_or_restricted( $sf['SourceMLSURL'] ) ) {
+      return '';
+    }
+    $img_url = esc_url( $sf['SourceMLSURL'] . '.png' );
+    $beacon_url = esc_js( $sf['SourceMLSURL'] );
+    $img = '<img src="' . $img_url . '" width="132" height="60" alt="Source MLS Verified" '
+      . 'onload="navigator.sendBeacon(\'' . $beacon_url . '\')" '
+      . 'onerror="this.style.display=\'none\'">';
+    if ( $wrapper_class !== null && $wrapper_class !== '' ) {
+      return '<div class="' . esc_attr( $wrapper_class ) . '">' . $img . '</div>';
+    }
+    return $img;
+  }
+
+  /**
+   * Renders the Flexmls/FBS products branding link (e.g. for disclosure section).
+   *
+   * @return string HTML for the branding link.
+   */
+  function render_flexmls_branding() {
+    return flexmlsConnect::fbs_products_branding_link();
   }
 
   function wpseo_title( $title ){

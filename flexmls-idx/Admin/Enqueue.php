@@ -5,6 +5,31 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 class Enqueue {
 
+	/**
+	 * Script handles for our plugin's own minified assets (add data-no-minify="1" to avoid double minification).
+	 *
+	 * @var string[]
+	 */
+	private static $no_minify_script_handles = array(
+		'flexmls_admin_script',
+		'fmc_connect',
+		'fmc_portal',
+		'fmc_flexmls_map',
+		'chart-umd-js',
+		'chartjs-adapter-date-fns-bundle',
+		'chartkick-js',
+	);
+
+	/**
+	 * Style handles for our plugin's own minified assets (add data-no-minify="1" to avoid double minification).
+	 *
+	 * @var string[]
+	 */
+	private static $no_minify_style_handles = array(
+		'fmc_connect',
+		'fmc_connect_frontend',
+	);
+
 	static function admin_enqueue_scripts( $hook ){
         $options = get_option( 'fmc_settings' );
 		$hooked_pages = array(
@@ -60,7 +85,8 @@ class Enqueue {
 
 		wp_localize_script( 'fmc_connect', 'fmcAjax', array(
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'pluginurl' => plugins_url( '', dirname( __FILE__ ) )
+			'pluginurl' => plugins_url( '', dirname( __FILE__ ) ),
+			'nonce' => wp_create_nonce( 'fmc_ajax' ),
 		) );
 
 		add_thickbox();
@@ -116,12 +142,19 @@ class Enqueue {
             );
         }
 
+		// Google Maps: only enqueue when a map is shown on load (listing detail or search with default_view=map).
+		// Search results with default_view=list (map closed) load the API when user clicks "Open Map" to avoid billing every page load.
 		$google_maps_no_enqueue = 0;
 		if( isset( $options[ 'google_maps_no_enqueue' ] ) && 1 == $options[ 'google_maps_no_enqueue' ] ){
 			$google_maps_no_enqueue = 1;
 		}
-		if( isset( $options[ 'google_maps_api_key' ] ) && !empty( $options[ 'google_maps_api_key' ] ) && 0 === $google_maps_no_enqueue ){
-			wp_enqueue_script( 'google-maps', 'https://maps.googleapis.com/maps/api/js?key=' . $options[ 'google_maps_api_key' ] );
+		$has_maps_key = isset( $options[ 'google_maps_api_key' ] ) && ! empty( $options[ 'google_maps_api_key' ] ) && 0 === $google_maps_no_enqueue;
+		global $fmc_special_page_caught;
+		$is_listing_detail = ! empty( $fmc_special_page_caught['type'] ) && $fmc_special_page_caught['type'] === 'listing-details';
+		$fmc_connect_deps = array( 'jquery' );
+		if ( $has_maps_key && $is_listing_detail ) {
+			self::enqueue_google_maps( $options );
+			$fmc_connect_deps[] = 'fmc-google-maps-bootstrap';
 		}
 
     if(!isset( $options[ 'select2_turn_off' ]))
@@ -131,19 +164,101 @@ class Enqueue {
         wp_enqueue_style('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css');
     }
 
-		wp_enqueue_script( 'fmc_connect', plugins_url( 'assets/js/main.js', dirname( __FILE__ ) ), array( 'jquery' ), FMC_PLUGIN_VERSION );
+		wp_enqueue_script( 'fmc_connect', plugins_url( 'assets/js/main.js', dirname( __FILE__ ) ), $fmc_connect_deps, FMC_PLUGIN_VERSION );
 		wp_enqueue_script( 'fmc_portal', plugins_url( 'assets/js/portal.js', dirname( __FILE__ ) ), array( 'jquery', 'fmc_connect' ), FMC_PLUGIN_VERSION );
 
 		wp_enqueue_script( 'fmc_connect_flot_resize', '//cdnjs.cloudflare.com/ajax/libs/flot/4.2.2/jquery.flot.resize.min.js', array( 'jquery' ), FMC_PLUGIN_VERSION, true );
 
 		wp_localize_script( 'fmc_connect', 'fmcAjax', array(
 			'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			'pluginurl' => plugins_url( '', dirname( __FILE__ ) )
+			'pluginurl' => plugins_url( '', dirname( __FILE__ ) ),
+			'nonce' => wp_create_nonce( 'fmc_ajax' ),
 		) );
 
 		wp_enqueue_style( 'wp-jquery-ui-dialog' );
 		wp_enqueue_style( 'fmc_connect', plugins_url( 'assets/css/style.css', dirname( __FILE__ ) ), FMC_PLUGIN_VERSION );
 
+	}
+
+	/**
+	 * Enqueue Google Maps API and bootstrap. Call when a map is shown on page load (listing detail or search with default_view=map).
+	 *
+	 * @param array|null $options Optional. FMC settings. Defaults to get_option( 'fmc_settings' ).
+	 */
+	static function enqueue_google_maps( $options = null ) {
+		if ( $options === null ) {
+			$options = get_option( 'fmc_settings' );
+		}
+		if ( empty( $options['google_maps_api_key'] ) ) {
+			return;
+		}
+		if ( ! empty( $options['google_maps_no_enqueue'] ) ) {
+			return;
+		}
+		$bootstrap = 'window.fmcGmapsQueue=[];window.fmcGmapsWhenReady=function(f){if(window.fmcGmapsLoaded)f();else window.fmcGmapsQueue.push(f);};window.fmcGmapsReady=function(){window.fmcGmapsLoaded=true;window.fmcGmapsQueue.forEach(function(f){f();});window.fmcGmapsQueue=[];};';
+		wp_register_script( 'fmc-google-maps-bootstrap', false, array(), null, false );
+		wp_enqueue_script( 'fmc-google-maps-bootstrap' );
+		wp_add_inline_script( 'fmc-google-maps-bootstrap', $bootstrap, 'before' );
+		$maps_url = 'https://maps.googleapis.com/maps/api/js?key=' . $options['google_maps_api_key'] . '&libraries=marker&loading=async&callback=fmcGmapsReady';
+		wp_enqueue_script( 'google-maps', $maps_url, array( 'fmc-google-maps-bootstrap' ), null, false );
+		wp_script_add_data( 'google-maps', 'async', true );
+		if ( ! has_filter( 'script_loader_tag', array( __CLASS__, 'google_maps_script_loader_tag' ) ) ) {
+			add_filter( 'script_loader_tag', array( __CLASS__, 'google_maps_script_loader_tag' ), 10, 3 );
+		}
+	}
+
+	/**
+	 * Add async attribute to Google Maps script tag (required for loading=async best practice).
+	 *
+	 * @param string $tag    The script tag.
+	 * @param string $handle The script handle.
+	 * @param string $src    The script src.
+	 * @return string
+	 */
+	static function google_maps_script_loader_tag( $tag, $handle, $src ) {
+		if ( 'google-maps' !== $handle ) {
+			return $tag;
+		}
+		if ( strpos( $tag, ' async' ) === false ) {
+			$tag = str_replace( ' src', ' async src', $tag );
+		}
+		return $tag;
+	}
+
+	/**
+	 * Add data-no-minify="1" to our plugin's script tags so optimization plugins (e.g. WP Rocket) skip minifying them.
+	 *
+	 * @param string $tag    The script tag.
+	 * @param string $handle The script handle.
+	 * @param string $src    The script src.
+	 * @return string
+	 */
+	static function script_loader_tag_no_minify( $tag, $handle, $src ) {
+		if ( ! in_array( $handle, self::$no_minify_script_handles, true ) ) {
+			return $tag;
+		}
+		if ( strpos( $tag, ' data-no-minify=' ) !== false ) {
+			return $tag;
+		}
+		return str_replace( ' src=', ' data-no-minify="1" src=', $tag );
+	}
+
+	/**
+	 * Add data-no-minify="1" to our plugin's style tags so optimization plugins (e.g. WP Rocket) skip minifying them.
+	 *
+	 * @param string $tag    The link tag.
+	 * @param string $handle The style handle.
+	 * @param string $href   The stylesheet href.
+	 * @return string
+	 */
+	static function style_loader_tag_no_minify( $tag, $handle, $href ) {
+		if ( ! in_array( $handle, self::$no_minify_style_handles, true ) ) {
+			return $tag;
+		}
+		if ( strpos( $tag, ' data-no-minify=' ) !== false ) {
+			return $tag;
+		}
+		return str_replace( ' href=', ' data-no-minify="1" href=', $tag );
 	}
 
 }

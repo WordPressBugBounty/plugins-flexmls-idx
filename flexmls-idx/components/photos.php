@@ -1296,6 +1296,7 @@ class fmcPhotos extends fmcWidget {
 
 
   function additional_photos() {
+    flexmls_verify_ajax_nonce();
     global $fmc_api;
 
     $full_id = flexmlsConnect::wp_input_get_post('id');
@@ -1323,6 +1324,7 @@ class fmcPhotos extends fmcWidget {
   }
 
   function additional_videos() {
+    flexmls_verify_ajax_nonce();
     global $fmc_api;
 
     $full_id = flexmlsConnect::wp_input_get_post('id');
@@ -1348,6 +1350,7 @@ class fmcPhotos extends fmcWidget {
   }
 
   function additional_vtours() {
+    flexmls_verify_ajax_nonce();
     global $fmc_api;
 
     $full_id = flexmlsConnect::wp_input_get_post('id');
@@ -1374,7 +1377,7 @@ class fmcPhotos extends fmcWidget {
 
 
   function additional_slides() {
-
+    flexmls_verify_ajax_nonce();
     // no arguments need to be passed for prepping the AJAX response
     $args = array();
 

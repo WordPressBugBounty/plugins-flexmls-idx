@@ -97,6 +97,7 @@ class flexmlsConnect {
     ?>
     <script type='text/javascript'>
       var fmcPluginUrl = '<?php echo $fmc_plugin_url; ?>';
+      if ( typeof window.fmcAjax === 'undefined' ) { window.fmcAjax = { ajaxurl: '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', nonce: '<?php echo esc_js( wp_create_nonce( 'fmc_ajax' ) ); ?>' }; }
     </script>
     <?php
   }

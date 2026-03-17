@@ -154,6 +154,7 @@ class LeadGeneration {
 	}
 
 	public static function submit_lead(){
+		flexmls_verify_ajax_nonce();
 		$result = array(
 			'message' => '',
 			'success' => 1

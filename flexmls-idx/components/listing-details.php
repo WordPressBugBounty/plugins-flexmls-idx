@@ -27,6 +27,7 @@ class fmcListingDetails extends fmcWidget {
     }
 
   function schedule_showing($attr = array()) {
+    flexmls_verify_ajax_nonce();
     global $fmc_api;
     $api_my_account = $fmc_api->GetMyAccount();
     if ( ! is_array( $api_my_account ) ) {
@@ -96,6 +97,7 @@ class fmcListingDetails extends fmcWidget {
 
 
   function contact($attr = array()) {
+    flexmls_verify_ajax_nonce();
     global $fmc_api;
     $api_my_account = $fmc_api->GetMyAccount();
     if ( ! is_array( $api_my_account ) ) {
