@@ -52,22 +52,8 @@
 						<span class="new-listing-tag open-house">Open House</span>
 					<?php endif; ?>
 				<?php endif; ?>
-					<?php
-
-							if ( flexmlsConnect::is_not_blank_or_restricted( $sf['CurrentPricePublic'] ) && !flexmlsConnect::is_not_blank_or_restricted( $sf['ListPriceLow'] ) && !flexmlsConnect::is_not_blank_or_restricted( $sf['ListPriceHigh']) ){
-								$list_price = '$' . flexmlsConnect::gentle_price_rounding( $sf['CurrentPricePublic'] );
-							} 
-					        elseif ( flexmlsConnect::is_not_blank_or_restricted($sf['ListPriceLow']) && flexmlsConnect::is_not_blank_or_restricted($sf['ListPriceHigh']) ){
-					            $list_price = '$'. flexmlsConnect::gentle_price_rounding($sf['ListPriceLow'] );
-					            $list_price .= '-';
-					            $list_price .= '$'. flexmlsConnect::gentle_price_rounding($sf['ListPriceHigh']);
-					          } 
-					        else {
-					            $list_price = "";
-					          }
-
-					?>
-					<span class="flexmls-price"><?php echo $list_price; ?></span>
+					<?php $list_price = flexmlsConnect::format_listing_standard_price_display( $sf ); ?>
+					<span class="flexmls-price"><?php echo esc_html( $list_price ); ?></span>
 					<div class="flexmls-portal-links">
 						<?php fmcAccount::write_carts( $record ); ?>
 					</div>

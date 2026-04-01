@@ -65,6 +65,79 @@ class Core {
 	 */
 	protected $user_agent;
 
+	/** Lock TTL (seconds) for auth token generation. */
+	private const AUTH_LOCK_TTL = 30;
+
+	/** Time (ms) to wait after claiming lock before re-checking. */
+	private const AUTH_LOCK_WAIT_MS = 200;
+
+	/** Max age (seconds) of lock timestamp to consider we still hold it. */
+	private const AUTH_LOCK_MAX_AGE = 25;
+
+	/** How long (seconds) to wait for another request to set the auth token. */
+	private const AUTH_POLL_MAX_WAIT = 25;
+
+	/** Lock TTL (seconds) for query cache single-flight. */
+	private const QUERY_LOCK_TTL = 60;
+
+	/** Time (ms) to wait after claiming query lock before re-checking. */
+	private const QUERY_LOCK_WAIT_MS = 300;
+
+	/** Max age (seconds) of query lock timestamp to consider we still hold it. */
+	private const QUERY_LOCK_MAX_AGE = 55;
+
+	/** How long (seconds) to wait for another request to fill query cache. */
+	private const QUERY_POLL_MAX_WAIT = 20;
+
+	/**
+	 * Try to acquire a transient-based lock (single-flight across requests).
+	 *
+	 * @param string $lock_key    Transient key for the lock.
+	 * @param int    $ttl_seconds Lock TTL in seconds.
+	 * @param int    $wait_ms     Milliseconds to wait after setting lock before re-reading.
+	 * @param int    $max_age     Max age in seconds of lock timestamp to consider we hold it.
+	 * @return bool True if this request holds the lock.
+	 */
+	private function try_acquire_lock( $lock_key, $ttl_seconds, $wait_ms, $max_age ) {
+		$lock_id = wp_generate_uuid4();
+		set_transient( $lock_key, array( 'id' => $lock_id, 'ts' => time() ), $ttl_seconds );
+		usleep( $wait_ms * 1000 );
+		$lock = get_transient( $lock_key );
+		return is_array( $lock )
+			&& isset( $lock['id'], $lock['ts'] )
+			&& $lock['id'] === $lock_id
+			&& ( time() - (int) $lock['ts'] ) < $max_age;
+	}
+
+	/**
+	 * Release a transient-based lock.
+	 *
+	 * @param string $lock_key Transient key for the lock.
+	 */
+	private function release_lock( $lock_key ) {
+		delete_transient( $lock_key );
+	}
+
+	/**
+	 * Poll for a transient to be set by another request.
+	 *
+	 * @param string $transient_name Transient key.
+	 * @param int    $max_wait_sec   Max seconds to wait.
+	 * @param int    $interval_ms    Milliseconds between checks.
+	 * @return mixed Transient value when found, or false.
+	 */
+	private function wait_for_transient( $transient_name, $max_wait_sec, $interval_ms = 500 ) {
+		$deadline = time() + $max_wait_sec;
+		while ( time() < $deadline ) {
+			$value = get_transient( $transient_name );
+			if ( false !== $value && '' !== $value ) {
+				return $value;
+			}
+			usleep( $interval_ms * 1000 );
+		}
+		return false;
+	}
+
 	/**
 	 * Constructor for the Core class.
 	 *
@@ -389,30 +462,49 @@ class Core {
 			return false;
 		}
 
-		$params           = $this->generate_security_params( $options );
-		$url              = sprintf( 'https://%s/%s/session?%s', $this->api_base, $this->api_version, build_query( $params ) );
-		$response         = wp_remote_post( $url, array( 'headers' => $this->api_headers ) );
-		$decoded_response = json_decode( wp_remote_retrieve_body( $response ), true );
+		// Single-flight: only one request should call the session API; others wait for the token.
+		$lock_key = 'flexmls_auth_token_lock';
+		$have_lock = $this->try_acquire_lock(
+			$lock_key,
+			self::AUTH_LOCK_TTL,
+			self::AUTH_LOCK_WAIT_MS,
+			self::AUTH_LOCK_MAX_AGE
+		);
 
-		if ( $this->is_valid_response( $decoded_response ) ) {
-			$auth_token = $decoded_response;
-			set_transient( 'flexmls_auth_token', $auth_token, 15 * MINUTE_IN_SECONDS );
-			return $auth_token;
+		if ( ! $have_lock ) {
+			$auth_token = $this->wait_for_transient( 'flexmls_auth_token', self::AUTH_POLL_MAX_WAIT );
+			return $auth_token ? $auth_token : $this->generate_auth_token( $retry );
 		}
 
-		// Preserve error code and message from API response before returning false
-		if ( is_array( $decoded_response ) && isset( $decoded_response['D'] ) ) {
-			if ( isset( $decoded_response['D']['Code'] ) ) {
-				$this->last_error_code = $decoded_response['D']['Code'];
-			}
-			if ( isset( $decoded_response['D']['Message'] ) ) {
-				$this->last_error_mess = $decoded_response['D']['Message'];
-			}
-		}
+		try {
+			$params           = $this->generate_security_params( $options );
+			$url              = sprintf( 'https://%s/%s/session?%s', $this->api_base, $this->api_version, build_query( $params ) );
+			$response         = wp_remote_post( $url, array( 'headers' => $this->api_headers ) );
+			$decoded_response = json_decode( wp_remote_retrieve_body( $response ), true );
 
-		// Record the failure timestamp
-		$failures_timestamps[] = time();
-		set_transient( 'flexmls_auth_failures_timestamps', $failures_timestamps, 15 * MINUTE_IN_SECONDS );
+			if ( $this->is_valid_response( $decoded_response ) ) {
+				$auth_token = $decoded_response;
+				set_transient( 'flexmls_auth_token', $auth_token, 15 * MINUTE_IN_SECONDS );
+				$this->release_lock( $lock_key );
+				return $auth_token;
+			}
+
+			// Preserve error code and message from API response before returning false.
+			if ( is_array( $decoded_response ) && isset( $decoded_response['D'] ) ) {
+				if ( isset( $decoded_response['D']['Code'] ) ) {
+					$this->last_error_code = $decoded_response['D']['Code'];
+				}
+				if ( isset( $decoded_response['D']['Message'] ) ) {
+					$this->last_error_mess = $decoded_response['D']['Message'];
+				}
+			}
+
+			// Only the lock-holder records failure (avoids race on failure_timestamps).
+			$failures_timestamps[] = time();
+			set_transient( 'flexmls_auth_failures_timestamps', $failures_timestamps, 15 * MINUTE_IN_SECONDS );
+		} finally {
+			$this->release_lock( $lock_key );
+		}
 
 		$this->handle_failed_auth( $retry );
 		return false;
@@ -720,10 +812,32 @@ class Core {
 			return $auth_token_generated;  // Return result from previously generated auth token.
 		}
 
-		// Attempt to retrieve cached result.
-		$json = get_transient( 'flexmls_query_' . $request['transient_name'] );
+		// Attempt to retrieve cached result (single-flight: only one request fetches per key).
+		$transient_name = 'flexmls_query_' . $request['transient_name'];
+		$json           = get_transient( $transient_name );
 		if ( false === wp_validate_boolean( $json ) ) {
-			$json = $this->execute_request( $request, $post_data );
+			$query_lock_key = 'flexmls_query_lock_' . $request['transient_name'];
+			$have_lock      = $this->try_acquire_lock(
+				$query_lock_key,
+				self::QUERY_LOCK_TTL,
+				self::QUERY_LOCK_WAIT_MS,
+				self::QUERY_LOCK_MAX_AGE
+			);
+
+			if ( ! $have_lock ) {
+				$json = $this->wait_for_transient( $transient_name, self::QUERY_POLL_MAX_WAIT );
+				if ( false !== $json && '' !== $json ) {
+					return $json;
+				}
+				// Lock holder may have failed; fetch ourselves.
+				$json = $this->execute_request( $request, $post_data );
+			} else {
+				try {
+					$json = $this->execute_request( $request, $post_data );
+				} finally {
+					$this->release_lock( $query_lock_key );
+				}
+			}
 
 			if ( isset( $json['D']['Code'] ) && 1020 === intval( $json['D']['Code'] ) && ! $a_retry ) {
 				delete_transient( 'flexmls_auth_token' );

@@ -110,6 +110,8 @@ class fmcWidget extends WP_Widget {
 			}
 			$is_slideshow_widget = ($widget_info['shortcode'] == "idx_slideshow") ? true : false;
 
+			$listing_summary_source = isset( $_REQUEST['source'] ) ? trim( (string) $_REQUEST['source'] ) : '';
+
 			foreach ($_REQUEST as $k => $v) {
 					if ( $k === 'action' || $k === 'nonce' || $k === 'fmc_render_token' ) {
 							continue;
@@ -117,6 +119,15 @@ class fmcWidget extends WP_Widget {
 
 					if ($is_slideshow_widget && $is_service_lacking_filter_support && ($k == "property_type" || $k == "location")) {
 							continue;
+					}
+
+					// ListAgentId only applies when "Filter by" is Specific agent.
+					if ( $k === 'agent' && $listing_summary_source !== 'agent' ) {
+							continue;
+					}
+
+					if ( $k === 'property_sub_type' && is_string( $v ) ) {
+							$v = trim( $v, " ,\t\n\r\0\x0B" );
 					}
 
 					if (!empty($v)) {

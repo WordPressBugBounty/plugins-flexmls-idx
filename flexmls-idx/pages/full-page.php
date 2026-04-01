@@ -108,8 +108,7 @@ class flexmlsConnectPage {
     global $fmc_special_page_caught;
     $classes[] = 'flexmls_connect__' . str_replace('-', '_', $fmc_special_page_caught['type']) . '_page';
 
-		$options = get_option( 'fmc_settings' );
-		if ( ! empty( $options['search_listing_template_version'] ) && ( $options['search_listing_template_version'] == 'v2' ) ) {
+		if ( flexmlsConnectPageCore::is_v2_template_active() ) {
 			$classes[] = "flexmls-v2-templates";
 		}
 
@@ -148,7 +147,11 @@ class flexmlsConnectPage {
    */
   static function rel_canonical() {
     global $fmc_special_page_caught;
-    echo "<link rel='canonical' href='" . $fmc_special_page_caught['page-url'] . "/' />\n";
+    $url = $fmc_special_page_caught['page-url'];
+    if ( is_string( $url ) && strpos( $url, 'v2=' ) !== false ) {
+      $url = remove_query_arg( 'v2', $url );
+    }
+    echo "<link rel='canonical' href='" . esc_url( $url ) . "/' />\n";
   }
 
 }

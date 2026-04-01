@@ -124,6 +124,7 @@ class FMCD_fmcSearchResults extends FMCD_module {
             'option_category' => 'basic_option',
             'description'     => esc_html__( '', 'fmcd-divi' ),
             'toggle_slug'     => 'flexmls_basic',
+            'default'         => '25',
           )
        );
        return $fields;

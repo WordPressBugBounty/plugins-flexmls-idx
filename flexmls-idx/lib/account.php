@@ -16,12 +16,15 @@ class FMC_Account {
 		if ( ! is_array( $this->Emails ) || count( $this->Emails ) === 0 ) {
 			return false;
 		}
-		foreach ($this->Emails as $email) {
-			if ( is_array( $email ) && array_key_exists( 'Primary', $email ) && isset( $email['Address'] ) ) {
+		foreach ( $this->Emails as $email ) {
+			if ( ! is_array( $email ) || ! isset( $email['Address'] ) || $email['Address'] === '' ) {
+				continue;
+			}
+			if ( isset( $email['Primary'] ) && $email['Primary'] ) {
 				return $email['Address'];
 			}
 		}
-		if ( isset( $this->Emails[0]['Address'] ) ) {
+		if ( isset( $this->Emails[0]['Address'] ) && $this->Emails[0]['Address'] !== '' ) {
 			return $this->Emails[0]['Address'];
 		}
 		return false;

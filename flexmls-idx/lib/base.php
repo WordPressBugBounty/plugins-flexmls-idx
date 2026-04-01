@@ -1398,6 +1398,43 @@ class flexmlsConnect {
       return number_format($val, 0);
   }
 
+  /**
+   * Display price from listing StandardFields (slideshow, list cards, detail blocks).
+   *
+   * Order: CurrentPricePublic (typical IDX public price), then ClosePrice when closed if public
+   * is unavailable, then ListPrice, then ListPriceHigh–ListPriceLow when both are set (high shown
+   * first, spaced dash, then low).
+   *
+   * @param array $sf StandardFields from an API listing.
+   * @return string Price with a leading "$", or empty string when no displayable price.
+   */
+  public static function format_listing_standard_price_display( $sf ) {
+    if ( ! is_array( $sf ) ) {
+      return '';
+    }
+    $current_public = $sf['CurrentPricePublic'] ?? '';
+    if ( flexmlsConnect::is_not_blank_or_restricted( $current_public ) ) {
+      return '$' . flexmlsConnect::gentle_price_rounding( $current_public );
+    }
+    $list_price = $sf['ListPrice'] ?? '';
+    if ( flexmlsConnect::is_not_blank_or_restricted( $list_price ) ) {
+      return '$' . flexmlsConnect::gentle_price_rounding( $list_price );
+    }
+    $close_price = $sf['ClosePrice'] ?? '';
+    $mls_status  = $sf['MlsStatus'] ?? '';
+    if ( flexmlsConnect::is_not_blank_or_restricted( $close_price ) && $mls_status === 'Closed' ) {
+      return '$' . flexmlsConnect::gentle_price_rounding( $close_price );
+    }
+
+    $list_price_low  = $sf['ListPriceLow'] ?? '';
+    $list_price_high = $sf['ListPriceHigh'] ?? '';
+    if ( flexmlsConnect::is_not_blank_or_restricted( $list_price_low ) && flexmlsConnect::is_not_blank_or_restricted( $list_price_high ) ) {
+      return '$' . flexmlsConnect::gentle_price_rounding( $list_price_high )
+        . ' - $' . flexmlsConnect::gentle_price_rounding( $list_price_low );
+    }
+    return '';
+  }
+
 	public static function garbage_collect_bad_caches(){
 		$SparkAPI = new \SparkAPI\Core();
 		$SparkAPI->clear_cache();

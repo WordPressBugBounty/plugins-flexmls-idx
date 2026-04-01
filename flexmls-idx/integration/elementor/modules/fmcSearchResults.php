@@ -154,7 +154,7 @@ class EL_fmcSearchResults extends EL_FMC_shortcode{
                 'label' => __( 'Listings per page', 'plugin-name' ),
                 'type' => \Elementor\Controls_Manager::SELECT,
                 'options' => $listings_per_page_options,
-                'default' => '10'
+                'default' => '25'
             ]
         );
     }

@@ -5,6 +5,7 @@
       }
       $phone_req  = in_array('phone', $api_prefs['RequiredFields']);
 ?>
+<?php $listing_display_price = flexmlsConnect::format_listing_standard_price_display( $sf ); ?>
 <div class="flexmls-listing-details flexmls-v2-widget flexmls-widthchange-wrapper flexmls-body-font">
 	<?php $has_search_return = ! empty( $_GET['search_referral_url'] ); ?>
 	<div class="flexmls-actions-wrapper listing-section <?php echo $has_search_return ? 'has-return-button' : ''; ?>">
@@ -50,21 +51,7 @@
 
 			
 			<div class="price-and-actions-wrapper">
-				<?php
-							if ( flexmlsConnect::is_not_blank_or_restricted( $sf['CurrentPricePublic'] ) && !flexmlsConnect::is_not_blank_or_restricted( $sf['ListPriceLow'] ) && !flexmlsConnect::is_not_blank_or_restricted( $sf['ListPriceHigh']) ){
-								$list_price = '$' . flexmlsConnect::gentle_price_rounding( $sf['CurrentPricePublic'] );
-						  	} 
-					        elseif ( flexmlsConnect::is_not_blank_or_restricted($sf['ListPriceLow']) && flexmlsConnect::is_not_blank_or_restricted($sf['ListPriceHigh']) ){
-					            $list_price = '$'. flexmlsConnect::gentle_price_rounding($sf['ListPriceLow'] );
-					            $list_price .= '-';
-					            $list_price .= '$'. flexmlsConnect::gentle_price_rounding($sf['ListPriceHigh']);
-					          } 
-					        else {
-					            $list_price = "";
-					          }
-
-					?>
-					<span class="flexmls-price flexmls-title-large"><?php echo $list_price; ?></span>
+					<span class="flexmls-price flexmls-title-large"><?php echo esc_html( $listing_display_price ); ?></span>
 				<div class="actions-wrapper">
 					<?php fmcAccount::write_carts( $record ); ?>
 				</div>
@@ -184,16 +171,10 @@
 			<?php endforeach; ?>
 		</div>
 		<div class="price-and-dates">
-			<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['ClosePrice']) && $sf['MlsStatus'] == 'Closed') : ?>
-			 <span class="flexmls-detail flexmls-price">
-					<span class="detail-label">Current Price:</span>
-					<span class="detail-value">$<?php echo esc_html( flexmlsConnect::gentle_price_rounding($sf['ClosePrice']) ); ?>
-					</span>
-				</span>
-			<?php elseif( flexmlsConnect::is_not_blank_or_restricted( $sf['ListPrice'] ) ) : ?>
+			<?php if ( $listing_display_price !== '' ) : ?>
 				<span class="flexmls-detail flexmls-price">
 					<span class="detail-label">Current Price:</span>
-					<span class="detail-value">$<?php echo esc_html( flexmlsConnect::gentle_price_rounding( $sf['ListPrice'] ) ); ?></span>
+					<span class="detail-value"><?php echo esc_html( $listing_display_price ); ?></span>
 				</span>
 			<?php endif; ?>
 			<?php if( flexmlsConnect::is_not_blank_or_restricted( $sf['OnMarketDate'] ) ) : ?>
@@ -215,8 +196,20 @@
 		<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Overview</h2>
 		<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['PublicRemarks'] ) ) : ?>
 			<h3 class="flexmls-title-large flexmls-heading-font overview-subhead">Description</h3>
+			<?php
+				$remarks_full = $sf['PublicRemarks'];
+				$remarks_plain = wp_strip_all_tags( $remarks_full );
+				$remarks_limit = 1000;
+				$remarks_long = strlen( $remarks_plain ) > $remarks_limit;
+				$remarks_teaser = $remarks_long ? substr( $remarks_plain, 0, $remarks_limit ) : '';
+			?>
 			<div class="flexmls-description">
-				<?php echo $sf['PublicRemarks']; ?>
+				<span class="flexmls-description-teaser"><?php echo $remarks_long ? esc_html( $remarks_teaser ) : $remarks_full; ?></span>
+				<?php if ( $remarks_long ) : ?>
+					<span class="flexmls-description-ellipsis">...</span>
+					<a href="#" class="flexmls-description-read-more" aria-expanded="false">(Read more)</a>
+					<span class="flexmls-description-full" style="display:none;"><?php echo $remarks_full; ?></span>
+				<?php endif; ?>
 			</div>
 			<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['Supplement'] ) ) : ?>
 				<?php
@@ -416,6 +409,13 @@
 			if ( ! empty( $property_features_values ) && ! in_array( '_PropertyFeatures_', $full_display_order, true ) ) {
 				$full_display_order[] = '_PropertyFeatures_';
 			}
+			// Remarks + misc sections often have long prose (Directions, Public Remarks). Wider breakpoints use a
+			// 2-across grid for listing-detail-rows; stack those sections so each field gets full width.
+			$section_uses_stacked_detail_rows = function( $name ) {
+				$n = trim( (string) $name );
+				$stacked = (bool) preg_match( '/remark/i', $n ) && (bool) preg_match( '/misc/i', $n );
+				return (bool) apply_filters( 'flexmls_listing_detail_use_stacked_detail_rows', $stacked, $n );
+			};
 			// First 6 = standalone expandable sections; rest = sub-sections under "More Information" (SmartFrame-style)
 			$first_six = array_slice( $full_display_order, 0, 6 );
 			$more_info_items = array_slice( $full_display_order, 6 );
@@ -449,7 +449,13 @@
 						<div class="details-section flexmls-detail-section-toggle" data-initially-expanded="<?php echo $expand_listing_detail_sections ? '1' : '0'; ?>">
 							<h3 class="detail-section-header flexmls-title-large flexmls-heading-font flexmls-primary-color-font flexmls-detail-section-header"><?php echo esc_html( $section_name ); ?></h3>
 							<div class="flexmls-detail-section-body">
-							<dl class="property-details-wrapper listing-detail-rows">
+							<?php
+							$listing_detail_dl_class = 'property-details-wrapper listing-detail-rows';
+							if ( $section_uses_stacked_detail_rows( $section_name ) ) {
+								$listing_detail_dl_class .= ' listing-detail-rows--stacked';
+							}
+							?>
+							<dl class="<?php echo esc_attr( $listing_detail_dl_class ); ?>">
 								<?php foreach ( $section_rows as $row ) : ?>
 									<dt class="detail-label flexmls-heading-font"><?php echo esc_html( $row['label'] ); ?></dt>
 									<dd class="detail-value"><?php echo esc_html( $row['value'] ); ?></dd>
@@ -487,7 +493,13 @@
 							?>
 								<div class="details-subsection">
 									<h4 class="detail-subsection-header flexmls-heading-font flexmls-primary-color-font"><?php echo esc_html( $section_name ); ?></h4>
-									<dl class="property-details-wrapper listing-detail-rows">
+									<?php
+									$listing_detail_dl_class = 'property-details-wrapper listing-detail-rows';
+									if ( $section_uses_stacked_detail_rows( $section_name ) ) {
+										$listing_detail_dl_class .= ' listing-detail-rows--stacked';
+									}
+									?>
+									<dl class="<?php echo esc_attr( $listing_detail_dl_class ); ?>">
 										<?php foreach ( $section_rows as $row ) : ?>
 											<dt class="detail-label flexmls-heading-font"><?php echo esc_html( $row['label'] ); ?></dt>
 											<dd class="detail-value"><?php echo esc_html( $row['value'] ); ?></dd>
@@ -506,20 +518,25 @@
 				<div class="details-section rooms-section flexmls-detail-section-toggle" data-initially-expanded="<?php echo $expand_listing_detail_sections ? '1' : '0'; ?>">
 					<h3 class="detail-section-header flexmls-title-large flexmls-heading-font flexmls-primary-color-font flexmls-detail-section-header">Room Information</h3>
 					<div class="flexmls-detail-section-body">
-					<div class="property-details-wrapper">
-						<?php foreach ( $room_values[0] as $i => $room ) : ?>
-							<span class="detail-value">
-								<span class="room-name"><?php echo esc_html( $room ); ?></span>
-								<?php foreach ( $room_names as $j => $room_field ) : ?>
-									<?php if ( $j > 0 && ! empty( $room_values[$j][$i] ) ) : ?>
-										<span class="room-detail">
-											<span class="detail-label"><?php echo esc_html( $room_field ); ?></span>: <?php echo esc_html( $room_values[$j][$i] ); ?>
-										</span>
-									<?php endif; ?>
-								<?php endforeach; ?>
-
-							</span>
-						<?php endforeach; ?>
+					<div class="flexmls-room-information-table-wrap">
+						<table class="flexmls-room-information-table" width="100%">
+							<thead>
+								<tr>
+									<?php foreach ( $room_names as $room_header ) : ?>
+										<th scope="col"><?php echo esc_html( $room_header ); ?></th>
+									<?php endforeach; ?>
+								</tr>
+							</thead>
+							<tbody>
+								<?php for ( $x = 0; $x < $room_count; $x++ ) : ?>
+									<tr class="<?php echo ( 0 === $x % 2 ) ? 'flexmls-room-row-zebra' : ''; ?>">
+										<?php for ( $i = 0; $i < count( $room_values ); $i++ ) : ?>
+											<td><?php echo isset( $room_values[ $i ][ $x ] ) ? esc_html( $room_values[ $i ][ $x ] ) : ''; ?></td>
+										<?php endfor; ?>
+									</tr>
+								<?php endfor; ?>
+							</tbody>
+						</table>
 					</div>
 					</div>
 				</div>
@@ -642,30 +659,34 @@
 (function() {
 	var listingDetails = document.querySelector('.flexmls-listing-details.flexmls-v2-widget');
 	if (!listingDetails) return;
-	// Supplements "Read more" / "Read less"
-	listingDetails.querySelectorAll('.flexmls-supplement-read-more').forEach(function(link) {
-		link.addEventListener('click', function(e) {
-			e.preventDefault();
-			var wrapper = this.closest('.flexmls-supplement');
-			var teaser = wrapper.querySelector('.flexmls-supplement-teaser');
-			var ellipsis = wrapper.querySelector('.flexmls-supplement-ellipsis');
-			var full = wrapper.querySelector('.flexmls-supplement-full');
-			var expanded = this.getAttribute('aria-expanded') === 'true';
-			if (expanded) {
-				if (teaser) teaser.style.display = '';
-				if (ellipsis) ellipsis.style.display = '';
-				if (full) full.style.display = 'none';
-				this.textContent = '(Read more)';
-				this.setAttribute('aria-expanded', 'false');
-			} else {
-				if (teaser) teaser.style.display = 'none';
-				if (ellipsis) ellipsis.style.display = 'none';
-				if (full) full.style.display = '';
-				this.textContent = '(Read less)';
-				this.setAttribute('aria-expanded', 'true');
-			}
+	function bindExpandableText(linkSelector, containerSelector, teaserSel, ellipsisSel, fullSel) {
+		listingDetails.querySelectorAll(linkSelector).forEach(function(link) {
+			link.addEventListener('click', function(e) {
+				e.preventDefault();
+				var wrapper = this.closest(containerSelector);
+				if (!wrapper) return;
+				var teaser = wrapper.querySelector(teaserSel);
+				var ellipsis = wrapper.querySelector(ellipsisSel);
+				var full = wrapper.querySelector(fullSel);
+				var expanded = this.getAttribute('aria-expanded') === 'true';
+				if (expanded) {
+					if (teaser) teaser.style.display = '';
+					if (ellipsis) ellipsis.style.display = '';
+					if (full) full.style.display = 'none';
+					this.textContent = '(Read more)';
+					this.setAttribute('aria-expanded', 'false');
+				} else {
+					if (teaser) teaser.style.display = 'none';
+					if (ellipsis) ellipsis.style.display = 'none';
+					if (full) full.style.display = '';
+					this.textContent = '(Read less)';
+					this.setAttribute('aria-expanded', 'true');
+				}
+			});
 		});
-	});
+	}
+	bindExpandableText('.flexmls-description-read-more', '.flexmls-description', '.flexmls-description-teaser', '.flexmls-description-ellipsis', '.flexmls-description-full');
+	bindExpandableText('.flexmls-supplement-read-more', '.flexmls-supplement', '.flexmls-supplement-teaser', '.flexmls-supplement-ellipsis', '.flexmls-supplement-full');
 	// Collapsible listing detail sections
 	var expandByDefault = listingDetails.querySelector('.features-section') && listingDetails.querySelector('.features-section').getAttribute('data-expand-sections') === '1';
 	listingDetails.querySelectorAll('.flexmls-detail-section-toggle').forEach(function(section) {

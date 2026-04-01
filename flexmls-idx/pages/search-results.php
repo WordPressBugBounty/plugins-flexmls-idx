@@ -196,7 +196,13 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 			$search_criteria = $this->search_criteria;
 
+			// Match variables expected by views/v2/fmcSearchResults.php (set in fmcSearchResults::jelly when using the component path).
+			$title     = isset( $this->title ) ? $this->title : '';
+			$settings  = is_array( $this->input_data ) ? $this->input_data : array();
+			$is_widget = (bool) $from_shortcode;
+
 			require( $fmc_plugin_dir . "/views/v2/fmcSearchResults.php" );
+			$this->render_template_styles();
 			$html = ob_get_contents();
 			ob_end_clean();
 			return $html;
@@ -381,7 +387,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					$markers[] = array(
 						'latitude'  => esc_html( $fields['Latitude'] ),
 						'longitude' => esc_html( $fields['Longitude'] ),
-						'listprice' => "$" . flexmlsConnect::gentle_price_rounding( esc_html( $fields['CurrentPricePublic'] ) ),
+						'listprice' => esc_html( flexmlsConnect::format_listing_standard_price_display( $fields ) ),
 						'rawprice'  => esc_html( $fields['ListPrice'] ),
 						'address1'  => esc_html( $first_line_address ),
 						'address2'  => esc_html( $second_line_address ),
@@ -433,7 +439,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			$rand = mt_rand();
 
 			//price
-			$list_price = flexmlsConnect::is_not_blank_or_restricted( $sf['CurrentPricePublic'] ) ? flexmlsConnect::gentle_price_rounding( $sf['CurrentPricePublic'] ) : flexmlsConnect::gentle_price_rounding( $sf['ListPrice'] );
+			$list_price = flexmlsConnect::format_listing_standard_price_display( $sf );
 
 
 
@@ -460,7 +466,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 //        }
 
 			echo "<div class='flexmls_connect__sr_price'>";
-			echo "$" . $list_price;
+			echo esc_html( $list_price );
 			// == price changes ==
 //        if(isset($price_changes) && count($price_changes) > 0){
 //          $price_change = abs($price_changes['PreviousValue'] - $price_changes['NewValue']);

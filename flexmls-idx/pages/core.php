@@ -529,23 +529,34 @@ class flexmlsConnectPageCore {
         }
 
     function contact_form_agent_email($standard_fields) {
-        $email = ($this->account->UserType == "Mls") ? $standard_fields['ListAgentEmail'] : $this->account->primary_email();
-        return addslashes($email);
+        if ( ! is_array( $standard_fields ) ) {
+            $standard_fields = array();
+        }
+        if ( $this->account->UserType === 'Mls' ) {
+            $email = isset( $standard_fields['ListAgentEmail'] ) ? $standard_fields['ListAgentEmail'] : '';
+        } else {
+            $primary = $this->account->primary_email();
+            $email   = is_string( $primary ) ? $primary : '';
+        }
+        return addslashes( $email );
     }
 
     function contact_form_office_email($standard_fields) {
-
-        if($this->account->UserType == "Member") {
-            $office_id = $this->account->OfficeId;
-            $office_account = new FMC_Account($this->api->GetAccount($office_id));
-            $email = $office_account->primary_email();
+        if ( ! is_array( $standard_fields ) ) {
+            $standard_fields = array();
         }
-        elseif ($this->account->UserType == "Office") {
+        if ( $this->account->UserType === 'Member' ) {
+            $office_id      = $this->account->OfficeId;
+            $office_account = new FMC_Account( $this->api->GetAccount( $office_id ) );
+            $email          = $office_account->primary_email();
+            $email          = is_string( $email ) ? $email : '';
+        } elseif ( $this->account->UserType === 'Office' ) {
             $email = $this->account->primary_email();
+            $email = is_string( $email ) ? $email : '';
         } else {
-            $email = $standard_fields['ListOfficeEmail'];
+            $email = isset( $standard_fields['ListOfficeEmail'] ) ? $standard_fields['ListOfficeEmail'] : '';
         }
-        return addslashes($email);
+        return addslashes( $email );
     }
 
     function wpseo_canonical() {
@@ -553,10 +564,44 @@ class flexmlsConnectPageCore {
         return false;
     }
 
-		function uses_v2_template() {
-			$options = get_option( 'fmc_settings' );
+		/**
+		 * Optional URL override for support / troubleshooting (does not change saved settings).
+		 * ?v2=1 or ?v2=true => force Version 2; ?v2=0 or ?v2=false => force Version 1.
+		 * Any other value is ignored and saved settings apply.
+		 *
+		 * @return bool|null null if no override; true/false if v2 query selects template version.
+		 */
+		private static function v2_url_template_override() {
+			if ( ! isset( $_GET['v2'] ) ) {
+				return null;
+			}
+			$val = sanitize_text_field( wp_unslash( $_GET['v2'] ) );
+			$lower = strtolower( $val );
+			if ( $val === '0' || $lower === 'false' ) {
+				return false;
+			}
+			if ( $val === '1' || $lower === 'true' ) {
+				return true;
+			}
+			return null;
+		}
 
-			return ! empty( $options['search_listing_template_version'] ) && ( $options['search_listing_template_version'] == 'v2' );
+		/**
+		 * Whether Version 2 templates should be used (saved option or v2= query override).
+		 *
+		 * @return bool
+		 */
+		public static function is_v2_template_active() {
+			$override = self::v2_url_template_override();
+			if ( $override !== null ) {
+				return $override;
+			}
+			$options = get_option( 'fmc_settings' );
+			return is_array( $options ) && ! empty( $options['search_listing_template_version'] ) && ( $options['search_listing_template_version'] === 'v2' );
+		}
+
+		function uses_v2_template() {
+			return self::is_v2_template_active();
 		}
 
 		function render_template_styles() {

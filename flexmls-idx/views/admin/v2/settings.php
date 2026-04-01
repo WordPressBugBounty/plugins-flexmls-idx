@@ -86,7 +86,8 @@
 			'fmc_field' => $field_id,
 			'collection' => $field_attr['collection'],
 			'option_value_attr' => 'value',
-			'option_display_attr' => 'display_text'
+			'option_display_attr' => 'display_text',
+			'default' => array_key_exists( 'default', $field_attr ) ? $field_attr['default'] : null
 		) ); ?>
 	</div>
 	<?php break; ?>

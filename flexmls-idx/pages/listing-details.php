@@ -282,10 +282,20 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
      $room_fields = $this->api->GetRoomFields($sf['MlsId']);
      $room_names = array();
      $room_values = array();
+     // Column order must follow $room_fields keys; values are matched by field key ($rfk), not Label —
+     // some MLSes define multiple room fields with the same Label (e.g. two "Length" columns). Matching
+     // by label pushed the same value into every column with that label, duplicating data.
+     $room_field_keys_ordered = array();
 
-     foreach ($room_fields as $mls_named_room){
-       array_push($room_names,$mls_named_room["Label"]);
-       array_push($room_values,array());
+     if ( is_array( $room_fields ) ) {
+       foreach ( $room_fields as $field_key => $mls_named_room ) {
+         if ( ! is_array( $mls_named_room ) || ! isset( $mls_named_room['Label'] ) ) {
+           continue;
+         }
+         array_push( $room_names, $mls_named_room['Label'] );
+         array_push( $room_field_keys_ordered, $field_key );
+         array_push( $room_values, array() );
+       }
      }
      $room_information_values = array();
 
@@ -296,17 +306,18 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
          foreach ($r['Fields'] as $rf) {
            foreach ($rf as $rfk => $rfv) {
 
-             $label = null;
-             if (is_array($room_fields) && array_key_exists($rfk, $room_fields)) {
-               // since the given name is a key found in the metadata, use the metadata label for it
-               $label = $room_fields[$rfk]['Label'];
+             if ( is_array( $room_fields ) && array_key_exists( $rfk, $room_fields ) ) {
+               $idx = array_search( $rfk, $room_field_keys_ordered, true );
+               if ( $idx !== false ) {
+                 array_push( $room_values[ $idx ], $rfv );
+               }
              } else {
-               $label = $rfk;
-             }
-
-             for ($i = 0; $i < count($room_names); $i++){
-               if ($label == $room_names[$i]){
-                 array_push($room_values[$i],$rfv);
+               // Field key not in MLS room metadata: match header text once (avoid duplicate Label columns).
+               for ( $i = 0; $i < count( $room_names ); $i++ ) {
+                 if ( (string) $rfk === (string) $room_names[ $i ] ) {
+                   array_push( $room_values[ $i ], $rfv );
+                   break;
+                 }
                }
              }
              /*if     ($label == "Room") {
@@ -369,7 +380,10 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
     // show price
     echo "<div class='flexmls_connect__ld_price'>";
-    if( flexmlsConnect::is_not_blank_or_restricted( $sf['CurrentPricePublic'] ) ) echo '<div>$' . flexmlsConnect::gentle_price_rounding( $sf['CurrentPricePublic'] )."</div>";
+    $ld_price = flexmlsConnect::format_listing_standard_price_display( $sf );
+    if ( $ld_price !== '' ) {
+      echo '<div>' . esc_html( $ld_price ) . '</div>';
+    }
     echo "</div>";
     fmcAccount::write_carts($record);
 

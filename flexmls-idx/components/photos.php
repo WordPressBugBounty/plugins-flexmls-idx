@@ -256,7 +256,7 @@ class fmcPhotos extends fmcWidget {
     $params['_select'] = 'MlsId,ListPrice,ListOfficeId,ListOfficeName,OpenHouses,BedsTotal,BathsTotal,
       BuildingAreaTotal,LivingArea,ListingKey,Photos,ListingId,SubdivisionName,PublicRemarks,UnparsedFirstLineAddress,
       StreetNumber,StreetDirPrefix,StreetName,StreetSuffix,StreetDirSuffix,StreetAdditionalInfo,City,
-      StateOrProvince,PostalCode,ClosePrice,MlsStatus,ListPriceLow,ListPriceHigh';
+      StateOrProvince,PostalCode,CurrentPricePublic,ClosePrice,MlsStatus,ListPriceLow,ListPriceHigh';
 
 
     $only_our_listings = false;
@@ -455,19 +455,7 @@ class fmcPhotos extends fmcWidget {
         $second_line_address = $listing_address[1];
         $one_line_address = $listing_address[2];
 
-        if ( flexmlsConnect::is_not_blank_or_restricted($listing['ListPrice']) && !flexmlsConnect::is_not_blank_or_restricted($listing['ListPriceLow']) && !flexmlsConnect::is_not_blank_or_restricted($listing['ListPriceHigh']) ){
-            $price = '$' . flexmlsConnect::gentle_price_rounding($listing['ListPrice']);
-          } 
-          elseif ( flexmlsConnect::is_not_blank_or_restricted( $listing['ClosePrice']) && $listing['MlsStatus'] == 'Closed'){
-            $price = '$'. esc_html( flexmlsConnect::gentle_price_rounding($listing['ClosePrice']) );
-          }
-          elseif( flexmlsConnect::is_not_blank_or_restricted($listing['ListPriceLow']) && flexmlsConnect::is_not_blank_or_restricted($listing['ListPriceHigh']) ){
-            $price = '$'. flexmlsConnect::gentle_price_rounding($listing['ListPriceLow']);
-            $price .= '-';
-            $price .= '$'. flexmlsConnect::gentle_price_rounding($listing['ListPriceHigh']);
-          } else {
-            $price = "";
-          }
+        $price = flexmlsConnect::format_listing_standard_price_display( $listing );
 
         if( flexmlsConnect::is_not_blank_or_restricted($listing['BuildingAreaTotal']) ) {
             $sf_sqft_value = $listing['BuildingAreaTotal'];

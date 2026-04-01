@@ -117,7 +117,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 					$second_line_address      = htmlspecialchars( $listing_address[1] );
 					$link_to_details_criteria = $this->search_criteria;
 
-					$list_price = flexmlsConnect::is_not_blank_or_restricted( $fields['ListPrice'] ) ? '$' . flexmlsConnect::gentle_price_rounding( $fields['ListPrice'] ) : '';
+					$list_price = flexmlsConnect::format_listing_standard_price_display( $fields );
 
 					$this_result_overall_index = ( $this->page_size * ( $this->current_page - 1 ) ) + $result_count;
 
@@ -495,6 +495,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 			'listings_per_page' => [
 				'type' => 'select',
 				'label' => 'Listings Per Page',
+				'default' => 25,
 				'collection' => [
 					[ 'value' => 5, 'display_text' => 5 ],
 					[ 'value' => 10, 'display_text' => 10 ],

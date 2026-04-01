@@ -107,7 +107,7 @@
 
     <?php foreach ($api_property_type_options as $property_code => $v) { ?>
       <optgroup label="<?php echo $property_code; ?>">
-          <option value="" selected="selected">All Sub Types</option>
+          <option value="">All Sub Types</option>
         <?php foreach ($api_property_sub_type_options as $sub_type) {
           if(in_array($property_code, $sub_type['AppliesTo']) and $sub_type['Name'] != "Select One" ){
           ?>
@@ -215,7 +215,7 @@
   <select fmc-field="listings_per_page" fmc-type='select' id="fmc_shortcode_field_listings_per_page" name="listings_per_page">
 
     <?php foreach ($listings_per_page_options as $k => $v): ?>
-      <option value='<?php echo $k; ?>' <?php selected( $v, '10' ); ?>>
+      <option value='<?php echo $k; ?>' <?php selected( $k, '25' ); ?>>
         <?php echo $v; ?>
       </option>
     <?php endforeach; ?>

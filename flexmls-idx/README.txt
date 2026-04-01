@@ -2,9 +2,9 @@
 Tags: flexmls, IDX, MLS search
 Contributors: flexmls
 Requires at least: 5.0
-Tested up to: 6.9
+Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 3.16
+Stable tag: 3.17
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,21 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.17 =
+Improvements & New Features:
+* Updated default listings per page to 25 in the IDX Listing Summary
+* Refactored the Listing Price widget to use a single helper for better performance
+* Hardened V2 listing detail layouts against theme CSS conflicts
+* Added a "Read More" character limit toggle for listing description pages
+* Updated the Remarks & Misc section layout to use rows instead of columns
+
+Efficiency Updates:
+* Resolved issue where IDX listing shortcodes did not correctly apply extra attributes
+* Resolved bug causing room dimension information to duplicate on listing detail pages
+* Addressed API connection race conditions related to auth tokens and caching
+* Fixed widget titles not displaying within the Elementor IDX Listing Summary
+* Resolved issue where the "Contact Agent" button failed to send to the primary email address
+
 = 3.16 =
 Improvements and New Features
 * V2 listing template: Listing details were redesigned with a "More Information" section and a clearer property features grid

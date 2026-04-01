@@ -177,6 +177,7 @@ class VCE_fmcSearchResults extends VCE_component {
               "heading" => 'Listings per page',
               "param_name" => "listings_per_page",
               "value" => $this->modify_array($listings_per_page_options),
+              "std" => "25",
             )
           )
         );
