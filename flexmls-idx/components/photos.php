@@ -923,7 +923,7 @@ class fmcPhotos extends fmcWidget {
     $Account = new \SparkAPI\Account();
     $api_my_account = $Account->get_my_account();
 
-    if ($api_property_type_options === false || $api_system_info === false || $api_my_account === false) {
+    if ( empty( $api_property_type_options ) || $api_system_info === false || $api_my_account === false ) {
       return flexmlsConnect::widget_not_available($fmc_api, true);
     }
 
@@ -1207,7 +1207,10 @@ class fmcPhotos extends fmcWidget {
 
     $source = $this->set_source_options();
     $property_type_use = $fmc_api->GetPropertyTypes();
-    $property_type = array_merge(['' => 'All'], $property_type_use);
+    if ( ! is_array( $property_type_use ) ) {
+      $property_type_use = array();
+    }
+    $property_type = array_merge( array( '' => 'All' ), $property_type_use );
     $property_sub_type = $fmc_api->GetPropertySubTypes();
     if(!is_array($property_sub_type)){
       $property_sub_type = [];

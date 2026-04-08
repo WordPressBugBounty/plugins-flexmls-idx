@@ -62,6 +62,9 @@
             $this->type_options = $type_options;
             $this->display_options = array();
 
+            if ( ! is_array( $property_type_options ) ) {
+                $property_type_options = array();
+            }
             $property_type_options = array_merge(['' => 'All'], $property_type_options);
 
 

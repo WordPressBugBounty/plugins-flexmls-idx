@@ -186,12 +186,24 @@ class flexmlsConnect {
       $return .= isset($args['after_title']) ? $args['after_title'] : '';
     }
 
+    if ( isset( $api->wordpress_idx_entitlement_blocked ) && true === $api->wordpress_idx_entitlement_blocked ) {
+      $message = is_admin()
+        ? \FlexMLS\Admin\ApiMessages::widget_wordpress_idx_entitlement_admin_message()
+        : \FlexMLS\Admin\ApiMessages::widget_wordpress_idx_subscription_blocked_public_message();
+      $return .= $message;
+      if (is_array($args)) {
+        $return .= isset($args['after_widget']) ? $args['after_widget'] : '';
+      }
+      return $return;
+    }
+
     $last_error_code = isset($api->last_error_code) ? $api->last_error_code : null;
     if ($last_error_code == 1500) {
       $message = "This widget requires a subscription to Flexmls&reg; IDX in order to work.  <a href=''>Buy Now</a>.";
     }
-    elseif ($last_error_code == 1010) {
-      $message = "This widget is unavailable because your Flexmls&reg; IDX Plugin Key has been disabled. Please contact the Flexmls IDX Consultant Team: <a href='tel:8663209977'>(866)320-9977</a> or <a href='mailto:idxsales@fbsdata.com'>Email</a>.";
+    elseif ( 1010 === (int) $last_error_code || 1015 === (int) $last_error_code ) {
+      $api_msg = isset( $api->last_error_mess ) ? $api->last_error_mess : '';
+      $message = \FlexMLS\Admin\ApiMessages::widget_unavailable_message( (int) $last_error_code, $api_msg );
     }
     elseif ($detailed == true) {
       $message = "There was an issue communicating with the Flexmls&reg; IDX API services required to generate this widget.  Please refresh the page or try again later.  Error code: ".$last_error_code;
@@ -1261,6 +1273,9 @@ class flexmlsConnect {
 
       if ( is_array($result) ) {
         foreach ($result as $r) {
+          if ( ! is_array( $r ) ) {
+            continue;
+          }
           if ($only_saved_search and !array_key_exists('SearchId', $r) ) {
             // we're only wanting saved search links and this isn't one
             continue;
@@ -1376,7 +1391,10 @@ class flexmlsConnect {
     }
     else {
       $api_property_types = $fmc_api->GetPropertyTypes();
-      return $api_property_types[$abbrev];
+      if ( ! is_array( $api_property_types ) || ! array_key_exists( $abbrev, $api_property_types ) ) {
+        return $abbrev;
+      }
+      return $api_property_types[ $abbrev ];
     }
   }
 
@@ -1501,6 +1519,9 @@ class flexmlsConnect {
   }
 
   static function show_error($error = array()){
+    if ( ! is_array( $error ) ) {
+      $error = array();
+    }
     $return = '<div class="fmc-error"><b>Error:</b> ';
     if (array_key_exists("title", $error)) {
       $return .= $error["title"] . "<br>";
@@ -1516,8 +1537,26 @@ class flexmlsConnect {
     global $fmc_api;
 
     $portal = $fmc_api->GetPortal();
+    if ( ! is_array( $portal ) || ! array_key_exists( 0, $portal ) ) {
+      return false;
+    }
+    $row = $portal[0];
+    if ( ! is_array( $row ) ) {
+      return false;
+    }
 
-    return (bool)$portal[0]['Enabled'];
+    return ! empty( $row['Enabled'] );
+  }
+
+  /**
+   * @param array<int, mixed>|mixed $portal Raw GetPortal() result.
+   * @return string|null
+   */
+  private static function portal_row_display_name( $portal ) {
+    if ( ! is_array( $portal ) || ! array_key_exists( 0, $portal ) || ! is_array( $portal[0] ) ) {
+      return null;
+    }
+    return isset( $portal[0]['DisplayName'] ) ? $portal[0]['DisplayName'] : null;
   }
 
   static function get_portal_slug() {
@@ -1528,12 +1567,12 @@ class flexmlsConnect {
     $portal_on = flexmlsConnect::is_portal_on();
 
     if ( $portal_on ) {
-      $portal_slug = $portal[0]['DisplayName'];
-    } else {
-      $fmc_api->SetPortal(array(), array('AutoName' => true));
-      $fmc_api->DeleteCache('portal');
+      $portal_slug = self::portal_row_display_name( $portal );
+    } elseif ( is_array( $portal ) && array_key_exists( 0, $portal ) && is_array( $portal[0] ) ) {
+      $fmc_api->SetPortal( array(), array( 'AutoName' => true ) );
+      $fmc_api->DeleteCache( 'portal' );
       $portal = $fmc_api->GetPortal();
-      $portal_slug = $portal[0]['DisplayName'];
+      $portal_slug = self::portal_row_display_name( $portal );
     }
 
     return $portal_slug;

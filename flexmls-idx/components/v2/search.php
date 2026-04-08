@@ -24,7 +24,7 @@ class fmcSearch extends fmcSearch_v1 {
 	}
 
 	function get_font_with_default( $key, $default = "default" ) {
-		$value = $this->widget_settings[$key];
+		$value = isset( $this->widget_settings[ $key ] ) ? $this->widget_settings[ $key ] : null;
 		if ( empty( $value ) || $value == "default" ) {
 			return false;
 		}
@@ -112,7 +112,7 @@ class fmcSearch extends fmcSearch_v1 {
 		$IDXLinks = new \SparkAPI\IDXLinks();
 		$api_links = $IDXLinks->get_all_idx_links();
 
-		if ($api_prop_types === false || $api_system_info === false || $api_links === false) {
+		if ( empty( $api_prop_types ) || $api_system_info === false || $api_links === false ) {
 			return flexmlsConnect::widget_not_available($fmc_api, false, $args, $settings);
 		}
 

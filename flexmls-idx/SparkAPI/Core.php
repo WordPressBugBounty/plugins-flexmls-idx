@@ -17,14 +17,14 @@ defined( 'ABSPATH' ) || die( 'This plugin requires WordPress' );
 /**
  * Core class
  *
- * This class provides functionalities for making API calls to the FlexMLS IDX API, generating authentication tokens,
+ * This class provides functionalities for making API calls to the Flexmls IDX API, generating authentication tokens,
  * handling cache, and processing API responses.
  */
 #[\AllowDynamicProperties]
 class Core {
 
 	/**
-	 * The base URL of the FlexMLS IDX API.
+	 * The base URL of the Flexmls IDX API.
 	 *
 	 * @var string $api_base
 	 */
@@ -38,14 +38,14 @@ class Core {
 	protected $api_headers;
 
 	/**
-	 * The version of the FlexMLS IDX API.
+	 * The version of the Flexmls IDX API.
 	 *
 	 * @var string $api_version
 	 */
 	protected $api_version;
 
 	/**
-	 * The version of the FlexMLS WordPress Plugin.
+	 * The version of the Flexmls WordPress Plugin.
 	 *
 	 * @var string $plugin_version
 	 */
@@ -159,7 +159,7 @@ class Core {
 		$this->api_headers    = array(
 			'Accept-Encoding'       => 'gzip,deflate',
 			'Content-Type'          => 'application/json',
-			'User-Agent'            => 'Flexmls WordPress Plugin/' . $this->api_version,
+			'User-Agent'            => 'FlexMLS WordPress Plugin/' . $this->api_version,
 			'X-SparkApi-User-Agent' => 'flexmls-WordPress-Plugin/' . $this->plugin_version,
 			'X-WP-User-Agent' 		=> $this->user_agent,
 			'X-User-IP-Address'		=> $this->user_ip
@@ -169,7 +169,7 @@ class Core {
 	/**
 	 * Display an admin notice for API connection error.
 	 *
-	 * This function displays an error notice in the WordPress admin area when there is an error connecting to the FlexMLS IDX API.
+	 * This function displays an error notice in the WordPress admin area when there is an error connecting to the Flexmls IDX API.
 	 * It provides a link to the support page for further assistance.
 	 *
 	 * Example usage:
@@ -177,41 +177,15 @@ class Core {
 	 * $core->admin_notices_api_connection_error();
 	 */
 	public function admin_notices_api_connection_error() {
-		// Check for specific error code 1010 (Plugin Key Disabled)
-		if ( $this->last_error_code == 1010 ) {
-			printf(
-				'<div class="notice notice-error">
-					<p>Your Flexmls&reg; IDX Plugin Key has been disabled.
-					<ul style="list-style-type: square; padding-left: 25px;">
-					<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
-					please <a href="%s">contact support</a>
-					<p>or</p></li>
-					<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
-					</ul>
-					</p>
-				</div>',
-				admin_url( 'admin.php?page=fmc_admin_intro&tab=support' )
-			);
-		} else {
-			$support_link    = admin_url( 'admin.php?page=fmc_admin_settings&tab=support' );
-			$error_message   = __( 'There was an error connecting to the FlexMLS® IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message,', 'fmcdomain' );
-			$contact_support = __( 'contact support', 'fmcdomain' );
-
-			printf(
-				'<div class="notice notice-error">
-				<p>%s <a href="%s">%s</a>.</p>
-			</div>',
-				esc_textarea( $error_message ),
-				esc_url( $support_link ),
-				esc_textarea( $contact_support )
-			);
-		}
+		echo '<div class="notice notice-error">';
+		\FlexMLS\Admin\ApiMessages::echo_admin_api_error_notice( $this->last_error_code, $this->last_error_mess, false );
+		echo '</div>';
 	}
 
 	/**
 	 * Clear cache.
 	 *
-	 * This function clears the cache by deleting transient options related to FlexMLS IDX API.
+	 * This function clears the cache by deleting transient options related to Flexmls IDX API.
 	 * It uses WordPress Transients API for compatibility with object caching systems (Memcached/Redis).
 	 * It also generates a new authentication token and stores it in the cache.
 	 *
@@ -252,7 +226,9 @@ class Core {
 		$this->cleanup_tracking_array();
 
 		delete_transient( 'flexmls_auth_token' );
-		$this->generate_auth_token();
+		if ( ! \FlexMLS\Admin\ConnectionPause::should_skip_clear_cache_token_refresh() ) {
+			$this->generate_auth_token( 'auto' );
+		}
 		return true;
 	}
 
@@ -420,41 +396,21 @@ class Core {
 	/**
 	 * Generate authentication token.
 	 *
-	 * This function generates an authentication token for making API requests.
-	 * It retrieves the cached authentication token if it exists and is valid.
-	 * Otherwise, it retrieves the API credentials, generates security parameters, and makes a request to the API to get a new authentication token.
-	 * The generated authentication token is stored in the cache for future use.
-	 *
-	 * @param bool $retry Whether to retry generating the authentication token or not.
+	 * @param string $context 'auto' respects cool-down; 'manual' forces one session POST (Retry connection button).
 	 *
 	 * @return array|bool The generated authentication token on success, false on failure.
-	 *
-	 * Example usage:
-	 * $core = new Core();
-	 * $core->generate_auth_token();  // Generates and retrieves the authentication token
-	 * $core->generate_auth_token(false);  // Generates and retrieves the authentication token without retrying
 	 */
-	public function generate_auth_token( $retry = true ) {
-		// Get the cached auth token and failure timestamps.
-		$auth_token          = get_transient( 'flexmls_auth_token' );
-		$failures_timestamps = get_transient( 'flexmls_auth_failures_timestamps' ) ?: array();
-
-		// Check if there have been more than 2 failures in the last 15 minutes.
-		$recent_failures = array_filter(
-			$failures_timestamps,
-			function ( $timestamp ) {
-				return ( time() - $timestamp ) <= ( 15 * MINUTE_IN_SECONDS );
-			}
-		);
-
-		// If there are more than 2 recent failures, return the bad token without making an API request.
-		if ( count( $recent_failures ) > 2 ) {
+	public function generate_auth_token( $context = 'auto' ) {
+		$auth_token = get_transient( 'flexmls_auth_token' );
+		if ( $auth_token ) {
+			delete_transient( 'flexmls_auth_failures_timestamps' );
+			\FlexMLS\Admin\ConnectionPause::clear_state();
 			return $auth_token;
 		}
 
-		// If we have a valid token and haven't failed too much, return the token.
-		if ( $auth_token ) {
-			return $auth_token;
+		if ( \FlexMLS\Admin\ConnectionPause::should_block_auto_session( $context ) ) {
+			\FlexMLS\Admin\ConnectionPause::sync_last_error_to_core( $this );
+			return false;
 		}
 
 		$options = get_option( 'fmc_settings' );
@@ -462,8 +418,7 @@ class Core {
 			return false;
 		}
 
-		// Single-flight: only one request should call the session API; others wait for the token.
-		$lock_key = 'flexmls_auth_token_lock';
+		$lock_key  = 'flexmls_auth_token_lock';
 		$have_lock = $this->try_acquire_lock(
 			$lock_key,
 			self::AUTH_LOCK_TTL,
@@ -473,23 +428,37 @@ class Core {
 
 		if ( ! $have_lock ) {
 			$auth_token = $this->wait_for_transient( 'flexmls_auth_token', self::AUTH_POLL_MAX_WAIT );
-			return $auth_token ? $auth_token : $this->generate_auth_token( $retry );
+			return $auth_token ? $auth_token : $this->generate_auth_token( $context );
 		}
 
+		$failures_timestamps = get_transient( 'flexmls_auth_failures_timestamps' ) ?: array();
+
 		try {
-			$params           = $this->generate_security_params( $options );
-			$url              = sprintf( 'https://%s/%s/session?%s', $this->api_base, $this->api_version, build_query( $params ) );
-			$response         = wp_remote_post( $url, array( 'headers' => $this->api_headers ) );
+			$params   = $this->generate_security_params( $options );
+			$url      = sprintf( 'https://%s/%s/session?%s', $this->api_base, $this->api_version, build_query( $params ) );
+			$response = wp_remote_post( $url, array( 'headers' => $this->api_headers ) );
+
+			if ( is_wp_error( $response ) ) {
+				$this->last_error_code = null;
+				$this->last_error_mess  = $response->get_error_message();
+				\FlexMLS\Admin\ConnectionPause::after_session_failure( 0, null, $this->last_error_mess, $failures_timestamps, null );
+				return false;
+			}
+
+			$http_code          = (int) wp_remote_retrieve_response_code( $response );
 			$decoded_response = json_decode( wp_remote_retrieve_body( $response ), true );
 
 			if ( $this->is_valid_response( $decoded_response ) ) {
 				$auth_token = $decoded_response;
 				set_transient( 'flexmls_auth_token', $auth_token, 15 * MINUTE_IN_SECONDS );
+				delete_transient( 'flexmls_auth_failures_timestamps' );
+				\FlexMLS\Admin\ConnectionPause::clear_state();
 				$this->release_lock( $lock_key );
 				return $auth_token;
 			}
 
-			// Preserve error code and message from API response before returning false.
+			$this->last_error_code = null;
+			$this->last_error_mess = null;
 			if ( is_array( $decoded_response ) && isset( $decoded_response['D'] ) ) {
 				if ( isset( $decoded_response['D']['Code'] ) ) {
 					$this->last_error_code = $decoded_response['D']['Code'];
@@ -498,15 +467,27 @@ class Core {
 					$this->last_error_mess = $decoded_response['D']['Message'];
 				}
 			}
+			if ( null === $this->last_error_mess || '' === $this->last_error_mess ) {
+				$this->last_error_mess = $http_code > 0
+					? sprintf(
+						/* translators: %d: HTTP status code */
+						__( 'HTTP %d', 'fmcdomain' ),
+						$http_code
+					)
+					: __( 'Invalid response from API.', 'fmcdomain' );
+			}
 
-			// Only the lock-holder records failure (avoids race on failure_timestamps).
-			$failures_timestamps[] = time();
-			set_transient( 'flexmls_auth_failures_timestamps', $failures_timestamps, 15 * MINUTE_IN_SECONDS );
+			\FlexMLS\Admin\ConnectionPause::after_session_failure(
+				$http_code,
+				is_array( $decoded_response ) ? $decoded_response : null,
+				'',
+				$failures_timestamps,
+				$response
+			);
 		} finally {
 			$this->release_lock( $lock_key );
 		}
 
-		$this->handle_failed_auth( $retry );
 		return false;
 	}
 
@@ -572,31 +553,6 @@ class Core {
 	}
 
 	/**
-	 * Handle failed authentication.
-	 *
-	 * This function handles failed authentication by incrementing the authentication token failures count.
-	 * If retry is set to true, it generates a new authentication token.
-	 * If retry is set to false, it adds an admin notice for API connection error.
-	 *
-	 * @param bool $retry Whether to retry generating the authentication token or not.
-	 *
-	 * @return void
-	 *
-	 * Example usage:
-	 * $core = new Core();
-	 * $core->handle_failed_auth();  // Handles failed authentication and retries generating the authentication token
-	 * $core->handle_failed_auth(false);  // Handles failed authentication and adds an admin notice for API connection error
-	 */
-	private function handle_failed_auth( $retry ) {
-		if ( ! $retry ) {
-			add_action( 'admin_notices', array( $this, 'admin_notices_api_connection_error' ) );
-			return;
-		}
-
-		$this->generate_auth_token( false );
-	}
-
-	/**
 	 * Get the first result from the API response.
 	 *
 	 * This function retrieves the first result from the API response.
@@ -653,7 +609,7 @@ class Core {
 	/**
 	 * Get data from API and process the response.
 	 *
-	 * This function makes an API call to the FlexMLS IDX API, retrieves the response, and processes it.
+	 * This function makes an API call to the Flexmls IDX API, retrieves the response, and processes it.
 	 * It takes the HTTP method, service, cache time, parameters, post data, and retry flag as input.
 	 * It returns an array containing the success status and the results from the API response.
 	 *
@@ -781,7 +737,7 @@ class Core {
 	/**
 	 * Make an API call.
 	 *
-	 * This function makes an API call to the FlexMLS IDX API.
+	 * This function makes an API call to the Flexmls IDX API.
 	 * It prepares the request object, signs the request, and executes the request.
 	 * It returns the API response in JSON format.
 	 *
@@ -812,6 +768,10 @@ class Core {
 			return $auth_token_generated;  // Return result from previously generated auth token.
 		}
 
+		if ( \FlexMLS\Admin\ApiMessages::is_spark_api_blocked_missing_wordpress_idx_subscription( $request['service'], $method ) ) {
+			return array( 'D' => array( 'Success' => false ) );
+		}
+
 		// Attempt to retrieve cached result (single-flight: only one request fetches per key).
 		$transient_name = 'flexmls_query_' . $request['transient_name'];
 		$json           = get_transient( $transient_name );
@@ -840,9 +800,11 @@ class Core {
 			}
 
 			if ( isset( $json['D']['Code'] ) && 1020 === intval( $json['D']['Code'] ) && ! $a_retry ) {
-				delete_transient( 'flexmls_auth_token' );
-				if ( $this->generate_auth_token() ) {
-					$json = $this->make_api_call( $method, $service, 0, $params, $post_data, true );
+				if ( ! \FlexMLS\Admin\ConnectionPause::should_block_auto_token_refresh() ) {
+					delete_transient( 'flexmls_auth_token' );
+					if ( $this->generate_auth_token( 'auto' ) ) {
+						$json = $this->make_api_call( $method, $service, 0, $params, $post_data, true );
+					}
 				}
 			}
 		}
@@ -932,6 +894,14 @@ class Core {
 				'http_code' => wp_remote_retrieve_response_code( $response ),
 				'body'      => $json,
 			);
+		}
+
+		// Key/account disabled: drop cached session so wp-admin re-checks and can show 1010/1015 from session.
+		if ( isset( $json['D']['Success'] ) && ! wp_validate_boolean( $json['D']['Success'] ) && isset( $json['D']['Code'] ) ) {
+			$err_code = (int) $json['D']['Code'];
+			if ( 1010 === $err_code || 1015 === $err_code ) {
+				delete_transient( 'flexmls_auth_token' );
+			}
 		}
 
 		// Handle valid JSON.

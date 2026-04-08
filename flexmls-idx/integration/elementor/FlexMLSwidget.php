@@ -106,6 +106,9 @@
     protected function integrationWithElementor(){}
 
     protected function modify_array($arr, $val = 'value', $label = 'display_text'){
+        if ( ! is_array( $arr ) ) {
+            return array();
+        }
         $options = array();
         foreach ($arr as $data) {
           $options[$data[$val]] = $data[$label];

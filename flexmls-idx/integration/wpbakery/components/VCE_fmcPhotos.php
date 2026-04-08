@@ -32,7 +32,7 @@ class VCE_fmcPhotos extends VCE_component {
           extract($this->vars);
       }
 
-        if(isset($agent)){
+        if ( isset( $agent ) && is_array( $agent ) ) {
           $agent = array_merge(array(array('Id' => '', 'Name' => '  - Select One -  ')), $agent);
         } else {
           $agent = [];

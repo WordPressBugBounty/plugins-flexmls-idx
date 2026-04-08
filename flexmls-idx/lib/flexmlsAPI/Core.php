@@ -40,11 +40,18 @@ class flexmlsAPI_Core {
     public $last_error_code = null;
     public $last_error_mess = null;
 
+    /**
+     * Set at bootstrap from GET /system: true when FlexmlsProducts lists omit WordPressIdx; null if not evaluated or inconclusive.
+     *
+     * @var bool|null
+     */
+    public $wordpress_idx_entitlement_blocked = null;
+
     public $api_headers = array(
         'Accept-Encoding' => "gzip,deflate",
         'Content-Type' => "application/json",
-        'User-Agent' => "Flexmls WordPress Plugin/3.17",
-        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.17"
+        'User-Agent' => "Flexmls WordPress Plugin/3.18",
+        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.18"
     );
 
 
@@ -60,23 +67,9 @@ class flexmlsAPI_Core {
 
     static function admin_notices_api_connection_error(){
         global $fmc_api;
-        // Check for specific error code 1010 (Plugin Key Disabled)
-        if ( isset( $fmc_api ) && $fmc_api->last_error_code == 1010 ) {
-            echo '	<div class="notice notice-error">
-						<p>Your Flexmls&reg; IDX Plugin Key has been disabled.
-						<ul style="list-style-type: square; padding-left: 25px;">
-						<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
-						please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
-						<p>or</p></li>
-						<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
-						</ul>
-						</p>
-					</div>';
-        } else {
-            echo '	<div class="notice notice-error">
-						<p>There was an error connecting to the Flexmls&reg; IDX API. Please check your credentials and try again. If your credentials are correct and you continue to see this error message, please <a href="' . admin_url( 'admin.php?page=fmc_admin_settings&tab=support' ) . '">contact support</a>.</p>
-					</div>';
-        }
+        $code = ( isset( $fmc_api ) && isset( $fmc_api->last_error_code ) ) ? $fmc_api->last_error_code : null;
+        $msg  = ( isset( $fmc_api ) && isset( $fmc_api->last_error_mess ) ) ? $fmc_api->last_error_mess : null;
+        \FlexMLS\Admin\ApiMessages::echo_admin_api_error_notice( $code, $msg, true );
     }
 
     function SetApplicationName( $name ){
@@ -215,6 +208,12 @@ class flexmlsAPI_Core {
       API services
     ----------------------------------------------------------------------*/
     function MakeAPICall( $method, $service, $cache_time = 0, $params = array(), $post_data = null, $a_retry = false, $use_oauth_key = false ){
+        if ( ! $use_oauth_key && \FlexMLS\Admin\ApiMessages::is_spark_api_blocked_missing_wordpress_idx_subscription( $service, $method ) ) {
+            return array(
+                'success' => false,
+                'results' => array(),
+            );
+        }
         if ($use_oauth_key) {
             $options = get_option( 'fmc_settings' );
             $oauthApi = new flexmlsConnectPortalUser($options['oauth_key'], $options['oauth_secret']);
@@ -567,9 +566,8 @@ class flexmlsAPI_Core {
 
             return $records;
         }
-        else {
-            return false;
-        }
+
+        return array();
     }
 
     function GetPropertySubTypes() {
@@ -577,9 +575,9 @@ class flexmlsAPI_Core {
 
         if ($response['success'] == true && array_key_exists('FieldList', $response['results'][0]['PropertySubType'])) {
             return $response['results'][0]['PropertySubType']['FieldList'];
-        } else {
-            return false;
         }
+
+        return array();
     }
 
 

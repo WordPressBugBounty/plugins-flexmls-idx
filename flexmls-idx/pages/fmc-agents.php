@@ -49,7 +49,7 @@ class flexmlsConnectAgentSearchResults extends flexmlsConnectPageCore {
     ?>
     <span class='flexmls_connect__sr_matches'>
     <div class='flexmls_connect__sr_matches_count'>
-      <?php echo number_format($this->total_rows, 0, '.', ','); ?>
+      <?php echo number_format( (int) ( $this->total_rows ?? 0 ), 0, '.', ',' ); ?>
     </div>
 
     <?php

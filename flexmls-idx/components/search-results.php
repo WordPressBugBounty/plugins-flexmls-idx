@@ -284,7 +284,7 @@ class fmcSearchResults_v1 extends fmcWidget {
       $vars["api_property_sub_type_options"] = [];
     }
 
-    if ($vars["api_property_type_options"] === false || $api_my_account === false) {
+    if ( empty( $vars["api_property_type_options"] ) || $api_my_account === false ) {
       return flexmlsConnect::widget_not_available($fmc_api, true);
     }
 
@@ -321,10 +321,19 @@ class fmcSearchResults_v1 extends fmcWidget {
       'Name'=> '(None)'
     );
 
-    $vars = $this->admin_view_vars(true);
-    $vars['api_links'] = flexmlsConnect::get_all_idx_links(true);
-    //$vars['api_links'] = $none_ + $default + $vars['api_links'];
-    array_unshift($vars['api_links'], $none_, $default);
+    $admin_vars = $this->admin_view_vars(true);
+    if ( ! is_array( $admin_vars ) ) {
+      // admin_view_vars() returns HTML from widget_not_available() when the API is unavailable.
+      return $this->integration_view_vars_api_unavailable( $admin_vars, $none_, $default );
+    }
+
+    $vars = $admin_vars;
+    $api_links = flexmlsConnect::get_all_idx_links(true);
+    if ( ! is_array( $api_links ) ) {
+      $api_links = array();
+    }
+    $vars['api_links'] = $api_links;
+    array_unshift( $vars['api_links'], $none_, $default );
 
     $standard_status = $vars['standard_status'];
     if($standard_status->allow_sold_searching()) {
@@ -342,6 +351,72 @@ class fmcSearchResults_v1 extends fmcWidget {
     $vars['agent'] = '';
     $vars['status'] = ''; */
 
+    return $vars;
+  }
+
+  /**
+   * Safe vars for Elementor/Divi/WPBakery when admin_view_vars() could not load API data (entitlement, outage, etc.).
+   *
+   * @param string $notice_html Output of widget_not_available().
+   * @param array  $none_       Placeholder idx link row.
+   * @param array  $default     Default idx link row.
+   * @return array<string, mixed>
+   */
+  protected function integration_view_vars_api_unavailable( $notice_html, $none_, $default ) {
+    $vars = array(
+      'special_neighborhood_title_ability' => $notice_html,
+      'api_links'                          => array( $none_, $default ),
+      'source_options'                     => array( 'location' => 'Location' ),
+      'api_property_type_options'          => array(),
+      'api_property_sub_type_options'      => array(),
+      'display_options'                    => array(
+        'all'           => 'All Listings',
+        'new'           => 'New Listings',
+        'open_houses'   => 'Open Houses',
+        'price_changes' => 'Recent Price Changes',
+        'recent_sales'  => 'Recent Sales',
+      ),
+      'display_day_options'                => array(
+        null => '1 (3 on Monday)',
+        1    => 1,
+        2    => 2,
+        3    => 3,
+        4    => 4,
+        5    => 5,
+        6    => 6,
+        7    => 7,
+        8    => 8,
+        9    => 9,
+        10   => 10,
+        11   => 11,
+        12   => 12,
+        13   => 13,
+        14   => 14,
+        15   => 15,
+      ),
+      'sort_options'                       => array(
+        'recently_changed'    => 'Recently changed first',
+        'price_low_high'      => 'Price, low to high',
+        'price_high_low'      => 'Price, high to low',
+        'year_built_low_high' => 'Year Built, low to high',
+        'year_built_high_low' => 'Year Built, high to low',
+        'sqft_low_high'       => 'SqFt, low to high',
+        'sqft_high_low'       => 'SqFt, high to low',
+        'open_house'          => 'Open House',
+      ),
+      'listings_per_page_options'          => array(
+        '5'  => '5',
+        '10' => '10',
+        '15' => '15',
+        '20' => '20',
+        '25' => '25',
+      ),
+      'standard_status'                    => new fmcStandardStatus( false ),
+      'portal_slug'                        => \flexmlsConnect::get_portal_slug(),
+    );
+    if ( flexmlsConnect::is_office() ) {
+      $vars['agent'] = array();
+    }
     return $vars;
   }
 }

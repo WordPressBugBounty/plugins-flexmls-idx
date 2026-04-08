@@ -178,6 +178,23 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 		$options = get_option( 'fmc_settings' );
 
+		$search_unavailable_inner = null;
+		if ( isset( $fmc_api->wordpress_idx_entitlement_blocked ) && true === $fmc_api->wordpress_idx_entitlement_blocked ) {
+			$search_unavailable_inner = esc_html( \FlexMLS\Admin\ApiMessages::widget_wordpress_idx_subscription_blocked_public_message() );
+		} elseif ( ! is_array( $this->search_data ) ) {
+			$search_unavailable_inner = flexmlsConnect::widget_not_available( $fmc_api, true );
+		}
+		if ( null !== $search_unavailable_inner ) {
+			$wrap = '<div class="flexmls_connect__page_content flexmls-idx-search-unavailable">' . $search_unavailable_inner . '</div>';
+			if ( $this->uses_v2_template() ) {
+				return $wrap;
+			}
+			ob_start();
+			flexmlsPortalPopup::popup_portal( 'search_page' );
+			echo $wrap;
+			return ob_get_clean();
+		}
+
 		if ( $this->uses_v2_template() ) {
 			global $fmc_plugin_dir;
 			

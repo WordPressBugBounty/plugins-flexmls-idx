@@ -14,14 +14,13 @@ class PropertyTypes extends Core {
 		if( true == $response[ 'success' ] && array_key_exists( 'FieldList', $response[ 'results' ][ 0 ][ 'PropertySubType' ] ) ){
 			return $response[ 'results' ][ 0 ][ 'PropertySubType' ][ 'FieldList' ];
 		}
-		return false;
+		return array();
 	}
 
 	function get_property_types(){
-		$records = false;
+		$records = array();
 		$response = $this->get_from_api( 'GET', 'propertytypes', DAY_IN_SECONDS );
 		if( true == $response[ 'success' ] ){
-			$records = array();
 			foreach( $response[ 'results' ] as $res ){
 				$records[ $res[ 'MlsCode' ] ] = $res[ 'MlsName' ];
 			}

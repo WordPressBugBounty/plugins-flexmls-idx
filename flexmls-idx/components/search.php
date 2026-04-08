@@ -106,7 +106,7 @@ class fmcSearch_v1 extends fmcWidget {
     $IDXLinks = new \SparkAPI\IDXLinks();
     $api_links = $IDXLinks->get_all_idx_links();
 
-    if ($api_prop_types === false || $api_system_info === false || $api_links === false) {
+    if ( empty( $api_prop_types ) || $api_system_info === false || $api_links === false ) {
       return flexmlsConnect::widget_not_available($fmc_api, false, $args, $settings);
     }
 

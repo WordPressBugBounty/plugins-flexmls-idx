@@ -2,9 +2,9 @@
 Tags: flexmls, IDX, MLS search
 Contributors: flexmls
 Requires at least: 5.0
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.17
+Stable tag: 3.18
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,17 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.18 =
+Efficiency Updates:
+* Fixed image stacking issues by applying display: inline-block styling - Version 1 Listing Templates.
+* Corrected listing summary layout breakpoints for widgets inside hidden tabs.
+* Resolved PHP 8.x fatal errors and WPBakery crashes via improved data handling.
+
+Improvements:
+* Added request throttling and a manual "Retry Connection" button for license activations.
+* Migrated Gutenberg blocks to Block API v3 for WordPress 6.9+ compatibility.
+* Added support for second parameter to sendBeacon SourceMLS badges
+
 = 3.17 =
 Improvements & New Features:
 * Updated default listings per page to 25 in the IDX Listing Summary

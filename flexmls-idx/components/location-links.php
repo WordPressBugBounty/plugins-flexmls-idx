@@ -66,6 +66,10 @@ class fmcLocationLinks extends fmcWidget {
       $my_link = $idx_links->links[$my_link_id];
     }
 
+    if ( ! is_array( $my_link ) ) {
+      return flexmlsConnect::widget_not_available( $fmc_api, false, $args, $settings );
+    }
+
     // break the Location Search string into separate pieces
     $locations = flexmlsConnect::parse_location_search_string($my_locations);
 
@@ -88,10 +92,13 @@ class fmcLocationLinks extends fmcWidget {
 
     $link_transform_params["PropertyType"] = "*PropertyType*";
 
+    $outbound_link = '';
     if ($settings['destination'] != 'local') {
       // make the API call to translate standard field names
-      $outbound_link = $fmc_api->GetTransformedIDXLink($my_link["Id"], $link_transform_params);
-
+      $outbound_link = $fmc_api->GetTransformedIDXLink( $my_link['Id'], $link_transform_params );
+      if ( ! is_string( $outbound_link ) || '' === $outbound_link ) {
+        return flexmlsConnect::widget_not_available( $fmc_api, false, $args, $settings );
+      }
     }
 
     $links_to_show = "";
@@ -200,7 +207,7 @@ class fmcLocationLinks extends fmcWidget {
 
     $System = new \SparkAPI\System();
 
-    if ($api_links === false || $api_property_type_options === false) {
+    if ($api_links === false || empty( $api_property_type_options ) ) {
       return flexmlsConnect::widget_not_available($fmc_api, true);
     }
 

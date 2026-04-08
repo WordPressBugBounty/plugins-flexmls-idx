@@ -14,6 +14,9 @@ class FMCD_fmcMarketStats extends FMCD_module {
 
        $location = '';// 'ListingId=19-1333&19-1333';
 
+       if ( ! is_array( $property_type_options ) ) {
+         $property_type_options = array();
+       }
        $property_type_options = array_merge(['' => 'All'], $property_type_options);
 
        $fields1 = array(

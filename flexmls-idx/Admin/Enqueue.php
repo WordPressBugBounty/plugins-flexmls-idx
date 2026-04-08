@@ -81,6 +81,18 @@ class Enqueue {
 
 		wp_enqueue_style( 'fmc_connect', plugins_url( 'assets/css/style_admin.css', dirname( __FILE__ ) ), array(), $version );
 
+		// WordPress about.css sets .about-wrap .notice { display: none } — Credentials lives inside .about-wrap.
+		if ( 'toplevel_page_fmc_admin_intro' === $hook ) {
+			wp_add_inline_style(
+				'fmc_connect',
+				'.about-flexmls .flexmls-idx-admin-notice{box-sizing:border-box;margin:12px 0 15px;padding:1px 12px;background:#fff;border:1px solid #c3c4c7;border-left-width:4px;box-shadow:0 1px 1px rgba(0,0,0,.04);}'
+				. '.about-flexmls .flexmls-idx-admin-notice p{margin:.65em 0;padding:2px;line-height:1.5;}'
+				. '.about-flexmls .flexmls-idx-admin-notice--warning{border-left-color:#dba617;}'
+				. '.about-flexmls .flexmls-idx-admin-notice--error{border-left-color:#d63638;}'
+				. '.about-flexmls .flexmls-idx-admin-notice--success{border-left-color:#00a32a;}'
+			);
+		}
+
 		wp_enqueue_style( 'fmc_connect_frontend', plugins_url( 'assets/css/style.css', dirname( __FILE__ ) ), array(), $version );
 
 		wp_localize_script( 'fmc_connect', 'fmcAjax', array(

@@ -15,7 +15,7 @@ function flex_mls_gtb_cgb_editor_assets() {
     wp_enqueue_script(
         'flex_mls_gtb-cgb-block-js', // Handle.
         plugins_url( '/assets/js/blocks.js', dirname( __FILE__ ) ),
-        array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-editor','wp-components' ),
+        array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-block-editor', 'wp-components' ),
         true // Enqueue the script in the footer.
     );
     wp_enqueue_script( 'fmc_gtb_global', plugins_url( 'assets/js/flex_gtb.js', dirname( __FILE__ ) ), array( 'jquery', 'jquery-ui-core' ) );
@@ -103,6 +103,13 @@ function init_flexmls_gutenberg()
     if(!function_exists("register_block_type"))
         return;
 
+    wp_register_style(
+        'flexmls-blocks-editor-canvas',
+        plugins_url( 'assets/css/blocks_editor_canvas.css', dirname( __FILE__ ) ),
+        array(),
+        defined( 'FMC_PLUGIN_VERSION' ) ? FMC_PLUGIN_VERSION : '1.0'
+    );
+
     add_filter( 'block_categories_all', function( $categories, $post ) {
         return array_merge(
             $categories,
@@ -115,165 +122,34 @@ function init_flexmls_gutenberg()
         );
     }, 10, 2 );
 
-    register_block_type( 'flex/market-stats', array(
+    $idx_block_args = array(
+        'api_version'     => 3,
         'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
+        'editor_style'    => 'flexmls-blocks-editor-canvas',
+        'attributes'      => array(
+            'widgetName'    => array(
                 'type' => 'string',
             ),
-            'sendData' => array(
-                'type' => 'object'
+            'sendData'      => array(
+                'type' => 'object',
             ),
             'inspectorHtml' => array(
-                'type' => 'html'
-            )
+                'type' => 'html',
+            ),
         ),
         'category' => 'flex',
-    ) );
+    );
 
-    register_block_type( 'flex/photos', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/search', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/location-links', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/idx-links-widget', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/leadgen', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/listing-details', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/search-results', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
-
-    register_block_type( 'flex/account', array(
-    'render_callback' => 'FlexMlsCallback',
-    'attributes'	  => array(
-        'widgetName'	 => array(
-            'type' => 'string',
-        ),
-        'sendData' => array(
-            'type' => 'object'
-        ),
-        'inspectorHtml' => array(
-            'type' => 'html'
-        )
-    ),
-    'category' => 'flex',
-) );
-
-    register_block_type( 'flex/agents', array(
-        'render_callback' => 'FlexMlsCallback',
-        'attributes'	  => array(
-            'widgetName'	 => array(
-                'type' => 'string',
-            ),
-            'sendData' => array(
-                'type' => 'object'
-            ),
-            'inspectorHtml' => array(
-                'type' => 'html'
-            )
-        ),
-        'category' => 'flex',
-    ) );
+    register_block_type( 'flex/market-stats', $idx_block_args );
+    register_block_type( 'flex/photos', $idx_block_args );
+    register_block_type( 'flex/search', $idx_block_args );
+    register_block_type( 'flex/location-links', $idx_block_args );
+    register_block_type( 'flex/idx-links-widget', $idx_block_args );
+    register_block_type( 'flex/leadgen', $idx_block_args );
+    register_block_type( 'flex/listing-details', $idx_block_args );
+    register_block_type( 'flex/search-results', $idx_block_args );
+    register_block_type( 'flex/account', $idx_block_args );
+    register_block_type( 'flex/agents', $idx_block_args );
 
 }
 function FlexMlsCallback($attributes )

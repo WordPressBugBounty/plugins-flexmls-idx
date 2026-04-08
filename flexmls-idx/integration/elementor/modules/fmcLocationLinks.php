@@ -13,6 +13,9 @@
         protected function setControlls() {
             extract($this->module_info['vars']);
 
+            if ( ! is_array( $property_type ) ) {
+                $property_type = array();
+            }
             $property_type = array_merge([''=>'All'], $property_type);
 
             $this->add_control(

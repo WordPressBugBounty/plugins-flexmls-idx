@@ -153,6 +153,9 @@ class FMCD_module extends ET_Builder_Module {
     }
 
     protected function modify_array($arr, $val = 'value', $label = 'display_text'){
+        if ( ! is_array( $arr ) ) {
+            return array();
+        }
         $options = array();
         foreach ($arr as $data) {
           $options[$data[$val]] = $data[$label];
@@ -187,7 +190,7 @@ class FMCD_module extends ET_Builder_Module {
         $Account = new \SparkAPI\Account();
         $api_my_account = $Account->get_my_account();
 
-        if ($api_property_type_options === false || $api_system_info === false || $api_my_account === false) {
+        if ( empty( $api_property_type_options ) || $api_system_info === false || $api_my_account === false ) {
             return flexmlsConnect::widget_not_available($fmc_api, true);
         } 
     }

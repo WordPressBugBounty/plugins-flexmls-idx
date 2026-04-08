@@ -985,8 +985,8 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     $img_url = esc_url( $sf['SourceMLSURL'] . '.png' );
     $beacon_url = esc_js( $sf['SourceMLSURL'] );
     $img = '<img src="' . $img_url . '" width="132" height="60" alt="Source MLS Verified" '
-      . 'onload="navigator.sendBeacon(\'' . $beacon_url . '\')" '
-      . 'onerror="this.style.display=\'none\'">';
+    . 'onload="navigator.sendBeacon(\'' . $beacon_url . '\', window.location.href)" '
+    . 'onerror="this.style.display=\'none\'">';
     if ( $wrapper_class !== null && $wrapper_class !== '' ) {
       return '<div class="' . esc_attr( $wrapper_class ) . '">' . $img . '</div>';
     }

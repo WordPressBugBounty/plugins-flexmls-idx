@@ -11,7 +11,13 @@ class Settings {
 
 		?>
 			<div class="wrap about-wrap about-flexmls">
-			
+			<?php
+			// Core admin_notices are hidden/suppressed on about-wrap screens; output API/connection notices here.
+			global $FlexMLS_IDX;
+			if ( $FlexMLS_IDX instanceof \FlexMLS_IDX ) {
+				$FlexMLS_IDX->render_fmc_api_connection_notices( true );
+			}
+			?>
 			<?php
 			// nginx warning removed from admin intro page - now only shown on behavior settings page
 			?>
@@ -285,7 +291,7 @@ class Settings {
 
 			$SparkAPI = new \SparkAPI\Core();
 			$SparkAPI->clear_cache( true );
-			$auth_token = $SparkAPI->generate_auth_token();
+			$auth_token = $SparkAPI->generate_auth_token( 'manual' );
 			if( $auth_token ){
 				add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
 			}
@@ -295,7 +301,7 @@ class Settings {
 		if( !empty( $_POST ) && isset( $_POST[ 'clear_api_cache_nonce' ] ) && wp_verify_nonce( $_POST[ 'clear_api_cache_nonce' ], 'clear_api_cache_action' ) ){
 			$SparkAPI = new \SparkAPI\Core();
 			$SparkAPI->clear_cache( true );
-			$auth_token = $SparkAPI->generate_auth_token();
+			$auth_token = $SparkAPI->generate_auth_token( 'manual' );
 			if( $auth_token ){
 				add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_clear_cache' ) );
 			}

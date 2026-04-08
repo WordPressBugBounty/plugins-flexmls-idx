@@ -475,7 +475,8 @@
 
         private function get_property_type_options(){
             global $fmc_api;
-            return $fmc_api->GetPropertyTypes();
+            $types = $fmc_api->GetPropertyTypes();
+            return is_array( $types ) ? $types : array();
         }
 
         function update($new_instance, $old_instance) {

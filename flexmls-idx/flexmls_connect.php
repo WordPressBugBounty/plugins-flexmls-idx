@@ -5,10 +5,10 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.17
+Version: 3.18
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.4
 */
 
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.17';
+const FMC_PLUGIN_VERSION = '3.18';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -72,6 +72,7 @@ class FlexMLS_IDX {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 		add_action( 'admin_menu', array( $this, 'admin_menu_fix_submenu_labels' ), 99 );
 		add_action( 'admin_init', array( $this, 'admin_init_redirect_clear_cache' ) );
+		add_action( 'admin_post_fmc_retry_connection', array( $this, 'handle_fmc_retry_connection' ) );
 		add_filter( 'submenu_file', array( $this, 'admin_submenu_file' ), 10, 2 );
 		add_action( 'admin_notices', array( $this, 'admin_notices' ) );
 		add_action( 'flexmls_hourly_cache_cleanup', array( '\FlexMLS\Admin\Update', 'hourly_cache_cleanup' ) );
@@ -134,6 +135,24 @@ class FlexMLS_IDX {
 		}
 	}
 
+	/**
+	 * Manual "Retry connection" from Connection Paused notice (nonce + manage_options).
+	 */
+	function handle_fmc_retry_connection() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to do that.', 'fmcdomain' ) );
+		}
+		check_admin_referer( 'fmc_retry_connection' );
+		\FlexMLS\Admin\ConnectionPause::clear_for_manual_retry();
+		delete_transient( 'flexmls_auth_failures_timestamps' );
+		delete_transient( 'flexmls_auth_token' );
+		$spark = new \SparkAPI\Core();
+		$ok    = (bool) $spark->generate_auth_token( 'manual' );
+		$arg   = $ok ? 'success' : 'fail';
+		wp_safe_redirect( admin_url( 'admin.php?page=fmc_admin_intro&fmc_connection_retry=' . rawurlencode( $arg ) ) );
+		exit;
+	}
+
 	function admin_menu_cb_clear_cache(){
 		wp_safe_redirect( admin_url( 'admin.php?page=fmc_admin_settings&tab=cache' ) );
 		exit;
@@ -144,6 +163,92 @@ class FlexMLS_IDX {
 			return 'fmc_admin_cache';
 		}
 		return $submenu_file;
+	}
+
+	/**
+	 * True on Flexmls IDX intro (Credentials / Support / Features). WordPress hides many admin_notices there (about-wrap).
+	 */
+	public static function is_fmc_admin_intro_screen() {
+		return isset( $_GET['page'] ) && 'fmc_admin_intro' === $_GET['page'];
+	}
+
+	/**
+	 * Connection paused, retry flash, API errors, Google Maps nudge — shown via admin_notices except on intro (see Settings::admin_menu_cb_intro).
+	 *
+	 * @param bool $for_about_wrap True inside Credentials `.about-wrap` (WP core hides `.notice` there).
+	 */
+	public function render_fmc_api_connection_notices( $for_about_wrap = false ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$options = get_option( 'fmc_settings' );
+		if ( empty( $options['api_key'] ) || empty( $options['api_secret'] ) ) {
+			$cls = esc_attr( \FlexMLS\Admin\ApiMessages::admin_alert_class( 'warning', $for_about_wrap ) );
+			printf(
+				'<div class="%3$s">
+						<p>You must enter your Flexmls&reg; API Credentials. <a href="%1$s">Click here</a> to enter your API credentials, or <a href="%2$s">contact Flexmls&reg; support</a>.</p>
+					</div>',
+				admin_url( 'admin.php?page=fmc_admin_intro' ),
+				admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ),
+				$cls
+			);
+			return;
+		}
+		if ( isset( $_GET['fmc_connection_retry'] ) && is_string( $_GET['fmc_connection_retry'] ) ) {
+			$retry_flag = sanitize_key( wp_unslash( $_GET['fmc_connection_retry'] ) );
+			if ( 'success' === $retry_flag ) {
+				$cls = esc_attr( \FlexMLS\Admin\ApiMessages::admin_alert_class( 'success', $for_about_wrap, ! $for_about_wrap ) );
+				echo '<div class="' . $cls . '"><p>' . esc_html__( 'Flexmls IDX: Connection retry succeeded.', 'fmcdomain' ) . '</p></div>';
+			} elseif ( 'fail' === $retry_flag ) {
+				$cls = esc_attr( \FlexMLS\Admin\ApiMessages::admin_alert_class( 'error', $for_about_wrap, ! $for_about_wrap ) );
+				echo '<div class="' . $cls . '"><p>' . esc_html__( 'Flexmls IDX: Connection retry failed. Check the message below or try again later.', 'fmcdomain' ) . '</p></div>';
+			}
+		}
+
+		// GetMyAccount() at plugin load sets last_error on $fmc_api; generate_auth_token() uses a separate Core instance
+		// and may still return a cached session token — so 1010/1015 from my/account (etc.) never reached the notice path.
+		global $fmc_api;
+		$fmc_err_code = ( isset( $fmc_api ) && isset( $fmc_api->last_error_code ) ) ? (int) $fmc_api->last_error_code : 0;
+		$fmc_err_mess = ( isset( $fmc_api ) && isset( $fmc_api->last_error_mess ) ) ? (string) $fmc_api->last_error_mess : '';
+		\FlexMLS\Admin\ConnectionPause::ensure_pause_from_bootstrap_1015( $fmc_err_code, $fmc_err_mess );
+
+		$cooling_down   = \FlexMLS\Admin\ConnectionPause::should_block_auto_session( 'auto' );
+		$pause_state    = \FlexMLS\Admin\ConnectionPause::get_state();
+		$pause_is_1015  = $cooling_down && isset( $pause_state['api_code'] ) && 1015 === (int) $pause_state['api_code'];
+		if ( $cooling_down ) {
+			\FlexMLS\Admin\ApiMessages::echo_connection_paused_notice( $pause_state, $for_about_wrap );
+		}
+
+		if ( 1010 === $fmc_err_code || 1015 === $fmc_err_code ) {
+			if ( 1015 === $fmc_err_code && $pause_is_1015 ) {
+				return;
+			}
+			\FlexMLS\Admin\ApiMessages::echo_admin_api_error_notice( $fmc_err_code, $fmc_err_mess, true, $for_about_wrap );
+			return;
+		}
+
+		$SparkAPI   = new \SparkAPI\Core();
+		$auth_token = $SparkAPI->generate_auth_token();
+		if ( false === $auth_token && ! $cooling_down ) {
+			$last_error_code = isset( $SparkAPI->last_error_code ) ? $SparkAPI->last_error_code : null;
+			$last_error_mess = isset( $SparkAPI->last_error_mess ) ? $SparkAPI->last_error_mess : null;
+			\FlexMLS\Admin\ApiMessages::echo_admin_api_error_notice( $last_error_code, $last_error_mess, true, $for_about_wrap );
+		} elseif ( $auth_token ) {
+			if ( isset( $fmc_api ) && is_object( $fmc_api ) ) {
+				\FlexMLS\Admin\ApiMessages::maybe_echo_wordpress_idx_entitlement_notice( $fmc_api, $for_about_wrap );
+			}
+			if ( ! isset( $options['google_maps_api_key'] ) || empty( $options['google_maps_api_key'] ) ) {
+				$cls = esc_attr( \FlexMLS\Admin\ApiMessages::admin_alert_class( 'warning', $for_about_wrap, ! $for_about_wrap ) );
+				printf(
+					'<div class="%3$s">
+								<p>You have not entered a Google Maps API Key. It&#8217;s not required for the Flexmls&reg; IDX plugin, but maps will not show on your site without a Google Maps API key. <a href="%1$s">Click here</a> to enter your Google Map API Key, or <a href="%2$s" target="_blank">generate a Google Map API Key here</a>.</p>
+							</div>',
+					admin_url( 'admin.php?page=fmc_admin_settings&tab=gmaps' ),
+					'https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key',
+					$cls
+				);
+			}
+		}
 	}
 
 	function admin_notices(){
@@ -162,56 +267,10 @@ class FlexMLS_IDX {
 					_n( 'this extension', 'these extensions', count( $required_php_extensions ) )
 				);
 			}
-			$options = get_option( 'fmc_settings' );
-			if( empty( $options[ 'api_key' ] ) || empty( $options[ 'api_secret' ] ) ){
-				printf(
-					'<div class="notice notice-warning">
-						<p>You must enter your Flexmls&reg; API Credentials. <a href="%1$s">Click here</a> to enter your API credentials, or <a href="%2$s">contact Flexmls&reg; support</a>.</p>
-					</div>',
-					admin_url( 'admin.php?page=fmc_admin_intro' ),
-					admin_url( 'admin.php?page=fmc_admin_intro&tab=support' )
-				);
-			} else {
-				$SparkAPI = new \SparkAPI\Core();
-				$auth_token = $SparkAPI->generate_auth_token();
-				if( false === $auth_token ){
-					// Check for specific error code 1010 (Plugin Key Disabled)
-					$last_error_code = isset( $SparkAPI->last_error_code ) ? $SparkAPI->last_error_code : null;
-					if ( $last_error_code == 1010 ) {
-						echo '<div class="notice notice-error">
-						<p>Your Flexmls&reg; IDX Plugin Key has been disabled.
-						<ul style="list-style-type: square; padding-left: 25px;">
-						<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
-						please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
-						<p>or</p></li>
-						<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
-						</ul>
-						</p>
-					</div>';
-					} else {
-						echo '<div class="notice notice-error">
-						<p>There was an error connecting to the Flexmls&reg; IDX API. 
-						<ul style="list-style-type: square; padding-left: 25px;">
-						<li>Please check your credentials and try again. If your credentials are correct and you continue to see this error message, 
-						please <a href="' . admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) . '">contact support</a>
-						<p>or</p></li>
-						<li> You may need to renew your plugin subscription. Please contact the Flexmls IDX Consultant Team: <a href="tel:8663209977">(866)320-9977</a> or <a href="mailto:idxsales@fbsdata.com">Email</a></li>	
-						</ul>
-						</p>
-					</div>';
-					}
-				} else {
-					if( !isset( $options[ 'google_maps_api_key' ] ) || empty( $options[ 'google_maps_api_key' ] ) ){
-						printf(
-							'<div class="notice notice-warning is-dismissible">
-								<p>You have not entered a Google Maps API Key. It&#8217;s not required for the Flexmls&reg; IDX plugin, but maps will not show on your site without a Google Maps API key. <a href="%1$s">Click here</a> to enter your Google Map API Key, or <a href="%2$s" target="_blank">generate a Google Map API Key here</a>.</p>
-							</div>',
-							admin_url( 'admin.php?page=fmc_admin_settings&tab=gmaps' ),
-							'https://developers.google.com/maps/documentation/javascript/get-api-key#get-an-api-key'
-						);
-					}
-				}
+			if ( self::is_fmc_admin_intro_screen() ) {
+				return;
 			}
+			$this->render_fmc_api_connection_notices();
 		}
 	}
 
@@ -625,6 +684,17 @@ $fmc_instance_cache = array();
 //add_action('widgets_init', array('flexmlsConnect', 'widget_init') );
 
 $active_account_check = $fmc_api->GetMyAccount();
+
+if ( ! empty( $api_key ) && ! empty( $api_secret ) ) {
+	\FlexMLS\Admin\ConnectionPause::ensure_pause_from_bootstrap_1015(
+		isset( $fmc_api->last_error_code ) ? (int) $fmc_api->last_error_code : 0,
+		isset( $fmc_api->last_error_mess ) ? (string) $fmc_api->last_error_mess : ''
+	);
+}
+
+if ( ! empty( $api_key ) && ! empty( $api_secret ) && ! empty( $active_account_check ) ) {
+	\FlexMLS\Admin\ApiMessages::sync_wordpress_idx_entitlement_on_api( $fmc_api );
+}
 
 if(!empty($api_key) && !empty($api_secret) && !empty($active_account_check) ){
 

@@ -4,6 +4,9 @@ class FMCD_fmcLocationLinks extends FMCD_module {
     public function get_fields() {
        extract($this->module_info['vars']);
 
+       if ( ! is_array( $property_type ) ) {
+         $property_type = array();
+       }
        $property_type = array_merge([''=>'All'], $property_type);
 
        $fields = array(
