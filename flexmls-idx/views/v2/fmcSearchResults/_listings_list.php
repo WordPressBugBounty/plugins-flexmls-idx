@@ -97,7 +97,7 @@
 					</div>
 
 					<?php if ( flexmlsConnect::mls_requires_office_name_in_search_results() ) : ?>
-						<?php $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of' : 'Listing Office:'; ?>
+						<?php $listing_office_label = flexmlsConnect::listing_detail_list_office_label( $sf ); ?>
 						<span class="flexmls-office-name">
 							<span class="flexmls-bold-label"><?php echo esc_html( $listing_office_label ) ; ?></span>
 							<?php echo esc_html( $sf["ListOfficeName"] ); ?>

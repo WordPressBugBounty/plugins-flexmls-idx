@@ -709,7 +709,7 @@ class flexmlsSearchUtil {
     );
 
 		//if RVA then add MLSStatus to list of fields to suppress
-    if ($sf['MlsId'] === "20051230194116769413000000") {
+    if ( isset( $sf['MlsId'] ) && $sf['MlsId'] === FMC_MlsIds::RVA ) {
       array_push($mls_fields_to_suppress, "MlsStatus");
     }
 

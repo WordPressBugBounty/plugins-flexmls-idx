@@ -557,11 +557,11 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				if ( $reqs[0]=='LOGO' ) :
 					if ( $reqs[1]=='IDX' ) :
 						?>
-							<span class="flexmls-idx-compliance-label">IDX</span>
+							<span class="flexmls-idx-compliance-label" role="img" aria-label="<?php esc_attr_e( 'IDX', 'fmcdomain' ); ?>"><?php esc_html_e( 'IDX', 'fmcdomain' ); ?></span>
 						<?php
 					else:
 						?>
-							<img class="flexmls-idx-compliance-badge" alt="IDX" src="<?php echo esc_attr( $reqs[1] ); ?>">
+							<img class="flexmls-idx-compliance-badge" alt="<?php esc_attr_e( 'IDX', 'fmcdomain' ); ?>" src="<?php echo esc_url( $reqs[1] ); ?>">
 						<?php
 					endif;
 				endif;

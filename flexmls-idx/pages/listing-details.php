@@ -805,21 +805,18 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
       echo "  <hr class='flexmls_connect__sr_divider'>";
 
-      // Compliance information
+      // Compliance: IDX logo first, then listing office / agent / selling office lines
       echo "<div class='flexmls_connect__ld_compliance'>";
       fmcSearchResults::compliance_label( $record, "Detail" );
-      echo "</div>";
 
-      // Office information
       if ( flexmlsConnect::mls_requires_office_name_in_listing_details() ) {
-        $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of ' : 'Listing Office: ';
+        $listing_office_label = flexmlsConnect::listing_detail_list_office_label_for_v1_markup( $sf );
         echo "<div class='flexmls_connect__ld_office_name'>";
         echo "<span class='flexmls_connect__bold_label'>" . esc_html( $listing_office_label ) . "</span>";
         echo esc_html( $sf["ListOfficeName"] );
         echo "</div>";
       }
 
-      // Agent information
       if ( flexmlsConnect::mls_requires_agent_name_in_listing_details() ) {
         echo "<div class='flexmls_connect__ld_agent_info'>";
         echo "<span class='flexmls_connect__bold_label'>Listing Agent: </span>";
@@ -838,13 +835,23 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         echo "</div>";
       }
 
+      foreach ( $compList as $reqs ) {
+        if ( is_array( $reqs ) && isset( $reqs[0], $reqs[1] ) && $reqs[0] === flexmlsConnect::LISTING_DETAIL_SELLING_OFFICE_LABEL && flexmlsConnect::is_not_blank_or_restricted( $reqs[1] ) ) {
+          echo "<div class='flexmls_connect__ld_selling_office_name'>";
+          echo "<span class='flexmls_connect__bold_label'>" . esc_html( flexmlsConnect::LISTING_DETAIL_SELLING_OFFICE_LABEL . ' ' ) . "</span>";
+          echo esc_html( $reqs[1] );
+          echo "</div>";
+        }
+      }
+      echo "</div>";
+
     // SourceMLS.org verification badge
     echo $this->render_source_mls_badge( $sf, 'flexmls_connect__source_mls_badge');
 
     // disclaimer
       echo "  <div class='flexmls_connect__idx_disclosure_text'>";
 
-  if ($sf['StateOrProvince'] != 'NY'){
+  if ( ! flexmlsConnect::listing_detail_uses_ny_state_rules( $sf ) ) {
       foreach ($compList as $reqs){
           if (is_array($reqs) && isset($reqs[1]) && flexmlsConnect::is_not_blank_or_restricted($reqs[1])){
               if (isset($reqs[0]) && $reqs[0] == 'LOGO'){
@@ -852,7 +859,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
                   continue;
                 }
               // Skip office and agent info if already handled by dedicated sections
-              if (isset($reqs[0]) && $reqs[0] != 'Listing Office:' && $reqs[0] != 'Listing Courtesy of' && $reqs[0] != 'Listing Agent:') {
+              if (isset($reqs[0]) && $reqs[0] != 'Listing Office:' && $reqs[0] != 'Listing Courtesy of' && $reqs[0] != 'Listing Agent:' && $reqs[0] != flexmlsConnect::LISTING_DETAIL_SELLING_OFFICE_LABEL) {
                 echo "<p>{$reqs[0]} {$reqs[1]}</p>";
               }
           }

@@ -2,6 +2,8 @@
 
 class flexmlsConnect {
 
+  /** Display label for StandardFields `BuyerOfficeName` when required in IDX Detail compliance. */
+  const LISTING_DETAIL_SELLING_OFFICE_LABEL = 'Selling Office:';
 
   function __construct() {
   }
@@ -975,6 +977,27 @@ class flexmlsConnect {
     ));
   }
 
+  /**
+   * New York state listings use alternate courtesy wording and a different disclosure layout.
+   */
+  static function listing_detail_uses_ny_state_rules( $sf ) {
+    return is_array( $sf ) && isset( $sf['StateOrProvince'] ) && $sf['StateOrProvince'] === 'NY';
+  }
+
+  /**
+   * Label for the listing office line (search summary and listing detail).
+   */
+  static function listing_detail_list_office_label( $sf ) {
+    return self::listing_detail_uses_ny_state_rules( $sf ) ? 'Listing Courtesy of' : 'Listing Office:';
+  }
+
+  /**
+   * Same as listing_detail_list_office_label with trailing space for legacy v1 markup concatenation.
+   */
+  static function listing_detail_list_office_label_for_v1_markup( $sf ) {
+    return self::listing_detail_uses_ny_state_rules( $sf ) ? 'Listing Courtesy of ' : 'Listing Office: ';
+  }
+
   static function mls_requires_office_name_in_search_results() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
@@ -1177,7 +1200,7 @@ class flexmlsConnect {
       }
     }
 
-    $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of' : 'Listing Office:';
+    $listing_office_label = self::listing_detail_list_office_label( $sf );
 
     //These will be printed in this order.
     $possibleRequired = array(
@@ -1201,6 +1224,7 @@ class flexmlsConnect {
       "CoListAgentEmail"  => array("Co Agent Email:",$sf["CoListAgentEmail"]),
       "CoListAgentURL"  => array("Co Agent Webpage:",$sf["CoListAgentURL"]),
       "CoListAgentAddress"  => array("Co Agent Address:",$CoAgentAddress),
+      "BuyerOfficeName"     => array( self::LISTING_DETAIL_SELLING_OFFICE_LABEL, isset( $sf['BuyerOfficeName'] ) ? $sf['BuyerOfficeName'] : '' ),
       "ListingUpdateTimestamp"=> array("Last Updated:",$LastModifiedDate),
       "IDXLogo"               => array("LOGO",$logo),//Todo -- Print Logo?
     );

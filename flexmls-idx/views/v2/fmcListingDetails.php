@@ -36,6 +36,7 @@
 		});">
 			Contact agent
 		</button>
+		<div class="flexmls_connect__success_message" id="flexmls_connect__success_message<?php echo esc_attr( $sf['ListingId'] ); ?>" role="status" aria-live="polite"></div>
 	</div>
 	<div class="top-info-wrapper listing-section">
 		<div class="title-and-details-wrapper">
@@ -580,48 +581,57 @@
 		<?php endif; ?>
 	</div>
 
-	<?php if ( flexmlsConnect::mls_requires_office_name_in_listing_details() ) : ?>
-		<?php $listing_office_label = ($sf['StateOrProvince'] == 'NY') ? 'Listing Courtesy of' : 'Listing Office:'; ?>
-		<div class="flexmls-office-name listing-section">
-			<span class="flexmls-bold-label"><?php echo esc_html( $listing_office_label ) ; ?></span>
-			<?php echo esc_html( $sf["ListOfficeName"] ); ?>
-		</div>
-	<?php endif; ?>
-
-	<?php if ( flexmlsConnect::mls_requires_agent_name_in_listing_details() ) : ?>
-		<div class="flexmls-agent-name-and-label-wrapper listing-section">
-			<span class="flexmls-agent-name">
-				<span class="flexmls-bold-label">Listing Agent: </span>
-				<?php echo esc_html( $sf["ListAgentName"] ); ?>
-
-				<?php if ( flexmlsConnect::mls_requires_agent_phone_in_listing_details() ) : ?>
-					<?php 
-					$phone_number = flexmlsConnect::get_agent_phone_with_fallback( $sf, 'detail' );
-					if ( ! empty( $phone_number ) ) {
-						echo "<br/>" . esc_html( $phone_number );
-					}
-					?>
-				<?php endif; ?>
-
-				<?php if ( flexmlsConnect::mls_requires_agent_email_in_listing_details() ) : ?>
-					<?php echo " |  " . esc_html( $sf["ListAgentEmail"] ); ?>
-				<?php endif; ?>
-				
-			</span>
-		</div>
-	<?php endif; ?>
-
 	<div class="compliance-section listing-section">
 		<?php fmcSearchResults::compliance_label( $record, "Detail" ); ?>
+
+		<?php if ( flexmlsConnect::mls_requires_office_name_in_listing_details() ) : ?>
+			<?php $listing_office_label = flexmlsConnect::listing_detail_list_office_label( $sf ); ?>
+			<div class="flexmls-office-name">
+				<span class="flexmls-bold-label"><?php echo esc_html( $listing_office_label ) ; ?></span>
+				<?php echo esc_html( $sf["ListOfficeName"] ); ?>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( flexmlsConnect::mls_requires_agent_name_in_listing_details() ) : ?>
+			<div class="flexmls-agent-name-and-label-wrapper">
+				<span class="flexmls-agent-name">
+					<span class="flexmls-bold-label">Listing Agent: </span>
+					<?php echo esc_html( $sf["ListAgentName"] ); ?>
+
+					<?php if ( flexmlsConnect::mls_requires_agent_phone_in_listing_details() ) : ?>
+						<?php
+						$phone_number = flexmlsConnect::get_agent_phone_with_fallback( $sf, 'detail' );
+						if ( ! empty( $phone_number ) ) {
+							echo "<br/>" . esc_html( $phone_number );
+						}
+						?>
+					<?php endif; ?>
+
+					<?php if ( flexmlsConnect::mls_requires_agent_email_in_listing_details() ) : ?>
+						<?php echo " |  " . esc_html( $sf["ListAgentEmail"] ); ?>
+					<?php endif; ?>
+
+				</span>
+			</div>
+		<?php endif; ?>
+
+		<?php foreach ( $compList as $reqs ) : ?>
+			<?php if ( isset( $reqs[0], $reqs[1] ) && $reqs[0] === flexmlsConnect::LISTING_DETAIL_SELLING_OFFICE_LABEL && flexmlsConnect::is_not_blank_or_restricted( $reqs[1] ) ) : ?>
+				<div class="flexmls-selling-office-name">
+					<span class="flexmls-bold-label"><?php echo esc_html( flexmlsConnect::LISTING_DETAIL_SELLING_OFFICE_LABEL ); ?></span>
+					<?php echo esc_html( $reqs[1] ); ?>
+				</div>
+			<?php endif; ?>
+		<?php endforeach; ?>
 	</div>
 
 	<?php echo $this->render_source_mls_badge( $sf, 'source-mls-badge listing-section' ); ?>
 
 	<div class="disclosure-section listing-section">
-		<?php if ( $sf['StateOrProvince'] != 'NY' ) : ?>
+		<?php if ( ! flexmlsConnect::listing_detail_uses_ny_state_rules( $sf ) ) : ?>
 			<?php foreach ( $compList as $reqs ) : ?>
 				<?php if ( flexmlsConnect::is_not_blank_or_restricted( $reqs[1] ) ) : ?>
-					<?php if ( $reqs[0] != 'Listing Office:' && $reqs[0] != 'Listing Courtesy of' && $reqs[0] != 'Listing Agent:' && $reqs[0] != 'LOGO' ) : ?>
+					<?php if ( $reqs[0] != 'Listing Office:' && $reqs[0] != 'Listing Courtesy of' && $reqs[0] != 'Listing Agent:' && $reqs[0] != flexmlsConnect::LISTING_DETAIL_SELLING_OFFICE_LABEL && $reqs[0] != 'LOGO' ) : ?>
 						<div class="listing-req"><?php echo esc_html( $reqs[0] ); ?> <?php echo esc_html( $reqs[1] ); ?></div>
 					<?php endif; ?>
 				<?php endif; ?>

@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.18
+Stable tag: 3.18.1
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,12 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.18.1 = 
+Efficiency Updates:
+* Added support for Selling Office IDX requirements, ensuring proper display for Sold and Closed listings
+* Improved the Sent Message confirmation logic for the Contact Agent form within the V2 Listing Template
+* Eliminated an issue causing duplicate Location Search fields when using the Elementor widget
+
 = 3.18 =
 Efficiency Updates:
 * Fixed image stacking issues by applying display: inline-block styling - Version 1 Listing Templates.

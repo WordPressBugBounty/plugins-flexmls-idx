@@ -34,7 +34,7 @@ class flexmlsConnectPageCore {
         $account_mls_id = $this->account->MlsId ?? '';
 
         //WP-1020 - ORE
-        $sf_sqft_value = ($account_mls_id == "20191104230040909159000000") ? 'LivingArea' : 'BuildingAreaTotal';
+        $sf_sqft_value = ( $account_mls_id === FMC_MlsIds::ORE ) ? 'LivingArea' : 'BuildingAreaTotal';
 
 
         $catch_fields = array(

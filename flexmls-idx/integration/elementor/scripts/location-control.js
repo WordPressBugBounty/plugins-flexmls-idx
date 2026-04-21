@@ -2,11 +2,16 @@ var locationControlView = elementor.modules.controls.BaseData.extend({
     onReady: function () {
         var self = this,
             input_val = jQuery(this.ui.input[0]),
-            apply = input_val.parent().parent().find('.flexmls_connect__location_button_apply');
-            
-            jQuery(apply).click(function(){
-                self.saveValue();
-            });
+            $wrap = this.$el.find('.elementor-control-field-location').first(),
+            apply = input_val.closest('.elementor-control-field-location').find('.flexmls_connect__location_button_apply');
+
+        if (typeof window.AdminLocationSearch === 'function' && $wrap.length) {
+            this.fmcAdminLocationSearch = new window.AdminLocationSearch($wrap);
+        }
+
+        jQuery(apply).on('click.flexmlsLocationCtrl', function () {
+            self.saveValue();
+        });
     },
 
     saveValue: function () {
@@ -15,6 +20,9 @@ var locationControlView = elementor.modules.controls.BaseData.extend({
 
     onBeforeDestroy: function () {
         this.saveValue();
+        if (this.fmcAdminLocationSearch && typeof this.fmcAdminLocationSearch.destroy === 'function') {
+            this.fmcAdminLocationSearch.destroy();
+        }
     }
 });
 

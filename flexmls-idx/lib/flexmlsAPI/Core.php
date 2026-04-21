@@ -50,8 +50,8 @@ class flexmlsAPI_Core {
     public $api_headers = array(
         'Accept-Encoding' => "gzip,deflate",
         'Content-Type' => "application/json",
-        'User-Agent' => "Flexmls WordPress Plugin/3.18",
-        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.18"
+        'User-Agent' => "Flexmls WordPress Plugin/3.18.1",
+        'X-SparkApi-User-Agent' => "flexmls-WordPress-Plugin/3.18.1"
     );
 
 
