@@ -491,32 +491,32 @@ class fmcPhotos extends fmcWidget {
         if (!empty($second_line_address)) $address_line .= "{$second_line_address}";
         $address_line .= "</small>";
 
+        $office_line = "";
         if ( flexmlsConnect::mls_requires_office_name_in_search_results() and !$only_our_listings ) {
-          // swap some of them around to make room for a dim Listing Office
-          $address_line .= "<small>Listing office: {$listing['ListOfficeName']}</small>";
-          $tall_line = "<small class='dark'>";
-          if (!empty($first_line_address)) $tall_line .= "{$first_line_address}<br />";
-          if (!empty($second_line_address)) $tall_line .= "{$second_line_address}";
-          $tall_line .= "</small>";
+          $office_line = "<small>Listing office: {$listing['ListOfficeName']}</small>";
         }
 
         // WP-717: This being and `elseif` meant that the extra fields were *never* shown if the above is true.
         if ($tall_carousel) {
           $show_additional_field_line = array();
-          foreach ($show_additional_fields as $fi) {
-            if ($fi == "beds" && flexmlsConnect::is_not_blank_or_restricted($listing['BedsTotal'])){
-                $show_additional_field_line[] = "{$listing['BedsTotal']} beds";
+          $additional_field_order = array( 'beds', 'baths', 'sqft' );
+          foreach ( $additional_field_order as $fi ) {
+            if ( ! in_array( $fi, $show_additional_fields, true ) ) {
+              continue;
             }
-            elseif ($fi == "baths" && flexmlsConnect::is_not_blank_or_restricted($listing['BathsTotal'])){
-                 $show_additional_field_line[] = "{$listing['BathsTotal']} baths";
-            }
-            elseif ($fi == "sqft" && !empty($sf_sqft_value)){
-                $show_additional_field_line[] = number_format($sf_sqft_value) ." sqft";
+            if ( $fi === "beds" && flexmlsConnect::is_not_blank_or_restricted( $listing['BedsTotal'] ) ) {
+              $show_additional_field_line[] = "{$listing['BedsTotal']} beds";
+            } elseif ( $fi === "baths" && flexmlsConnect::is_not_blank_or_restricted( $listing['BathsTotal'] ) ) {
+              $show_additional_field_line[] = "{$listing['BathsTotal']} baths";
+            } elseif ( $fi === "sqft" && ! empty( $sf_sqft_value ) ) {
+              $show_additional_field_line[] = number_format( $sf_sqft_value ) . " sqft";
             }
           }
 
           $extra_title_line = ' | '. implode(" | ", $show_additional_field_line);
-          $tall_line = "<small class='dark'>". implode(" &nbsp;", $show_additional_field_line) ."</small>";
+          if ( count( $show_additional_field_line ) > 0 ) {
+            $tall_line = "<small class='dark'>" . implode( " &nbsp;", $show_additional_field_line ) . "</small>";
+          }
         }
 
 
@@ -626,8 +626,9 @@ class fmcPhotos extends fmcWidget {
               <p class='caption'>
                 {$link_to_start}
                 {$relevant_info_line}
-                {$tall_line}
                 {$address_line}
+                {$tall_line}
+                {$office_line}
                 {$link_to_end}
               </p>
               {$show_idx_badge}
@@ -860,8 +861,8 @@ class fmcPhotos extends fmcWidget {
   private function set_office_roster($api, $account, $isFeature = false){
     $office_roster = array();
 
-    if ($isFeature) {
-      $accounts = $api->GetAccountsByOffice( $account['Id'] );
+    if ($isFeature && ! empty( $account['OfficeId'] ) ) {
+      $accounts = $api->GetAccountsByOffice( $account['OfficeId'] );
       if( ! empty($accounts)){
         $office_roster = $accounts;
       }
@@ -930,7 +931,7 @@ class fmcPhotos extends fmcWidget {
     $office_roster = $this->set_office_roster($fmc_api, $api_my_account, $roster_feature);
 
 /*     if ($roster_feature) {
-      $accounts = $fmc_api->GetAccountsByOffice( $api_my_account['Id'] );
+      $accounts = $fmc_api->GetAccountsByOffice( $api_my_account['OfficeId'] );
       if( ! empty($accounts)){
         $office_roster = $accounts;
       }

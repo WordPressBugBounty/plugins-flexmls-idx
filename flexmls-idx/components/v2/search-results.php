@@ -127,6 +127,10 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 					// figure out if there's a next listing possible
 					$link_to_details_criteria['n'] = ( $this_result_overall_index < $this->total_rows ) ? 'y' : 'n';
 
+					if ( ! empty( $fields['MlsId'] ) ) {
+						$link_to_details_criteria['m'] = $fields['MlsId'];
+					}
+
 					$link_to_details = flexmlsConnect::make_nice_address_url( $record, $link_to_details_criteria );
 					$link_to_details = add_query_arg( 'search_referral_url', urlencode( $current_url ), $link_to_details );
 

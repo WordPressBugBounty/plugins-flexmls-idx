@@ -320,6 +320,7 @@ class Settings {
 					case 'allow_sold_searching':
 					case 'listing_detail_expand_sections':
 					case 'listing_detail_show_more_info':
+					case 'listing_detail_contact_on_closed':
 						// Simple 1 or 0 values
 						$fmc_settings[ $key ] = ( 1 == $val ? 1 : 0 );
 						break;

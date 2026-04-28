@@ -385,6 +385,10 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					// figure out if there's a next listing possible
 					$link_to_details_criteria['n'] = ( $this_result_overall_index < $this->total_rows ) ? 'y' : 'n';
 
+					if ( ! empty( $fields['MlsId'] ) ) {
+						$link_to_details_criteria['m'] = $fields['MlsId'];
+					}
+
 					$link_to_details = flexmlsConnect::make_nice_address_url( $record, $link_to_details_criteria, $this->type );
 
 					// Image
@@ -580,6 +584,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 			echo "<div class='flexmls_connect__sr_details_buttons'>";
 				echo "<button href='{$link_to_details}'>View Details</button>";
+				if ( flexmlsConnect::should_show_listing_lead_ctas( $sf, $options ) ) :
 				?>
 				<button onclick="flexmls_connect.contactForm({
 					'title': 'Ask a Question',
@@ -596,6 +601,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					Ask Question
 				</button>
 				<?php
+				endif;
 			echo "</div>";
 
 			if ($count_photos > 0)

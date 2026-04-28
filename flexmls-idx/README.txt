@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.18.1
+Stable tag: 3.18.2
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,13 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+= 3.18.2 = 
+Efficiency Updates:
+* Option to toggle 'Contact Agent' visibility on closed/sold listings.
+* Listing Address duplication in IDX Slideshow for listings with empty fields
+* Resolved API Accounts Error
+* Map Listing detail links now correctly include the MLS Share parameter
+
 = 3.18.1 = 
 Efficiency Updates:
 * Added support for Selling Office IDX requirements, ensuring proper display for Sold and Closed listings

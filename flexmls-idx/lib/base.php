@@ -985,6 +985,42 @@ class flexmlsConnect {
   }
 
   /**
+   * Sold or closed listing: used with Behavior "contact buttons on sold/closed" to hide lead CTAs.
+   */
+  static function listing_is_sold_or_closed( $sf ) {
+    if ( ! is_array( $sf ) ) {
+      return false;
+    }
+    $ms = isset( $sf['MlsStatus'] ) ? (string) $sf['MlsStatus'] : '';
+    if ( 'Closed' === $ms || strcasecmp( $ms, 'Sold' ) === 0 ) {
+      return true;
+    }
+    if ( isset( $sf['StandardStatus'] ) && 'Closed' === (string) $sf['StandardStatus'] ) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether to show lead CTAs (contact, ask, schedule) for this listing per Behavior and status.
+   *
+   * @param array      $sf            Standard fields for the listing.
+   * @param array|null $fmc_settings  fmc_settings option, or null to load from the database.
+   */
+  static function should_show_listing_lead_ctas( $sf, $fmc_settings = null ) {
+    if ( $fmc_settings === null ) {
+      $fmc_settings = get_option( 'fmc_settings', array() );
+    }
+    if ( ! is_array( $fmc_settings ) ) {
+      $fmc_settings = array();
+    }
+    if ( ! isset( $fmc_settings['listing_detail_contact_on_closed'] ) || 1 === (int) $fmc_settings['listing_detail_contact_on_closed'] ) {
+      return true;
+    }
+    return ! self::listing_is_sold_or_closed( $sf );
+  }
+
+  /**
    * Label for the listing office line (search summary and listing detail).
    */
   static function listing_detail_list_office_label( $sf ) {

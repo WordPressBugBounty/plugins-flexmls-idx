@@ -13,6 +13,7 @@ $fmc_settings[ 'contact_notifications' ] = ( isset( $fmc_settings[ 'contact_noti
 $fmc_settings[ 'allow_sold_searching' ] = ( isset( $fmc_settings[ 'allow_sold_searching' ] ) && 1 == $fmc_settings[ 'allow_sold_searching' ] ) ? 1 : 0;
 $fmc_settings[ 'listing_detail_expand_sections' ] = isset( $fmc_settings[ 'listing_detail_expand_sections' ] ) ? (int) $fmc_settings[ 'listing_detail_expand_sections' ] : 0;
 $fmc_settings[ 'listing_detail_show_more_info' ] = isset( $fmc_settings[ 'listing_detail_show_more_info' ] ) ? (int) $fmc_settings[ 'listing_detail_show_more_info' ] : 1;
+$fmc_settings[ 'listing_detail_contact_on_closed' ] = isset( $fmc_settings[ 'listing_detail_contact_on_closed' ] ) ? (int) $fmc_settings[ 'listing_detail_contact_on_closed' ] : 1;
 $fmc_settings[ 'neigh_template' ] = isset( $fmc_settings[ 'neigh_template' ] ) ? $fmc_settings[ 'neigh_template' ] : '';
 $fmc_settings[ 'destwindow' ] = isset( $fmc_settings[ 'destwindow' ] ) ? $fmc_settings[ 'destwindow' ] : '';
 $fmc_settings[ 'listlink' ] = isset( $fmc_settings[ 'listlink' ] ) ? $fmc_settings[ 'listlink' ] : '';
@@ -163,6 +164,17 @@ add_thickbox();
 						<label for="listing_detail_show_more_info_n"><input type="radio" name="fmc_settings[listing_detail_show_more_info]" id="listing_detail_show_more_info_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_show_more_info' ], 0 ); ?>> No, hide the More Information section</label>
 					</p>
 					<p class="description">When No, the expandable &quot;More Information&quot; block is not displayed on listing detail pages.</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="listing_detail_contact_on_closed_y">Contact on sold &amp; closed listings</label>
+				</th>
+				<td>
+					<p>
+						<label for="listing_detail_contact_on_closed_y"><input type="radio" name="fmc_settings[listing_detail_contact_on_closed]" id="listing_detail_contact_on_closed_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_contact_on_closed' ], 1 ); ?>> Yes, show the Contact button on sold &amp; closed listings</label><br />
+						<label for="listing_detail_contact_on_closed_n"><input type="radio" name="fmc_settings[listing_detail_contact_on_closed]" id="listing_detail_contact_on_closed_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_contact_on_closed' ], 0 ); ?>> No, hide it on sold &amp; closed listings</label>
+					</p>
 				</td>
 			</tr>
 		</tbody>

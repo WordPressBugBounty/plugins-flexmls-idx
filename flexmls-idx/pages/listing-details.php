@@ -440,8 +440,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       }
       $phone_req = in_array('phone', $api_prefs['RequiredFields']);
       $address_req = in_array('address', $api_prefs['RequiredFields']);
+      $show_listing_lead_actions = flexmlsConnect::should_show_listing_lead_ctas( $sf, $options );
 
-      if (isset($api_my_account['Name']) && isset($api_my_account['Emails'][0]['Address'])) : ?>
+      if ( $show_listing_lead_actions && isset($api_my_account['Name']) && isset($api_my_account['Emails'][0]['Address'])) : ?>
         <button onclick="flexmls_connect.scheduleShowing({
           'id': '<?php addslashes($sf['ListingKey']) ?>',
           'title': 'Schedule a Showing',
@@ -458,6 +459,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
           <img src='<?php echo $fmc_plugin_url ?>/assets/images/showing.png' align='absmiddle' alt='Schedule a Showing' title='Schedule a Showing' /> Schedule a Showing
         </button>
       <?php endif ?>
+      <?php if ( $show_listing_lead_actions ) : ?>
       <button onclick="flexmls_connect.contactForm({
         'title': 'Ask a Question',
         'subject': '<?php echo $one_line_address_add_slashes; ?> - MLS# <?php echo addslashes($sf['ListingId'])?> ',
@@ -473,6 +475,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         <img src='<?php echo $fmc_plugin_url ?>/assets/images/admin_16.png' align='absmiddle' alt='Ask a Question' title='Ask a Question' />
         Ask a Question
       </button>
+      <?php endif; ?>
     </div>
     <?php
 

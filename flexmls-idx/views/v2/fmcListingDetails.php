@@ -4,6 +4,8 @@
         $api_prefs['RequiredFields'] = array();
       }
       $phone_req  = in_array('phone', $api_prefs['RequiredFields']);
+      $options     = get_option( 'fmc_settings', array() );
+      $fmc_show_listing_lead_actions = flexmlsConnect::should_show_listing_lead_ctas( $sf, $options );
 ?>
 <?php $listing_display_price = flexmlsConnect::format_listing_standard_price_display( $sf ); ?>
 <div class="flexmls-listing-details flexmls-v2-widget flexmls-widthchange-wrapper flexmls-body-font">
@@ -15,7 +17,6 @@
 			$search_referral_url = isset( $_GET['search_referral_url'] ) ? $_GET['search_referral_url'] : '';
 			
 			// Get the default search URL with permalink base (e.g., /idx/search/)
-			$options = get_option('fmc_settings');
 			$permabase = isset( $options['permabase'] ) ? $options['permabase'] : 'idx';
 			$default_search_url = get_home_url() . '/' . $permabase . '/search/';
 			
@@ -23,6 +24,7 @@
 			?>
 			<a class="back-to-search-link flexmls-primary-color-font" href="<?php echo esc_url( $back_to_search_link ); ?>">&larr; Back to search</a>
 		<?php endif; ?>
+		<?php if ( $fmc_show_listing_lead_actions ) : ?>
 		<button class="flexmls-btn flexmls-btn-primary flexmls-primary-color-background" onclick="flexmls_connect.contactForm({
 			'title': 'Contact agent',
 			'subject': '<?php echo $one_line_address_add_slashes; ?> - MLS# <?php echo addslashes($sf['ListingId'])?> ',
@@ -37,6 +39,7 @@
 			Contact agent
 		</button>
 		<div class="flexmls_connect__success_message" id="flexmls_connect__success_message<?php echo esc_attr( $sf['ListingId'] ); ?>" role="status" aria-live="polite"></div>
+		<?php endif; ?>
 	</div>
 	<div class="top-info-wrapper listing-section">
 		<div class="title-and-details-wrapper">
