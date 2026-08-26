@@ -130,12 +130,32 @@
         $vars = array();
 
         global $fmc_widgets_integration;
-        $info = $fmc_widgets_integration[$className];
-        
-        $component = new $className();
-        $vars = $component->integration_view_vars();         
+        if ( empty( $fmc_widgets_integration[ $className ] ) ) {
+            $this->module_info = array( 'vars' => array() );
+            return;
+        }
 
-        $module_info = array(
+        $info = $fmc_widgets_integration[ $className ];
+
+        // Component classes are normally loaded in widgets_init only when API auth
+        // succeeds. Elementor may register widgets later (or while auth is paused),
+        // so load the component file here if the class is not already available.
+        if ( ! class_exists( $className, false ) && ! empty( $info['component'] ) ) {
+            $component_file = FMC_PLUGIN_DIR . 'components/' . $info['component'];
+            if ( file_exists( $component_file ) ) {
+                require_once $component_file;
+            }
+        }
+
+        if ( ! class_exists( $className, false ) ) {
+            $this->module_info = array( 'vars' => array() );
+            return;
+        }
+
+        $component = new $className();
+        $vars = $component->integration_view_vars();
+
+        $this->module_info = array(
             "title" => $info['title'],
             'id_base' => $className,
             'slug' => 'fmc-widget-'.strtolower($className),
@@ -144,9 +164,6 @@
             'component' => &$component,
             'vars' => $vars,
         );
-
-        $this->module_info = $module_info;
-
     } 
 
     protected function createShortcode($params, $params_empty = []){

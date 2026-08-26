@@ -14,15 +14,18 @@
                 //'allow_pending_searching',
                 'property_type_enabled',
                 'property_type',
+                'property_type_ui',
+                'show_property_subtypes',
                 'std_fields',
                 'theme',
                 'default_view',
                 'orientation',
+                'search_layout',
+                'compact_submit_style',
                 'width_',
-                'title_font',
-                'field_font',
                 'border_style',
                 'widget_drop_shadow',
+                'background_style',
                 'background_color_',
                 'title_text_color',
                 'field_text_color',
@@ -52,10 +55,25 @@
                 $props[$value] = ( isset( $props[$value] ) && $props[$value] === 'yes' ) ? 'on' : 'off';
             }
 
+            if ( ! isset( $props['show_property_subtypes'] ) ) {
+                $props['show_property_subtypes'] = 'on';
+            } else {
+                $props['show_property_subtypes'] = ( $props['show_property_subtypes'] === 'yes' ) ? 'on' : 'off';
+            }
+
+            if ( empty( $props['property_type_ui'] ) || ! in_array( $props['property_type_ui'], array( 'checkboxes', 'tabs' ), true ) ) {
+                $props['property_type_ui'] = 'checkboxes';
+            }
+
             $props['width'] = $props['width_']['size'];
             $props['background_color'] = $props['background_color_'];
             unset($props['width_']);
             unset($props['background_color_']);
+
+            // Force v2 jelly so WP-388 layout/style options (compact row, tabs, etc.) apply.
+            $props['widget_version'] = class_exists( 'fmcSearch', false )
+                ? fmcSearch::WIDGET_VERSION
+                : 2;
 
             $return = $props + ['integration' => 'elementor'];
             return $return;
@@ -226,6 +244,40 @@
             );
 
             $this->add_control(
+                'property_type_ui',
+                array(
+                    'label'       => __( 'Property Type display', 'plugin-name' ),
+                    'type'        => \Elementor\Controls_Manager::SELECT,
+                    'options'     => array(
+                        'checkboxes' => __( 'Checkboxes (default)', 'plugin-name' ),
+                        'tabs'       => __( 'Tabs', 'plugin-name' ),
+                    ),
+                    'default'     => 'checkboxes',
+                    'description' => __( 'Tabs appear at the top of the widget; one type is active at a time. Sub-types show in the selected tab panel. Checkbox mode keeps the classic row with other filters.', 'plugin-name' ),
+                    'condition'   => array(
+                        'property_type_enabled' => 'yes',
+                    ),
+                )
+            );
+
+            $this->add_control(
+                'show_property_subtypes',
+                array_merge(
+                    array(
+                        'label'        => __( 'Show Property Sub-Types', 'plugin-name' ),
+                        'type'         => \Elementor\Controls_Manager::SWITCHER,
+                        'default'      => 'yes',
+                        'return_value' => 'yes',
+                        'description'  => __( 'When off, sub-type checkboxes are hidden.', 'plugin-name' ),
+                        'condition'    => array(
+                            'property_type_enabled' => 'yes',
+                        ),
+                    ),
+                    $on_off_options
+                )
+            );
+
+            $this->add_control(
               'std_fields',
                 array(
                     'label'           => __( 'Fields', 'plugin-name' ),
@@ -278,6 +330,34 @@
             );
 
             $this->add_control(
+              'search_layout',
+                array(
+                    'label'       => __( 'Search bar layout', 'plugin-name' ),
+                    'type'        => \Elementor\Controls_Manager::SELECT,
+                    'options'     => array(
+                        'default'     => __( 'Default (stacked)', 'plugin-name' ),
+                        'compact_row' => __( 'Compact row (hero-style)', 'plugin-name' ),
+                    ),
+                    'default'     => 'default',
+                    'description' => __( 'Compact row fits location, numeric filters, and submit on the first row when space allows; property type, sort, and many fields wrap to more rows. Use horizontal orientation, wide widget width, fewer fields, or Property Type → Tabs. Vertical layout always stacks.', 'plugin-name' ),
+                )
+            );
+
+            $this->add_control(
+              'compact_submit_style',
+                array(
+                    'label'       => __( 'Compact row: search button', 'plugin-name' ),
+                    'type'        => \Elementor\Controls_Manager::SELECT,
+                    'options'     => array(
+                        'full'      => __( 'Full text button', 'plugin-name' ),
+                        'icon_only' => __( 'Magnifying glass (icon only)', 'plugin-name' ),
+                    ),
+                    'default'     => 'full',
+                    'description' => __( 'Only applies when Search bar layout is Compact row. Button text is still used as the accessible label.', 'plugin-name' ),
+                )
+            );
+
+            $this->add_control(
               'width_',
                 array(
                     'label'           => __( 'Widget Width', 'plugin-name' ),
@@ -295,26 +375,6 @@
                         'unit' => 'px',
                         'size' => 650,
                     ],
-                )
-            );
-
-            $this->add_control(
-              'title_font',
-                array(
-                    'label'           => __( 'Title Font', 'plugin-name' ),
-                    'type'            => \Elementor\Controls_Manager::SELECT,
-                    'options'         => flexmlsConnect::possible_fonts(),
-                    'default' => 'Arial'
-                )
-            );
-
-            $this->add_control(
-              'field_font',
-                array(
-                    'label'           => __( 'Field Font', 'plugin-name' ),
-                    'type'            => \Elementor\Controls_Manager::SELECT,
-                    'options'         => flexmlsConnect::possible_fonts(),
-                    'default' => 'Arial'
                 )
             );
 
@@ -339,6 +399,20 @@
                 ],
                 $on_off_options
               )
+            );
+
+            $this->add_control(
+              'background_style',
+                array(
+                    'label'       => __( 'Widget background', 'plugin-name' ),
+                    'type'        => \Elementor\Controls_Manager::SELECT,
+                    'options'     => array(
+                        'solid'       => __( 'Solid color', 'plugin-name' ),
+                        'transparent' => __( 'Transparent', 'plugin-name' ),
+                    ),
+                    'default'     => 'solid',
+                    'description' => __( 'Transparent removes the widget fill so the page background shows through.', 'plugin-name' ),
+                )
             );
 
             $this->add_control(

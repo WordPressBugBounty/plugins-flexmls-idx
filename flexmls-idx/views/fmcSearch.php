@@ -8,14 +8,15 @@
 
 <?php echo $before_widget; ?>
 
+<?php if ( class_exists( 'flexmlsConnectPageCore' ) ) { flexmlsConnectPageCore::render_primary_color_styles_once(); } ?>
+
 <div class="flexmls_connect__search flexmls_connect__search_new
   flexmls_connect__search_new_<?php echo $orientation; ?> <?php echo $box_shadow_class; ?>"
   style="
     color: <?php echo $field_text_color; ?>;
-    max-width: <?php echo $width; ?>px;
-    font-family: <?php echo $field_font; ?>, sans-serif;
+    max-width: <?php echo esc_attr( $width ); ?>;
     <?php echo $border_radius; ?>
-    background-color: <?php echo $background_color ?>;
+    background-color: <?php echo esc_attr( $background_color ); ?>;
   ">
 
   <?php if ($destination == "remote") { ?>
@@ -26,8 +27,7 @@
   <?php } ?>
 
     <?php // title ?>
-    <div class='flexmls_connect__search_new_title' style="color: <?php echo $title_text_color; ?>;
-      font-family: <?php echo $title_font; ?>, sans-serif;">
+    <div class='flexmls_connect__search_new_title' style="color: <?php echo $title_text_color; ?>;">
       <?php echo $title; ?>
     </div>
 

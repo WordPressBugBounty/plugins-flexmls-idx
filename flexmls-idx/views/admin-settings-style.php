@@ -9,8 +9,6 @@ if ( ! is_array( $fmc_settings ) ) {
 $search_listing_template_version = isset( $fmc_settings['search_listing_template_version'] ) ? $fmc_settings['search_listing_template_version'] : 'v1';
 $market_stat_version = isset( $fmc_settings['market_stat_version'] ) ? $fmc_settings['market_stat_version'] : 'v1';
 $search_listing_template_primary_color = isset( $fmc_settings['search_listing_template_primary_color'] ) ? $fmc_settings['search_listing_template_primary_color'] : '';
-$search_listing_template_heading_font = isset( $fmc_settings['search_listing_template_heading_font'] ) ? $fmc_settings['search_listing_template_heading_font'] : '';
-$search_listing_template_body_font = isset( $fmc_settings['search_listing_template_body_font'] ) ? $fmc_settings['search_listing_template_body_font'] : '';
 
 add_thickbox();
 
@@ -69,53 +67,7 @@ add_thickbox();
 	</table>
 
 	<h3>Typography</h3>
-	<p>Used for text on the search &amp; listing templates. Leave as "default" to use theme fonts.<br>Only used if you've selected "Version 2" above.</p>
+	<p class="description">Font settings have been removed. Existing saved font values are still honored on the front end until you save these settings again. New searches and listings use your theme fonts.</p>
 
-	<table class="form-table">
-		<tbody>
-			<tr>
-				<th scope="row">
-					<label for="search-listing-template-heading-font">Heading font</label>
-				</th>
-				<td>
-					<p>
-						<input type="text"
-							class="font-picker"
-							id="search-listing-template-heading-font"
-							name="fmc_settings[search_listing_template_heading_font]"
-							value="<?php echo esc_attr( $search_listing_template_heading_font ); ?>"
-							data-fonts='<?php echo json_encode( fmcWidget::available_fonts() ); ?>'
-							>
-					</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
-					<label for="search-listing-template-body-font">Body font</label>
-				</th>
-				<td style="padding-bottom: 120px;">
-					<p>
-						<input type="text"
-							class="font-picker"
-							id="search-listing-template-body-font"
-							name="fmc_settings[search_listing_template_body_font]"
-							value="<?php echo esc_attr( $search_listing_template_body_font ); ?>"
-							data-fonts='<?php echo json_encode( fmcWidget::available_fonts() ); ?>'
-							>
-					</p>
-				</td>
-			</tr>
-		</tbody>
-	</table>
-
-	<script type="text/javascript">
-		jQuery( '.font-picker' ).each( function () {
-			jQuery( this ).fontselect( {
-				googleFonts: false,
-				systemFonts: jQuery( this ).data( 'fonts' )
-			} );
-		} );
-	</script>
-
-	<p><?php wp_nonce_field( 'update_fmc_style_action', 'update_fmc_style_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
+	<?php \FlexMLS\Admin\Settings::floating_save_button( 'update_fmc_style_action', 'update_fmc_style_nonce', 'Save Settings' ); ?>
 </form>

@@ -106,9 +106,12 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				if (is_array($this->search_data)) {
 					foreach ( $this->search_data as $record ) {
 					$result_count ++;
+					if ( ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
+						continue;
+					}
 					$fields = $record['StandardFields'];
 
-					if ( ! flexmlsConnect::is_not_blank_or_restricted( $fields['Latitude'] ) || ! flexmlsConnect::is_not_blank_or_restricted( $fields['Longitude'] ) ) {
+					if ( ! flexmlsConnect::is_not_blank_or_restricted( $fields['Latitude'] ?? '' ) || ! flexmlsConnect::is_not_blank_or_restricted( $fields['Longitude'] ?? '' ) ) {
 							continue;
 					}
 
@@ -172,6 +175,14 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 	}
 
 	function jelly( $args, $settings, $type ) {
+		// widget_version="1" forces the Version 1 listing template even when Style is set to V2.
+		if ( $this->is_widget_version_one( $settings ) ) {
+			flexmlsConnectPageCore::force_v1_template( true );
+			$return = parent::jelly( $args, $settings, $type );
+			flexmlsConnectPageCore::force_v1_template( false );
+			return $return;
+		}
+
 		if ( ! $this->is_new_version_widget( $settings ) ) {
 			return parent::jelly( $args, $settings, $type );
 		}
@@ -389,9 +400,6 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 			}
 		}
 
-		$saved_search_options = $this->idx_links();
-		array_unshift( $saved_search_options, ['value' => '', 'display_text' => "(None)"] );
-
 		$settings_fields = [
 			'general_title' => [
 				'type' => 'section-title',
@@ -419,10 +427,14 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				'description' => 'Use only if you want to create a summary of listings that meet a certain criteria or otherwise want to limit the results displayed to your visitors'
 			],
 			'link' => [
-				'type' => 'select',
+				'type' => 'select_lazy_idx',
+				'only_saved_search' => true,
+				'static_options' => array(
+					array( 'value' => '', 'text' => '(None)' ),
+					array( 'value' => 'default', 'text' => '(Use Saved Default)' ),
+				),
 				'label' => 'Saved Search',
 				'description' => 'Use any Saved Search from Flexmls to apply to this search',
-				'collection' => $saved_search_options
 			],
 			'source' => [
 				'type' => 'select',
@@ -435,11 +447,13 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				'parent_input_name' => 'source',
 				'inputs' => [
 					[
-						'type' => 'select',
+						'type' => 'select_lazy_office_agents',
 						'parent_input_value' => 'agent',
-						'collection' => $this->agent_options()
-					]
-				]
+						'static_options' => array(
+							array( 'value' => '', 'text' => '  - Select One -  ' ),
+						),
+					],
+				],
 			],
 			'location_fields' => [
 				'type' => 'location',
@@ -712,24 +726,40 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 
 	public static function main_photo_from_collection( $photos ) {
 		global $fmc_plugin_url;
+		if ( ! is_array( $photos ) ) {
+			$photos = array();
+		}
 		$count_photos = count( $photos );
 
 		foreach ( $photos as $photo ) {
 			if ( $photo['Primary'] === TRUE ) {
+				$uri1280 = '';
+				if ( ! empty( $photo['Uri1280'] ) ) {
+					$uri1280 = $photo['Uri1280'];
+				} elseif ( ! empty( $photo['Uri1024'] ) ) {
+					$uri1280 = $photo['Uri1024'];
+				} elseif ( ! empty( $photo['Uri800'] ) ) {
+					$uri1280 = $photo['Uri800'];
+				}
+
 				return [
 					'Uri300' => $photo['Uri300'],
 					'Uri640' => $photo['Uri640'],
+					'Uri1280' => $uri1280,
 					'UriLarge' => $photo['UriLarge'],
-					'caption' => htmlspecialchars( $photo['Caption'], ENT_QUOTES )
+					'caption' => htmlspecialchars( $photo['Caption'], ENT_QUOTES ),
 				];
 			}
 		}
 
+		$nophoto = "{$fmc_plugin_url}/assets/images/nophoto.gif";
+
 		return [
-			'Uri300' => "{$fmc_plugin_url}/assets/images/nophoto.gif",
-			'Uri640' => "{$fmc_plugin_url}/assets/images/nophoto.gif",
-			'UriLarge' => "{$fmc_plugin_url}/assets/images/nophoto.gif",
-			'caption' => ''
+			'Uri300' => $nophoto,
+			'Uri640' => $nophoto,
+			'Uri1280' => '',
+			'UriLarge' => $nophoto,
+			'caption' => '',
 		];
 	}
 }

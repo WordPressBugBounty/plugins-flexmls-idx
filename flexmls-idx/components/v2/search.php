@@ -12,7 +12,7 @@ class fmcSearch extends fmcSearch_v1 {
 	}
 
 	function settings_form( $instance ) {
-		if ( ! $this->is_new_version_widget( $instance ) || ! in_array( '_is_gutenberg_new', $instance ) ) {
+		if ( ! $this->is_new_version_widget( $instance ) ) {
 			return parent::settings_form( $instance );
 		}
 
@@ -21,15 +21,6 @@ class fmcSearch extends fmcSearch_v1 {
 		$this->admin_view_vars = $this->admin_view_vars();
 
 		return $this->render( $fmc_plugin_dir . "/views/admin/v2/settings.php", $this->admin_view_vars );
-	}
-
-	function get_font_with_default( $key, $default = "default" ) {
-		$value = isset( $this->widget_settings[ $key ] ) ? $this->widget_settings[ $key ] : null;
-		if ( empty( $value ) || $value == "default" ) {
-			return false;
-		}
-
-		return $value;
 	}
 
 	function jelly( $args, $settings, $type ) {
@@ -71,6 +62,14 @@ class fmcSearch extends fmcSearch_v1 {
 
 		$user_sorting = trim($settings['user_sorting']);
 		$property_type_enabled = (array_key_exists('property_type_enabled', $settings)) ? trim($settings['property_type_enabled']) : "on" ;
+		$property_type_ui = ( array_key_exists( 'property_type_ui', $settings ) ) ? trim( (string) $settings['property_type_ui'] ) : 'checkboxes';
+		if ( ! in_array( $property_type_ui, array( 'checkboxes', 'tabs' ), true ) ) {
+			$property_type_ui = 'checkboxes';
+		}
+		$show_property_subtypes = ( array_key_exists( 'show_property_subtypes', $settings ) ) ? trim( (string) $settings['show_property_subtypes'] ) : 'on';
+		if ( ! in_array( $show_property_subtypes, array( 'on', 'off' ), true ) ) {
+			$show_property_subtypes = 'on';
+		}
 		$property_type = isset($settings['property_type'])? trim($settings['property_type']) : null;
 		$property_types_selected = explode(",", $property_type ?? '');
 		$std_fields = isset($settings['std_fields'])? trim($settings['std_fields']) : null;
@@ -80,27 +79,54 @@ class fmcSearch extends fmcSearch_v1 {
 		// theme="vert_round_dark"
 		$orientation = (array_key_exists('orientation', $settings)) ? trim($settings['orientation']) : "horizontal" ;
 
-		$width = ($orientation == "horizontal") ? 760 : 360;
-		if( array_key_exists( 'width', $settings ) ){
-			if( is_numeric( $settings[ 'width' ] ) ){
-				$width = trim($settings['width']) - 40;
-			 }
+		$search_layout = ( array_key_exists( 'search_layout', $settings ) ) ? trim( (string) $settings['search_layout'] ) : 'default';
+		if ( 'compact_row' !== $search_layout ) {
+			$search_layout = 'default';
 		}
+		// Compact single-row layout is only applied for horizontal orientation (vertical unchanged).
+		$use_compact_row_layout = ( 'compact_row' === $search_layout && 'vertical' !== $orientation );
+
+		$compact_submit_style = ( array_key_exists( 'compact_submit_style', $settings ) ) ? trim( (string) $settings['compact_submit_style'] ) : 'full';
+		if ( ! in_array( $compact_submit_style, array( 'full', 'icon_only' ), true ) ) {
+			$compact_submit_style = 'full';
+		}
+		$use_compact_icon_submit = ( $use_compact_row_layout && 'icon_only' === $compact_submit_style );
+
+		$width_setting = array_key_exists( 'width', $settings ) ? trim( (string) $settings['width'] ) : '';
+		$width = fmcSearch_v1::format_widget_max_width_css(
+			'' !== $width_setting ? $width_setting : '100%',
+			$orientation
+		);
 
 		$border_style = (array_key_exists('border_style', $settings)) ? trim($settings['border_style']) : "squared" ;
 
-		$background_color = fmcSearch::get_setting_color('background_color');
+		$background_color = $this->resolve_widget_background_color();
 		$title_text_color = fmcSearch::get_setting_color('title_text_color');
 		$field_text_color = fmcSearch::get_setting_color('field_text_color');
 		$detailed_search_text_color = fmcSearch::get_setting_color('detailed_search_text_color');
+		$property_type_tab_background_color = '';
+		$property_type_tab_text_color       = '#ffffff';
+		if ( ! empty( $settings['property_type_tab_background_color'] ) ) {
+			$property_type_tab_background_color = trim( (string) $settings['property_type_tab_background_color'] );
+			if (
+				0 !== strpos( $property_type_tab_background_color, '#' )
+				&& 0 !== stripos( $property_type_tab_background_color, 'rgb' )
+			) {
+				$property_type_tab_background_color = '#' . $property_type_tab_background_color;
+			}
+			if (
+				class_exists( 'flexmlsConnectPageCore' )
+				&& 0 === strpos( $property_type_tab_background_color, '#' )
+			) {
+				$property_type_tab_text_color = flexmlsConnectPageCore::contrasting_text_color( $property_type_tab_background_color );
+			}
+		}
 
 		$submit_button_shine = (array_key_exists('submit_button_shine', $settings)) ? trim($settings['submit_button_shine']) : "shine" ;
 
 		$submit_button_background = fmcSearch::get_setting_color('submit_button_background');
 		$submit_button_text_color = fmcSearch::get_setting_color('submit_button_text_color');
 
-		$title_font = ($this->get_font_with_default( 'title_font' )) ? $this->get_font_with_default( 'title_font' ) : '';
-		$field_font = ($this->get_font_with_default( 'field_font' )) ? $this->get_font_with_default( 'field_font' ) : '';
 		$destination = (array_key_exists('destination', $settings)) ? trim($settings['destination']) : "local" ;
 		$default_view = (array_key_exists('default_view', $settings)) ? trim($settings['default_view']) : "list";
 		$listings_per_page = (array_key_exists('listings_per_page', $settings)) ? trim($settings['listings_per_page']) : "20";
@@ -109,10 +135,8 @@ class fmcSearch extends fmcSearch_v1 {
 		$api_property_sub_types = $fmc_api->GetPropertySubTypes();
 		$api_system_info = $fmc_api->GetSystemInfo();
 
-		$IDXLinks = new \SparkAPI\IDXLinks();
-		$api_links = $IDXLinks->get_all_idx_links();
-
-		if ( empty( $api_prop_types ) || $api_system_info === false || $api_links === false ) {
+		$probe_links = $fmc_api->GetIDXLinks( array( '_pagination' => 1, '_page' => 1, '_limit' => 1 ) );
+		if ( empty( $api_prop_types ) || $api_system_info === false || false === $probe_links ) {
 			return flexmlsConnect::widget_not_available($fmc_api, false, $args, $settings);
 		}
 
@@ -120,12 +144,8 @@ class fmcSearch extends fmcSearch_v1 {
 			$my_link = flexmlsConnect::get_default_idx_link();
 		}
 
-		$good_link = false;
-		foreach ($api_links as $link) {
-			if ($link['LinkId'] == $my_link) {
-				$good_link = true;
-			}
-		}
+		$idx_link_row = flexmlsConnect::idx_links_resolve_api_row( $my_link );
+		$good_link = is_array( $idx_link_row ) && ! empty( $idx_link_row['LinkId'] );
 
 		if (!$good_link) {
 			return flexmlsConnect::widget_not_available($fmc_api, false, $args, $settings);
@@ -138,7 +158,10 @@ class fmcSearch extends fmcSearch_v1 {
 			$this_target = " target='_blank'";
 		}
 
-		$idx_link_details = flexmlsConnect::get_idx_link_details($my_link);
+		$idx_link_details = flexmlsConnect::get_idx_link_details( $my_link );
+		if ( ! is_array( $idx_link_details ) && is_array( $idx_link_row ) ) {
+			$idx_link_details = $idx_link_row;
+		}
 		$detailed_search_url = '';
 		if ( is_array($idx_link_details) && isset($idx_link_details['Uri']) ) {
 			$detailed_search_url = flexmlsConnect::make_destination_link($idx_link_details['Uri']);
@@ -154,6 +177,10 @@ class fmcSearch extends fmcSearch_v1 {
 
 		if ( 'vertical' == $orientation ) {
 			$wrapper_class .= " flexmls_connect__search_v2_vertical ";
+		}
+
+		if ( $use_compact_row_layout ) {
+			$wrapper_class .= ' flexmls_connect__search_v2_layout_compact ';
 		}
 
 		// submit button CSS
@@ -185,7 +212,15 @@ class fmcSearch extends fmcSearch_v1 {
 		$submit_return .= "<div style='visibility:hidden;' class='query' ></div>";
 
 		$submit_return .= "<div class='flexmls_connect__search_v2_links'>";
-		$submit_return .= "<input class='flexmls_connect__search_v2_submit' type='submit' value='{$buttontext}' style='{$submit_button_css}' />";
+		if ( $use_compact_icon_submit ) {
+			$raw_btn = isset( $settings['buttontext'] ) ? trim( (string) $settings['buttontext'] ) : '';
+			$submit_aria = esc_attr( '' !== $raw_btn ? $raw_btn : 'Search' );
+			$submit_return .= '<button type="submit" class="flexmls_connect__search_v2_submit flexmls_connect__search_v2_submit--icon-only" style="' . $submit_button_css . '" aria-label="' . $submit_aria . '">';
+			$submit_return .= '<span class="flexmls-icon-search flexmls_connect__search_v2_submit_icon" aria-hidden="true"></span>';
+			$submit_return .= '</button>';
+		} else {
+			$submit_return .= "<input class='flexmls_connect__search_v2_submit' type='submit' value='{$buttontext}' style='{$submit_button_css}' />";
+		}
 		if ($detailed_search == "on") {
 			$submit_return .= "<a href='{$detailed_search_url}' style='color:{$detailed_search_text_color};'{$this_target}>{$detailed_search_text}</a>";
 		}
@@ -225,6 +260,26 @@ class fmcSearch extends fmcSearch_v1 {
 
 		$portal_slug = flexmlsConnect::get_portal_slug();
 
+		$pt_render_top_horizontal   = false;
+		$pt_render_in_vertical_slot = false;
+		$pt_render_in_righthand       = false;
+		if ( ! empty( $property_types_selected[0] ) ) {
+			$uses_tabs_block = ( 'tabs' === $property_type_ui && 'on' === $property_type_enabled && count( $good_prop_types ) > 0 );
+			if ( $uses_tabs_block ) {
+				if ( 'vertical' === $orientation ) {
+					$pt_render_in_vertical_slot = true;
+				} else {
+					$pt_render_top_horizontal = true;
+				}
+			} else {
+				if ( 'vertical' === $orientation ) {
+					$pt_render_in_vertical_slot = true;
+				} else {
+					$pt_render_in_righthand = true;
+				}
+			}
+		}
+
 		// output html from the template
 		ob_start();
 			global $fmc_plugin_dir;
@@ -238,8 +293,6 @@ class fmcSearch extends fmcSearch_v1 {
 
 
 	function settings_fields_v2() {
-		$idx_links = $this->idx_links();
-
 		$possible_desinations = [];
 		$possible_desinations = $this->destination_options();
 
@@ -254,6 +307,12 @@ class fmcSearch extends fmcSearch_v1 {
 		global $fmc_api;
 		$standard_status = new fmcStandardStatus( $fmc_api->GetStandardField("StandardStatus") );
 		$allow_sold_searching = $standard_status->allow_sold_searching();
+
+		$fmc_settings = get_option( 'fmc_settings' );
+		$primary_color_default = (
+			is_array( $fmc_settings )
+			&& ! empty( $fmc_settings['search_listing_template_primary_color'] )
+		) ? ltrim( (string) $fmc_settings['search_listing_template_primary_color'], '#' ) : '0577d9';
 
 		$settings_fields = [
 			'sorting_title' => [
@@ -300,6 +359,23 @@ class fmcSearch extends fmcSearch_v1 {
 				'selected' => $this->get_selected_property_types(),
 				'field_grouping' => 'property_type_enabled'
 			],
+			'property_type_ui' => [
+				'label' => 'Property Type display',
+				'type' => 'select',
+				'collection' => [
+					[ 'value' => 'checkboxes', 'display_text' => 'Checkboxes (default)' ],
+					[ 'value' => 'tabs', 'display_text' => 'Tabs (saves horizontal space)' ],
+				],
+				'default' => 'checkboxes',
+				'description' => 'Tabs place property type at the top of the widget; only one type is active at a time. Sub-types appear in the selected tab panel. Checkboxes mode keeps the classic multi-select row with the other filters.',
+				'field_grouping' => 'property_type_enabled',
+			],
+			'show_property_subtypes' => [
+				'label' => 'Show Property Sub-Types',
+				'type' => 'enabler',
+				'description' => 'When on, selecting exactly one property type reveals its sub-type checkboxes. Turn off to hide all sub-type lists.',
+				'field_grouping' => 'property_type_enabled',
+			],
 			'std_fields' => [
 				'label' => 'Other Fields to Show',
 				'type' => 'list',
@@ -312,8 +388,10 @@ class fmcSearch extends fmcSearch_v1 {
 			],
 			'link' => [
 				'label' => 'IDX Link',
-				'type' => 'select',
-				'collection' => $this->idx_links(),
+				'type' => 'select_lazy_idx',
+				'only_saved_search' => false,
+				'static_options' => array(),
+				'default' => $this->options->default_link(),
 				'description' => 'This is the IDX Link generated from within the Flexmls IDX Manager that you wish to use when this search is executed. We recommend choosing a link with broad criteria unless you would like to limit the search results for your website visitors.',
 			],
 			'destination' => [
@@ -324,6 +402,21 @@ class fmcSearch extends fmcSearch_v1 {
 			'layout_title' => [
 				'type' => 'section-title',
 				'text' => 'Layout and Style'
+			],
+			'background_style' => [
+				'label' => 'Widget background',
+				'type' => 'select',
+				'collection' => [
+					[ 'value' => 'solid', 'display_text' => 'Solid color' ],
+					[ 'value' => 'transparent', 'display_text' => 'Transparent' ],
+				],
+				'default' => 'solid',
+				'description' => 'Transparent removes the widget fill so your page background shows through. When set to solid, use the color below.',
+			],
+			'background_color' => [
+				'label' => 'Background color',
+				'type' => 'color',
+				'default' => 'ffffff',
 			],
 			'listings_per_page' => [
 				'label' => 'Listings per page',
@@ -358,33 +451,49 @@ class fmcSearch extends fmcSearch_v1 {
 					[ 'value' => 'vertical', 'display_text' => 'Vertical' ],
 				]
 			],
+			'search_layout' => [
+				'label' => 'Search bar layout',
+				'type' => 'select',
+				'collection' => [
+					[ 'value' => 'default', 'display_text' => 'Default (stacked)' ],
+					[ 'value' => 'compact_row', 'display_text' => 'Compact row (hero-style)' ],
+				],
+				'default' => 'default',
+				'description' => 'Compact row (horizontal only) places location (up to ~500px wide), numeric filters, and submit on one row when space allows; extra options (property type, sort, status) wrap to additional rows. Use 100% widget width for best results. Vertical orientation always uses the default stacked layout.',
+			],
+			'compact_submit_style' => [
+				'label' => 'Compact row: search button',
+				'type' => 'select',
+				'collection' => [
+					[ 'value' => 'full', 'display_text' => 'Full text button' ],
+					[ 'value' => 'icon_only', 'display_text' => 'Magnifying glass (icon only)' ],
+				],
+				'default' => 'full',
+				'description' => 'Icon only shows a compact magnifying-glass submit on the same row as the search fields. Only applies when Search bar layout is Compact row. Submit Button Text is still used as the accessible name for screen readers.',
+			],
 			'width' => [
 				'label' => 'Widget Width',
 				'type' => 'text',
-				'input_width' => 5,
-				'after_input' => ' px'
-			],
-			'title_font' => [
-				'label' => 'Title Font',
-				'type' => 'font',
-				'collection' => fmcWidget::available_fonts(),
-				'default' => 'default'
+				'input_width' => 7,
+				'after_input' => '',
+				'description' => 'Pixels: plain number uses legacy sizing (saved value minus 40), or use an explicit suffix (e.g. 800px). Percentages: e.g. 100% or 90%. Leave blank to use 100%.',
 			],
 			'title_text_color' => [
 				'label' => 'Title Text Color',
 				'type' => 'color',
 				'default' => '333333'
 			],
-			'field_font' => [
-				'label' => 'Field Font',
-				'type' => 'font',
-				'collection' => fmcWidget::available_fonts(),
-				'default' => 'default'
-			],
 			'field_text_color' => [
 				'label' => 'Field Text Color',
 				'type' => 'color',
 				'default' => '333333'
+			],
+			'property_type_tab_background_color' => [
+				'label' => 'Selected Property Type Tab Color',
+				'type' => 'color',
+				'default' => $primary_color_default,
+				'description' => 'Background color for the active Property Type and Property Sub-Type tabs. Only applies when Property Type display is Tabs. Text color is automatically adjusted for contrast.',
+				'field_grouping' => 'property_type_tabs',
 			],
 			'submit_button_background' => [
 				'label' => 'Submit Button Background',
@@ -397,9 +506,11 @@ class fmcSearch extends fmcSearch_v1 {
 				'default' => 'ffffff'
 			],
 			'detailed_search_text_color' => [
-				'label' => 'Field Text Color',
+				'label' => 'Detailed Search Link Color',
 				'type' => 'color',
-				'default' => '333333'
+				'default' => '333333',
+				'description' => 'Color for the optional "Detailed Search" link shown next to the submit button.',
+				'field_grouping' => 'detailed_search',
 			],
 			'widget_version' => [
 				'type' => 'hidden',
@@ -472,7 +583,6 @@ class fmcSearch extends fmcSearch_v1 {
 
 		$vars = array();
 		$vars["settings_fields"] = $this->settings_fields_v2();
-		$vars["idx_links"] = flexmlsConnect::get_all_idx_links();
 		$vars["idx_links_default"] = $this->options->default_link();
 		$vars["property_types"] = $this->get_view_property_types();
 		$vars["selected_property_types"] = $this->get_selected_property_types();

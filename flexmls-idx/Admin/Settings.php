@@ -5,6 +5,25 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 class Settings {
 
+	/**
+	 * Outputs the nonce fields and submit button for a settings form.
+	 *
+	 * The button is pinned to the corner of the viewport by
+	 * `.fmc-floating-save` so it stays reachable on long settings screens. It
+	 * must be rendered inside its form so that it submits natively, which keeps
+	 * browser validation and the TinyMCE/color picker submit hooks working.
+	 *
+	 * @param string $nonce_action Action passed to wp_nonce_field().
+	 * @param string $nonce_name   Field name passed to wp_nonce_field().
+	 * @param string $label        Visible button text.
+	 */
+	public static function floating_save_button( $nonce_action, $nonce_name, $label ){
+		echo '<div class="fmc-floating-save">';
+		wp_nonce_field( $nonce_action, $nonce_name );
+		echo '<button type="submit" class="button button-primary fmc-floating-save-button">' . esc_html( $label ) . '</button>';
+		echo '</div>';
+	}
+
 	public static function admin_menu_cb_intro(){
 		$tab = isset( $_GET[ 'tab' ] ) ? sanitize_title( $_GET[ 'tab' ] ) : 'api';
 		$fmc_plugin_dir = FMC_PLUGIN_DIR;
@@ -215,6 +234,8 @@ class Settings {
 				<h1><?php echo get_admin_page_title(); ?></h1>
 				<h2 class="nav-tab-wrapper wp-clearfix">
 					<?php if( $auth_token ): ?><a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings' ); ?>" class="nav-tab<?php echo ( 'behavior' == $tab ? ' nav-tab-active' : '' ); ?>">Behavior</a><?php endif; ?>
+					<?php if( $auth_token ): ?><a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=search-results' ); ?>" class="nav-tab<?php echo ( 'search-results' == $tab ? ' nav-tab-active' : '' ); ?>">Search Results</a><?php endif; ?>
+					<?php if( $auth_token ): ?><a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=listing-detail' ); ?>" class="nav-tab<?php echo ( 'listing-detail' == $tab ? ' nav-tab-active' : '' ); ?>">Listing Detail</a><?php endif; ?>
 					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=style' ); ?>" class="nav-tab<?php echo ( 'style' == $tab ? ' nav-tab-active' : '' ); ?>">Style</a>
 					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=portal' ); ?>" class="nav-tab<?php echo ( 'portal' == $tab ? ' nav-tab-active' : '' ); ?>">Portal</a>
 					<?php if( $auth_token ): ?><a href="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=gmaps' ); ?>" class="nav-tab<?php echo ( 'gmaps' == $tab ? ' nav-tab-active' : '' ); ?>">Google Maps</a><?php endif; ?>
@@ -226,6 +247,14 @@ class Settings {
 
 					case 'behavior':
 						include_once( $fmc_plugin_dir . 'views/admin-settings-behavior.php' ); 
+					break;
+
+					case 'search-results':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-search-results.php' );
+					break;
+
+					case 'listing-detail':
+						include_once( $fmc_plugin_dir . 'views/admin-settings-listing-detail.php' );
 					break;
 
 					case 'cache':
@@ -334,6 +363,8 @@ class Settings {
 					case 'destwindow':
                     case 'select2_turn_off':
 					case 'chartkick_turn_off':
+					case 'v2_listing_photo_click_action':
+					case 'v2_listing_photo_modal_provider':
 					case 'destpref':
 					case 'listpref':
 					case 'permabase':
@@ -397,6 +428,64 @@ class Settings {
 					add_action( 'shutdown', 'flush_rewrite_rules' );
 				}
 			}
+			add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
+		}
+
+		// User saves Search Results settings
+		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_search_results_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_search_results_nonce' ], 'update_fmc_search_results_action' ) ){
+			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+				switch( $key ){
+					case 'multiple_summaries':
+					case 'allow_sold_searching':
+					case 'search_listing_card_native_lazy_load':
+					case 'search_results_display_open_house_datetime':
+						$fmc_settings[ $key ] = ( 1 == $val ? 1 : 0 );
+						break;
+					case 'v2_listing_photo_click_action':
+					case 'v2_listing_photo_modal_provider':
+						$fmc_settings[ $key ] = sanitize_text_field( $val );
+						break;
+					case 'search_results_fields':
+						$clean_fields = array();
+						foreach( $val as $sr_key => $sr_val ){
+							$clean_fields[ sanitize_text_field( $sr_key ) ] = sanitize_text_field( $sr_val );
+						}
+						$fmc_settings[ 'search_results_fields' ] = $clean_fields;
+						break;
+				}
+			}
+
+			add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
+		}
+
+		// User saves Listing Detail settings
+		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_listing_detail_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_listing_detail_nonce' ], 'update_fmc_listing_detail_action' ) ){
+			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+				switch( $key ){
+					case 'listing_detail_expand_sections':
+					case 'listing_detail_show_more_info':
+					case 'listing_detail_contact_on_closed':
+						$fmc_settings[ $key ] = ( 1 == $val ? 1 : 0 );
+						break;
+					case 'v2_listing_photo_click_action':
+					case 'v2_listing_photo_modal_provider':
+						$fmc_settings[ $key ] = sanitize_text_field( $val );
+						break;
+					case 'listlink':
+						$fmc_settings[ $key ] = preg_replace( '/[^0-9]/', '', $val );
+						break;
+					case 'listpref':
+						$fmc_settings[ $key ] = sanitize_text_field( $val );
+						break;
+				}
+			}
+			if( !isset( $_POST[ 'fmc_settings' ][ 'v2_listing_photo_click_action' ] ) || ! in_array( $_POST[ 'fmc_settings' ][ 'v2_listing_photo_click_action' ], array( 'detail', 'modal' ), true ) ){
+				$fmc_settings[ 'v2_listing_photo_click_action' ] = 'modal';
+			}
+			if( !isset( $_POST[ 'fmc_settings' ][ 'v2_listing_photo_modal_provider' ] ) || ! in_array( $_POST[ 'fmc_settings' ][ 'v2_listing_photo_modal_provider' ], array( 'auto', 'cbox', 'third_party', 'none' ), true ) ){
+				$fmc_settings[ 'v2_listing_photo_modal_provider' ] = 'auto';
+			}
+
 			add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
 		}
 

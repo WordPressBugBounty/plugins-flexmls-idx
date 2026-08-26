@@ -5,7 +5,7 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 3.18.2
+Version: 4.0
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
 Tested up to: 7.1
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '3.18.2';
+const FMC_PLUGIN_VERSION = '4.0';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -25,7 +25,7 @@ $auth_token_failures = 0;
 
 $fmc_version = FMC_PLUGIN_VERSION;
 $fmc_plugin_dir = dirname(realpath(__FILE__));
-$fmc_plugin_url = plugins_url() .'/flexmls-idx';
+$fmc_plugin_url = untrailingslashit( plugins_url( '', __FILE__ ) );
 
 if( defined( 'FMC_DEV' ) && FMC_DEV && WP_DEBUG ){
 	ini_set( 'error_log', FMC_PLUGIN_DIR . '/debug.log' );
@@ -101,6 +101,9 @@ class FlexMLS_IDX {
 		
 		// AJAX handler for nginx configuration rules
 		add_action( 'wp_ajax_fmc_get_nginx_rules', array( '\FlexMLS\Admin\NginxCompatibility', 'ajax_get_nginx_rules' ) );
+		\FlexMLS\Admin\IdxLinksSelectAjax::register();
+		\FlexMLS\Admin\LegacyVersionNudge::register();
+		\FlexMLS\Admin\OfficeAgentsSelectAjax::register();
 
 		add_shortcode( 'idx_frame', array( 'flexmlsConnect', 'shortcode' ) );
 		add_shortcode( 'lead_generation', array( '\FlexMLS\Shortcodes\LeadGeneration', 'shortcode' ) );
@@ -272,6 +275,7 @@ class FlexMLS_IDX {
 				return;
 			}
 			$this->render_fmc_api_connection_notices();
+			\FlexMLS\Admin\LegacyVersionNudge::maybe_render();
 		}
 	}
 

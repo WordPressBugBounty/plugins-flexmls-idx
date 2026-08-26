@@ -219,7 +219,10 @@ class fmcSearchResults_v1 extends fmcWidget {
         $vars["source_options"]['company'] = "My Company's Listings";
       }
       $vars["source_options"]['agent'] = "Specific agent";
-      $vars["office_roster"] = ( is_array( $api_my_account ) && ! empty( $api_my_account['OfficeId'] ) ) ? $fmc_api->GetAccountsByOffice( $api_my_account['OfficeId'] ) : array();
+      // Full roster only for page builders (WPBakery/Divi/etc.); core shortcode UI uses lazy Select2.
+      if ( $integration === true && is_array( $api_my_account ) && ! empty( $api_my_account['OfficeId'] ) ) {
+        $vars["office_roster"] = flexmlsConnect::get_accounts_by_office_all_pages( $api_my_account['OfficeId'] );
+      }
     }
 
     if ( flexmlsConnect::is_company() ) {

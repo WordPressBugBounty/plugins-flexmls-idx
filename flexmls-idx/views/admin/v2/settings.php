@@ -56,8 +56,8 @@
 
 	  <div class="flexmls_connect__sortable_wrapper">
 	    <input fmc-field="<?php echo esc_attr( $field_id ); ?>" fmc-type="text" type="hidden"
-	      name='<?php echo $this->get_field_name( $field_id ); ?>'
-	      class="flexmls_connect__list_values" value="<?php echo $this->get_field_value( $field_id ); ?>" data-choices='<?php echo json_encode( $field_attr['collection'] ); ?>'>
+	      name="<?php echo esc_attr( $this->get_field_name( $field_id ) ); ?>"
+	      class="flexmls_connect__list_values" value="<?php echo esc_attr( $this->get_field_value( $field_id ) ); ?>" data-choices='<?php echo wp_json_encode( $field_attr["collection"], JSON_HEX_APOS ); ?>'>
 
 	    <?php $this->sortable_list( $field_attr['selected'] ); ?>
 
@@ -89,6 +89,27 @@
 			'option_display_attr' => 'display_text',
 			'default' => array_key_exists( 'default', $field_attr ) ? $field_attr['default'] : null
 		) ); ?>
+	</div>
+	<?php break; ?>
+<?php case 'select_lazy_idx': ?>
+	<div class="flexmls-admin-field-row flexmls-select-field <?php echo esc_attr( $wrapper_class ); ?>">
+		<div class="label-wrapper">
+			<?php $this->label_tag( $field_id, $field_attr['label'] ); ?>
+			<?php if ( array_key_exists( 'description', $field_attr ) ) : ?>
+				<?php $this->info_icon( $field_attr['description'] ); ?>
+			<?php endif; ?>
+		</div>
+		<?php
+		$this->lazy_idx_links_select_tag(
+			array(
+				'fmc_field'         => $field_id,
+				'only_saved_search' => ! empty( $field_attr['only_saved_search'] ),
+				'static_options'    => isset( $field_attr['static_options'] ) && is_array( $field_attr['static_options'] ) ? $field_attr['static_options'] : array(),
+				'class'             => 'widefat',
+				'default'           => array_key_exists( 'default', $field_attr ) ? $field_attr['default'] : null,
+			)
+		);
+		?>
 	</div>
 	<?php break; ?>
 
@@ -167,6 +188,17 @@
 						'option_display_attr' => 'display_text',
 						'parent_input_value' => $input['parent_input_value']
 					) ); ?>
+				<?php elseif ( 'select_lazy_office_agents' == $input['type'] ) : ?>
+					<?php
+					$this->lazy_office_agents_select_tag(
+						array(
+							'fmc_field'          => $field_id,
+							'static_options'     => isset( $input['static_options'] ) && is_array( $input['static_options'] ) ? $input['static_options'] : array(),
+							'class'              => 'widefat',
+							'parent_input_value' => $input['parent_input_value'],
+						)
+					);
+					?>
 				<?php endif; ?>
 			<?php endforeach; ?>
 		</div>
@@ -205,5 +237,31 @@
 				window.flexmls_connect.load_font_picker( jQuery( this ) );
 			} );
 		}
+
+		jQuery( ".flexmls-v2-widget-wrapper select[fmc-field='background_style']" ).each( function () {
+			var $bgStyle = jQuery( this );
+			var $wrapper = $bgStyle.closest( '.flexmls-v2-widget-wrapper' );
+			var $row = $wrapper.find( "input[fmc-field='background_color']" ).closest( '.flexmls-admin-field-row' );
+			function syncBgColorRow() {
+				if ( ! $row.length ) { return; }
+				$row.toggle( String( $bgStyle.val() ).toLowerCase() !== 'transparent' );
+			}
+			$bgStyle.on( 'change', syncBgColorRow );
+			syncBgColorRow();
+		} );
+
+		jQuery( ".flexmls-v2-widget-wrapper" ).each( function () {
+			var $wrapper = jQuery( this );
+			var $propertyTypeEnabled = $wrapper.find( "select[fmc-field='property_type_enabled']" );
+			var $propertyTypeUi = $wrapper.find( "select[fmc-field='property_type_ui']" );
+			var $row = $wrapper.find( '.flexmls_connect__disable_group_property_type_tabs' );
+			function syncPropertyTypeTabColorRow() {
+				var propertyTypesOn = ! $propertyTypeEnabled.length || String( $propertyTypeEnabled.val() ).toLowerCase() === 'on';
+				var tabsSelected = String( $propertyTypeUi.val() ).toLowerCase() === 'tabs';
+				$row.toggle( propertyTypesOn && tabsSelected );
+			}
+			$propertyTypeEnabled.add( $propertyTypeUi ).on( 'change', syncPropertyTypeTabColorRow );
+			syncPropertyTypeTabColorRow();
+		} );
 	</script>
 </div><!-- end .flexmls-v2-widget-wrapper -->

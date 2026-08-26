@@ -100,6 +100,16 @@ class flexmlsConnect {
     <script type='text/javascript'>
       var fmcPluginUrl = '<?php echo $fmc_plugin_url; ?>';
       if ( typeof window.fmcAjax === 'undefined' ) { window.fmcAjax = { ajaxurl: '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', nonce: '<?php echo esc_js( wp_create_nonce( 'fmc_ajax' ) ); ?>' }; }
+      if ( typeof window.flexmlsIdxLinksSelect === 'undefined' ) {
+        window.flexmlsIdxLinksSelect = <?php echo wp_json_encode(
+          array(
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'fmc_ajax' ),
+            'action'  => 'flexmls_idx_links_select2',
+            'enabled' => self::idx_links_select2_enabled() ? 1 : 0,
+          )
+        ); ?>;
+      }
     </script>
     <?php
   }
@@ -285,11 +295,22 @@ class flexmlsConnect {
     
     $show_link = ( isset($query_url_parse['host']) && $query_url_parse['host'] == 'link.flexmls.com' ) ? $query_url : flexmlsConnect::get_default_idx_link_url();
 
+    // links saved or cached before the search widget stopped emitting blank criteria can
+    // still arrive malformed, so repair them rather than framing a page flexmls rejects
+    $show_link = flexmlsConnect::clean_idx_link($show_link);
+
     if(strpos($show_link, 'StreetAddress')){
        $show_link = str_replace('StreetAddress', 'streetaddress', $show_link);
     }
 
-    $flexmls_iframe = "<iframe src='{$show_link}' width='{$attr['width']}' height='{$attr['height']}' frameborder='0'></iframe>";
+    // Encode attributes before wp_kses(): a raw "<" in a query value such as
+    // list_price=<500000 is treated as a new tag and the iframe is printed as text.
+    $flexmls_iframe = sprintf(
+      "<iframe src='%s' width='%s' height='%s' frameborder='0'></iframe>",
+      esc_attr( $show_link ),
+      esc_attr( $attr['width'] ),
+      esc_attr( $attr['height'] )
+    );
 
     $allowed_tags = array(
         'iframe' => array(
@@ -499,6 +520,67 @@ class flexmlsConnect {
       $val = substr($val, 1);
     }
     return $val;
+  }
+
+
+  /*
+   * A submitted search value is blank when the visitor typed nothing: either an empty
+   * string or nothing but the comparison operators the search widget prefixes to a range.
+   */
+  static function is_blank_search_value($value) {
+
+    if ( !is_string($value) ) {
+      return empty($value);
+    }
+
+    return (bool) preg_match('/^[\s<>=,]*$/', $value);
+
+  }
+
+
+  /*
+   * Guarantee an IDX link handed to a SmartFrame is a well formed URL: the query string
+   * has to start with "?" and cannot contain parameters without a value.  Without the "?"
+   * flexmls reads the whole query string as a path, which is rejected outright once a
+   * value contains an encoded space.
+   */
+  static function clean_idx_link($link) {
+
+    if ( empty($link) || !is_string($link) ) {
+      return $link;
+    }
+
+    $split_at = strpos($link, '?');
+    if ($split_at === false) {
+      $split_at = strpos($link, '&');
+    }
+    if ($split_at === false) {
+      return $link;
+    }
+
+    $base = substr($link, 0, $split_at);
+    $query_string = substr($link, $split_at + 1);
+
+    $keep = array();
+    foreach ( explode('&', $query_string) as $pair ) {
+      if ($pair === '') {
+        continue;
+      }
+
+      $parts = explode('=', $pair, 2);
+      if ( count($parts) == 2 && flexmlsConnect::is_blank_search_value($parts[1]) ) {
+        continue;
+      }
+
+      $keep[] = $pair;
+    }
+
+    if ( empty($keep) ) {
+      return $base;
+    }
+
+    return $base . '?' . implode('&', $keep);
+
   }
 
   static function is_ie() {
@@ -909,16 +991,24 @@ class flexmlsConnect {
     global $fmc_api;
     $AttributionContact = null;
 
-    $GetListingOfficeInfo = $fmc_api->GetAccount($sf['ListOfficeId']) ?? '';
-    $GetListingAgentInfo = $fmc_api->GetAccount($sf['ListAgentId']) ?? '';
+    $GetListingOfficeInfo = array();
+    $GetListingAgentInfo = array();
+    if ( isset( $sf['ListOfficeId'] ) ) {
+      $office_info = $fmc_api->GetAccount( $sf['ListOfficeId'] );
+      $GetListingOfficeInfo = is_array( $office_info ) ? $office_info : array();
+    }
+    if ( isset( $sf['ListAgentId'] ) ) {
+      $agent_info = $fmc_api->GetAccount( $sf['ListAgentId'] );
+      $GetListingAgentInfo = is_array( $agent_info ) ? $agent_info : array();
+    }
 
     if ( isset( $sf['AttributionContact'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['AttributionContact'] ) ) {
       $AttributionContact = $sf['AttributionContact'];
     } 
-    elseif ( isset( $sf['AttributionContact'] ) && flexmlsConnect::is_not_blank_or_restricted( $GetListingAgentInfo['AttributionContact'] ) ) {
+    elseif ( isset( $GetListingAgentInfo['AttributionContact'] ) && flexmlsConnect::is_not_blank_or_restricted( $GetListingAgentInfo['AttributionContact'] ) ) {
       $AttributionContact = $GetListingAgentInfo['AttributionContact'];
     } 
-    elseif ( isset( $sf['AttributionContact'] ) && flexmlsConnect::is_not_blank_or_restricted( $GetListingOfficeInfo['AttributionContact'] ) ) {
+    elseif ( isset( $GetListingOfficeInfo['AttributionContact'] ) && flexmlsConnect::is_not_blank_or_restricted( $GetListingOfficeInfo['AttributionContact'] ) ) {
       $AttributionContact = $GetListingOfficeInfo['AttributionContact'];
     }
 
@@ -1063,57 +1153,87 @@ class flexmlsConnect {
   static function mls_requires_agent_phone_in_search_results() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Summary"]["DisplayCompliance"]);
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance']
+      : array();
 
-    return (in_array("ListAgentPhone", $compList));
+    return in_array( 'ListAgentPhone', $compList );
   }
 
   static function mls_requires_agent_email_in_search_results() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Summary"]["DisplayCompliance"]);
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Summary']['DisplayCompliance']
+      : array();
 
-    return (in_array("ListAgentEmail", $compList));
+    return in_array( 'ListAgentEmail', $compList );
   }
 
   // Similar methods for Detail view
   static function mls_requires_agent_name_in_listing_details() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance']
+      : array();
 
-    return (in_array("ListAgentName", $compList));
+    return in_array( 'ListAgentName', $compList );
   }
 
   static function mls_requires_agent_phone_in_listing_details() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance']
+      : array();
 
     // Check for both ListMemberPhone (detail view) and ListAgentPhone (fallback)
-    return (in_array("ListMemberPhone", $compList) || in_array("ListAgentPhone", $compList));
+    return ( in_array( 'ListMemberPhone', $compList ) || in_array( 'ListAgentPhone', $compList ) );
   }
 
   static function mls_requires_agent_email_in_listing_details() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance']
+      : array();
 
-    return (in_array("ListMemberEmail", $compList));
+    return in_array( 'ListMemberEmail', $compList );
   }
 
   static function mls_requires_office_name_in_listing_details() {
     global $fmc_api;
     $api_system_info = $fmc_api->GetSystemInfo();
-    $mlsId = $api_system_info["MlsId"];
-    $compList = ($api_system_info["DisplayCompliance"][$mlsId]["View"]["Detail"]["DisplayCompliance"]);
+    if ( ! is_array( $api_system_info ) || ! isset( $api_system_info['MlsId'] ) ) {
+      return false;
+    }
+    $mlsId = $api_system_info['MlsId'];
+    $compList = isset( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] ) && is_array( $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance'] )
+      ? $api_system_info['DisplayCompliance'][$mlsId]['View']['Detail']['DisplayCompliance']
+      : array();
 
-    return (in_array("ListOfficeName", $compList));
+    return in_array( 'ListOfficeName', $compList );
   }
 
   /**
@@ -1184,35 +1304,50 @@ class flexmlsConnect {
     //Names
     $AgentName = "";
     $CoAgentName = "";
-                if ((flexmlsConnect::is_not_blank_or_restricted($sf["ListAgentFirstName"])) && (flexmlsConnect::is_not_blank_or_restricted($sf["ListAgentLastName"])))
-                        $AgentName = "{$sf["ListAgentFirstName"]} {$sf["ListAgentLastName"]}";
+    if (
+      isset( $sf['ListAgentFirstName'], $sf['ListAgentLastName'] )
+      && flexmlsConnect::is_not_blank_or_restricted( $sf['ListAgentFirstName'] )
+      && flexmlsConnect::is_not_blank_or_restricted( $sf['ListAgentLastName'] )
+    ) {
+      $AgentName = "{$sf['ListAgentFirstName']} {$sf['ListAgentLastName']}";
+    }
 
-    if ((flexmlsConnect::is_not_blank_or_restricted($sf["CoListAgentFirstName"])) && (flexmlsConnect::is_not_blank_or_restricted($sf["CoListAgentLastName"])))
-                        $CoAgentName = "{$sf["CoListAgentFirstName"]} {$sf["CoListAgentLastName"]}";
-
+    if (
+      isset( $sf['CoListAgentFirstName'], $sf['CoListAgentLastName'] )
+      && flexmlsConnect::is_not_blank_or_restricted( $sf['CoListAgentFirstName'] )
+      && flexmlsConnect::is_not_blank_or_restricted( $sf['CoListAgentLastName'] )
+    ) {
+      $CoAgentName = "{$sf['CoListAgentFirstName']} {$sf['CoListAgentLastName']}";
+    }
 
     //Primary Phone Numbers and Extensions
     $ListOfficePhone = "";
     $ListAgentPhone = "";
     $CoListAgentPhone = "";
-    if (flexmlsConnect::is_not_blank_or_restricted($sf["ListOfficePhone"]))
-      $ListOfficePhone = $sf["ListOfficePhone"];
-      if (flexmlsConnect::is_not_blank_or_restricted($sf["ListOfficePhoneExt"]))
-                          $ListOfficePhone .= " ext. " . $sf["ListOfficePhoneExt"];
+    if ( isset( $sf['ListOfficePhone'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['ListOfficePhone'] ) ) {
+      $ListOfficePhone = $sf['ListOfficePhone'];
+      if ( isset( $sf['ListOfficePhoneExt'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['ListOfficePhoneExt'] ) ) {
+        $ListOfficePhone .= ' ext. ' . $sf['ListOfficePhoneExt'];
+      }
+    }
 
-    if (flexmlsConnect::is_not_blank_or_restricted($sf["ListAgentPreferredPhone"]))
-                        $ListAgentPhone = $sf["ListAgentPreferredPhone"];
-                        if (flexmlsConnect::is_not_blank_or_restricted($sf["ListAgentPreferredPhone"]))
-                                $ListAgentPhone .= " ext. " . $sf["ListAgentPreferredPhone"];
+    if ( isset( $sf['ListAgentPreferredPhone'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['ListAgentPreferredPhone'] ) ) {
+      $ListAgentPhone = $sf['ListAgentPreferredPhone'];
+      if ( isset( $sf['ListAgentPreferredPhoneExt'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['ListAgentPreferredPhoneExt'] ) ) {
+        $ListAgentPhone .= ' ext. ' . $sf['ListAgentPreferredPhoneExt'];
+      }
+    }
 
-                if (flexmlsConnect::is_not_blank_or_restricted($sf["CoListAgentPreferredPhone"]))
-                        $CoListAgentPhone = $sf["CoListAgentPreferredPhone"];
-                        if (flexmlsConnect::is_not_blank_or_restricted($sf["CoListAgentPreferredPhone"]))
-                                $CoListAgentPhone .= " ext. " . $sf["CoListAgentPreferredPhone"];
+    if ( isset( $sf['CoListAgentPreferredPhone'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['CoListAgentPreferredPhone'] ) ) {
+      $CoListAgentPhone = $sf['CoListAgentPreferredPhone'];
+      if ( isset( $sf['CoListAgentPreferredPhoneExt'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['CoListAgentPreferredPhoneExt'] ) ) {
+        $CoListAgentPhone .= ' ext. ' . $sf['CoListAgentPreferredPhoneExt'];
+      }
+    }
 
 
     //format last modified date
-    $LastModifiedDate = flexmlsConnect::format_date("F - d - Y", $sf["ModificationTimestamp"]);
+    $LastModifiedDate = flexmlsConnect::format_date( 'F - d - Y', $sf['ModificationTimestamp'] ?? '' );
 
     $logo="";
     // Only set logo if IDXLogo is required in the compliance settings
@@ -1240,25 +1375,25 @@ class flexmlsConnect {
 
     //These will be printed in this order.
     $possibleRequired = array(
-      "ListOfficeName"  => array($listing_office_label,$sf["ListOfficeName"]),
-      "ListOfficePhone"   => array("Office Phone:",$ListOfficePhone),
-      "ListOfficeEmail"   => array("Office Email:",$sf["ListOfficeEmail"]),
-      "ListOfficeURL"   => array("Office Website:",$sf["ListOfficeURL"]),
-      "ListOfficeAddress"   => array("Office Address:",$OfficeAddress),
-      "ListAgentName"   => array("Listing Agent:",$AgentName),//Agent name is done below to make sure first and last name are present
-      "ListMemberPhone"   => array("Agent Phone:",$sf["ListAgentPreferredPhone"] ),
-      "ListMemberEmail"   => array("Agent Email:",$sf["ListAgentEmail"]),
-      "ListMemberURL"   => array("Agent Website:",$sf["ListAgentURL"]),
-      "ListMemberAddress"   => array("Agent Address:",$AgentAddress),
-      "CoListOfficeName"  => array("Co Office Name:",$sf["CoListOfficeName"]),
-      "CoListOfficePhone" => array("Co Office Phone:",$sf["CoListOfficePhone"]),
-      "CoListOfficeEmail" => array("Co Office Email:",$sf["CoListOfficeEmail"]),
-      "CoListOfficeURL" => array("Co Office Website:",$sf["CoListOfficeURL"]),
-      "CoListOfficeAddress" => array("Co Office Address:","$CoAgentAddress"),
-      "CoListAgentName" => array("Co Listing Agent:",$CoAgentName),
-      "CoListAgentPhone"  => array("Co Agent Phone:",$CoListAgentPhone),
-      "CoListAgentEmail"  => array("Co Agent Email:",$sf["CoListAgentEmail"]),
-      "CoListAgentURL"  => array("Co Agent Webpage:",$sf["CoListAgentURL"]),
+      "ListOfficeName"  => array( $listing_office_label, $sf['ListOfficeName'] ?? '' ),
+      "ListOfficePhone"   => array( "Office Phone:", $ListOfficePhone ),
+      "ListOfficeEmail"   => array( "Office Email:", $sf['ListOfficeEmail'] ?? '' ),
+      "ListOfficeURL"   => array( "Office Website:", $sf['ListOfficeURL'] ?? '' ),
+      "ListOfficeAddress"   => array( "Office Address:", $OfficeAddress ),
+      "ListAgentName"   => array( "Listing Agent:", $AgentName ),
+      "ListMemberPhone"   => array( "Agent Phone:", $sf['ListAgentPreferredPhone'] ?? '' ),
+      "ListMemberEmail"   => array( "Agent Email:", $sf['ListAgentEmail'] ?? '' ),
+      "ListMemberURL"   => array( "Agent Website:", $sf['ListAgentURL'] ?? '' ),
+      "ListMemberAddress"   => array( "Agent Address:", $AgentAddress ),
+      "CoListOfficeName"  => array( "Co Office Name:", $sf['CoListOfficeName'] ?? '' ),
+      "CoListOfficePhone" => array( "Co Office Phone:", $sf['CoListOfficePhone'] ?? '' ),
+      "CoListOfficeEmail" => array( "Co Office Email:", $sf['CoListOfficeEmail'] ?? '' ),
+      "CoListOfficeURL" => array( "Co Office Website:", $sf['CoListOfficeURL'] ?? '' ),
+      "CoListOfficeAddress" => array( "Co Office Address:", $CoAgentAddress ),
+      "CoListAgentName" => array( "Co Listing Agent:", $CoAgentName ),
+      "CoListAgentPhone"  => array( "Co Agent Phone:", $CoListAgentPhone ),
+      "CoListAgentEmail"  => array( "Co Agent Email:", $sf['CoListAgentEmail'] ?? '' ),
+      "CoListAgentURL"  => array( "Co Agent Webpage:", $sf['CoListAgentURL'] ?? '' ),
       "CoListAgentAddress"  => array("Co Agent Address:",$CoAgentAddress),
       "BuyerOfficeName"     => array( self::LISTING_DETAIL_SELLING_OFFICE_LABEL, isset( $sf['BuyerOfficeName'] ) ? $sf['BuyerOfficeName'] : '' ),
       "ListingUpdateTimestamp"=> array("Last Updated:",$LastModifiedDate),
@@ -1354,6 +1489,546 @@ class flexmlsConnect {
     }
 
     return $return;
+  }
+
+  /**
+   * Whether Select2 is allowed in admin (lazy IDX link selects use it).
+   */
+  static function idx_links_select2_enabled() {
+    $options = get_option( 'fmc_settings', array() );
+    $v = isset( $options['select2_turn_off'] ) ? $options['select2_turn_off'] : 0;
+    return ( 'admin' !== $v && 'all' !== $v );
+  }
+
+  /**
+   * Load one IDX link row from the API. Widget/shortcode values may be a full numeric LinkId or a base-36 tiny code;
+   * only the former works with GetIDXLink() directly — tiny codes must use GetIDXLinkFromTinyId().
+   *
+   * @param string|int $link_id Raw link identifier from saved settings.
+   * @return array<string,mixed>|null
+   */
+  static function idx_links_resolve_api_row( $link_id ) {
+    global $fmc_api;
+    if ( ! $fmc_api ) {
+      return null;
+    }
+    $link_id = trim( (string) $link_id );
+    if ( '' === $link_id || 'default' === $link_id ) {
+      return null;
+    }
+    // Spark "expanded" LinkIds used in GET idxlinks/{id} are long all-digit strings (see translate_tiny_code()).
+    if ( strlen( $link_id ) >= 20 && ctype_digit( $link_id ) ) {
+      $row = $fmc_api->GetIDXLink( $link_id );
+      return ( is_array( $row ) && ! empty( $row['LinkId'] ) ) ? $row : null;
+    }
+    // Non-numeric (or short) ids are treated as tiny/base-36 codes. Do not fall back to GetIDXLink( $link_id )
+    // — the API returns 400 for tiny strings on idxlinks/{id}, and only adds noise after FromTinyId fails.
+    $row = $fmc_api->GetIDXLinkFromTinyId( $link_id );
+    return ( is_array( $row ) && ! empty( $row['LinkId'] ) ) ? $row : null;
+  }
+
+  /**
+   * One option row for a pre-selected IDX link (edit mode) without loading the full list.
+   *
+   * @param string|int|null $link_id LinkId or magic values default / empty.
+   * @return array{id:string,text:string}|null
+   */
+  static function idx_links_select2_prefetch_option( $link_id ) {
+    if ( null === $link_id || '' === $link_id || 'default' === $link_id ) {
+      return null;
+    }
+    $raw = trim( (string) $link_id );
+    $row = self::idx_links_resolve_api_row( $raw );
+    if ( ! is_array( $row ) || empty( $row['LinkId'] ) ) {
+      return null;
+    }
+    // Keep option value as stored (e.g. tiny code) so selected= matches get_field_value(); label from API.
+    return array(
+      'id'   => $raw,
+      'text' => isset( $row['Name'] ) ? (string) $row['Name'] : (string) $row['LinkId'],
+    );
+  }
+
+  /**
+   * Escape a string for use inside a SparkQL character literal (single-quoted), e.g. contains('...').
+   *
+   * @param string $value Raw user or app string.
+   * @return string
+   */
+  private static function sparkql_escape_char_literal( $value ) {
+    $value = str_replace( '\\', '\\\\', $value );
+    $value = str_replace( "'", "\\'", $value );
+    return $value;
+  }
+
+  /**
+   * SparkQL _filter for IDX link name substring search (GET idxlinks).
+   *
+   * @param string $escaped_term Already escaped for single-quoted Spark literal inside contains().
+   * @param bool   $only_saved_search Whether to restrict to SavedSearch link type.
+   * @return string
+   */
+  private static function idx_links_select2_build_name_filter( $escaped_term, $only_saved_search ) {
+    $name_part = "Name Eq contains('" . $escaped_term . "')";
+    if ( $only_saved_search ) {
+      return "LinkType Eq 'SavedSearch' And " . $name_part;
+    }
+    return $name_part;
+  }
+
+  /**
+   * @param bool $only_saved_search Same semantics as get_all_idx_links( true ): saved search IDX links only.
+   * @param string $search_term Non-empty: server-side Spark _filter on Name; empty: normal API pagination.
+   * @return array{results:array<int,array{id:string,text:string}>,more:bool}
+   */
+  static function idx_links_select2_query( $page, $per_page, $only_saved_search, $search_term = '' ) {
+    global $fmc_api;
+    if ( ! $fmc_api ) {
+      return array( 'results' => array(), 'more' => false );
+    }
+    $page = max( 1, (int) $page );
+    $per_page = (int) $per_page;
+    if ( $per_page < 5 ) {
+      $per_page = 20;
+    }
+    if ( $per_page > 50 ) {
+      $per_page = 50;
+    }
+    $search_term = is_string( $search_term ) ? trim( $search_term ) : '';
+    if ( '' !== $search_term ) {
+      if ( function_exists( 'mb_substr' ) ) {
+        $search_term = mb_substr( $search_term, 0, 200, 'UTF-8' );
+      } else {
+        $search_term = substr( $search_term, 0, 200 );
+      }
+      return self::idx_links_select2_query_search( $page, $per_page, $only_saved_search, $search_term );
+    }
+    $params = array(
+      '_pagination' => 1,
+      '_page'       => $page,
+      '_limit'      => $per_page,
+    );
+    if ( $only_saved_search ) {
+      $params['_filter'] = "LinkType Eq 'SavedSearch'";
+    }
+    $raw = $fmc_api->GetIDXLinks( $params );
+    if ( false === $raw || ! is_array( $raw ) ) {
+      unset( $params['_filter'] );
+      $raw = $fmc_api->GetIDXLinks( $params );
+    }
+    $results = array();
+    if ( is_array( $raw ) ) {
+      foreach ( $raw as $r ) {
+        if ( ! is_array( $r ) ) {
+          continue;
+        }
+        if ( $only_saved_search && ! self::idx_link_row_is_saved_search( $r ) ) {
+          continue;
+        }
+        $opt = self::idx_links_select2_row( $r );
+        if ( $opt ) {
+          $results[] = $opt;
+        }
+      }
+    }
+    $more = false;
+    if ( null !== $fmc_api->total_pages && null !== $fmc_api->current_page ) {
+      $more = (int) $fmc_api->current_page < (int) $fmc_api->total_pages;
+    }
+    return array( 'results' => $results, 'more' => $more );
+  }
+
+  /**
+   * Search IDX links: prefer Spark `_filter` + pagination; fall back to scanning API pages in PHP if the API rejects the filter.
+   *
+   * @return array{results:array<int,array{id:string,text:string}>,more:bool}
+   */
+  private static function idx_links_select2_query_search( $page, $per_page, $only_saved_search, $search_term ) {
+    global $fmc_api;
+    $escaped = self::sparkql_escape_char_literal( $search_term );
+    $filter  = self::idx_links_select2_build_name_filter( $escaped, $only_saved_search );
+    $params  = array(
+      '_pagination' => 1,
+      '_page'       => $page,
+      '_limit'      => $per_page,
+      '_filter'     => $filter,
+    );
+    $raw = $fmc_api->GetIDXLinks( $params );
+    if ( false !== $raw && is_array( $raw ) ) {
+      $results = array();
+      foreach ( $raw as $r ) {
+        if ( ! is_array( $r ) ) {
+          continue;
+        }
+        if ( $only_saved_search && ! self::idx_link_row_is_saved_search( $r ) ) {
+          continue;
+        }
+        $opt = self::idx_links_select2_row( $r );
+        if ( $opt ) {
+          $results[] = $opt;
+        }
+      }
+      $more = false;
+      if ( null !== $fmc_api->total_pages && null !== $fmc_api->current_page ) {
+        $more = (int) $fmc_api->current_page < (int) $fmc_api->total_pages;
+      }
+      return array( 'results' => $results, 'more' => $more );
+    }
+
+    if ( $only_saved_search ) {
+      $params_name_only = array(
+        '_pagination' => 1,
+        '_page'       => $page,
+        '_limit'      => $per_page,
+        '_filter'     => "Name Eq contains('" . $escaped . "')",
+      );
+      $raw_retry = $fmc_api->GetIDXLinks( $params_name_only );
+      if ( false !== $raw_retry && is_array( $raw_retry ) ) {
+        $results = array();
+        foreach ( $raw_retry as $r ) {
+          if ( ! is_array( $r ) || ! self::idx_link_row_is_saved_search( $r ) ) {
+            continue;
+          }
+          $opt = self::idx_links_select2_row( $r );
+          if ( $opt ) {
+            $results[] = $opt;
+          }
+        }
+        $more = false;
+        if ( null !== $fmc_api->total_pages && null !== $fmc_api->current_page ) {
+          $more = (int) $fmc_api->current_page < (int) $fmc_api->total_pages;
+        }
+        return array( 'results' => $results, 'more' => $more );
+      }
+    }
+
+    return self::idx_links_select2_query_search_client_scan( $page, $per_page, $only_saved_search, $search_term );
+  }
+
+  /**
+   * Legacy search: pull pages without _filter and match Name in PHP (capped pages). Used when Spark rejects _filter.
+   *
+   * @return array{results:array<int,array{id:string,text:string}>,more:bool}
+   */
+  private static function idx_links_select2_query_search_client_scan( $page, $per_page, $only_saved_search, $search_term ) {
+    global $fmc_api;
+    $skip              = max( 0, ( $page - 1 ) * $per_page );
+    $matched           = array();
+    $api_page          = 1;
+    $max_api_pages     = 40;
+    $total_pages       = 1;
+    $last_batch_size   = 0;
+    while ( $api_page <= $max_api_pages && count( $matched ) < $per_page ) {
+      $raw = $fmc_api->GetIDXLinks(
+        array(
+          '_pagination' => 1,
+          '_page'       => $api_page,
+          '_limit'      => 50,
+        )
+      );
+      if ( false === $raw || ! is_array( $raw ) ) {
+        break;
+      }
+      $last_batch_size = count( $raw );
+      if ( null !== $fmc_api->total_pages ) {
+        $total_pages = max( 1, (int) $fmc_api->total_pages );
+      }
+      foreach ( $raw as $r ) {
+        if ( ! is_array( $r ) ) {
+          continue;
+        }
+        if ( $only_saved_search && ! self::idx_link_row_is_saved_search( $r ) ) {
+          continue;
+        }
+        $name = isset( $r['Name'] ) ? (string) $r['Name'] : '';
+        if ( function_exists( 'mb_stripos' ) ) {
+          if ( mb_stripos( $name, $search_term, 0, 'UTF-8' ) === false ) {
+            continue;
+          }
+        } elseif ( stripos( $name, $search_term ) === false ) {
+          continue;
+        }
+        $opt = self::idx_links_select2_row( $r );
+        if ( ! $opt ) {
+          continue;
+        }
+        if ( $skip > 0 ) {
+          $skip--;
+          continue;
+        }
+        if ( count( $matched ) < $per_page ) {
+          $matched[] = $opt;
+        }
+      }
+      if ( count( $matched ) >= $per_page ) {
+        break;
+      }
+      if ( $api_page >= $total_pages ) {
+        break;
+      }
+      $api_page++;
+    }
+    $more = ( count( $matched ) === $per_page ) && ( $api_page < $total_pages || $last_batch_size >= 50 );
+    return array( 'results' => $matched, 'more' => $more );
+  }
+
+  /**
+   * @param array<string,mixed> $r
+   */
+  private static function idx_link_row_is_saved_search( $r ) {
+    if ( ! is_array( $r ) ) {
+      return false;
+    }
+    if ( isset( $r['LinkType'] ) && 'SavedSearch' === $r['LinkType'] ) {
+      return true;
+    }
+    return array_key_exists( 'SearchId', $r );
+  }
+
+  /**
+   * @param array<string,mixed> $r
+   * @return array{id:string,text:string}|null
+   */
+  private static function idx_links_select2_row( $r ) {
+    if ( empty( $r['LinkId'] ) ) {
+      return null;
+    }
+    return array(
+      'id'   => (string) $r['LinkId'],
+      'text' => isset( $r['Name'] ) ? (string) $r['Name'] : (string) $r['LinkId'],
+    );
+  }
+
+  /**
+   * Lazy office-agent Select2 uses the same admin Select2 on/off setting as IDX links.
+   */
+  static function office_agents_select2_enabled() {
+    return self::idx_links_select2_enabled();
+  }
+
+  /**
+   * Full office roster via Spark pagination (for integrations and plain &lt;select&gt; fallback).
+   *
+   * @param string $office_id From my/account OfficeId.
+   * @return array<int,array<string,mixed>>
+   */
+  static function get_accounts_by_office_all_pages( $office_id ) {
+    global $fmc_api;
+    if ( ! $fmc_api || '' === (string) $office_id ) {
+      return array();
+    }
+    $out         = array();
+    $page        = 1;
+    $total_pages = 1;
+    while ( $page <= $total_pages ) {
+      $raw = $fmc_api->GetAccountsByOffice(
+        $office_id,
+        array(
+          '_pagination' => 1,
+          '_page'       => $page,
+          '_limit'      => 25,
+        )
+      );
+      if ( false === $raw || ! is_array( $raw ) ) {
+        break;
+      }
+      foreach ( $raw as $row ) {
+        if ( is_array( $row ) ) {
+          $out[] = $row;
+        }
+      }
+      if ( null === $fmc_api->total_pages ) {
+        break;
+      }
+      $total_pages = max( 1, (int) $fmc_api->total_pages );
+      ++$page;
+    }
+    return $out;
+  }
+
+  /**
+   * @param string|int|null $account_id
+   * @return array{id:string,text:string}|null
+   */
+  static function office_agents_select2_prefetch_option( $account_id ) {
+    if ( null === $account_id || '' === trim( (string) $account_id ) ) {
+      return null;
+    }
+    global $fmc_api;
+    if ( ! $fmc_api ) {
+      return null;
+    }
+    $raw = trim( (string) $account_id );
+    $row = $fmc_api->GetAccount( $raw );
+    if ( ! is_array( $row ) || empty( $row['Id'] ) ) {
+      return null;
+    }
+    return array(
+      'id'   => (string) $row['Id'],
+      'text' => isset( $row['Name'] ) ? (string) $row['Name'] : (string) $row['Id'],
+    );
+  }
+
+  /**
+   * @return array{id:string,text:string}|null
+   */
+  private static function office_agents_select2_row( $r ) {
+    if ( ! is_array( $r ) || empty( $r['Id'] ) ) {
+      return null;
+    }
+    return array(
+      'id'   => (string) $r['Id'],
+      'text' => isset( $r['Name'] ) ? (string) $r['Name'] : (string) $r['Id'],
+    );
+  }
+
+  /**
+   * Paged office roster for Select2 (server uses my/account OfficeId).
+   *
+   * @return array{results:array<int,array{id:string,text:string}>,more:bool}
+   */
+  static function office_agents_select2_query( $page, $per_page, $search_term = '' ) {
+    global $fmc_api;
+    if ( ! $fmc_api || ! self::is_office() ) {
+      return array( 'results' => array(), 'more' => false );
+    }
+    $acct = $fmc_api->GetMyAccount();
+    if ( ! is_array( $acct ) || empty( $acct['OfficeId'] ) ) {
+      return array( 'results' => array(), 'more' => false );
+    }
+    $office_id = $acct['OfficeId'];
+    $page      = max( 1, (int) $page );
+    $per_page  = (int) $per_page;
+    if ( $per_page < 5 ) {
+      $per_page = 20;
+    }
+    if ( $per_page > 50 ) {
+      $per_page = 50;
+    }
+    $api_limit   = min( $per_page, 25 );
+    $search_term = is_string( $search_term ) ? trim( $search_term ) : '';
+    if ( function_exists( 'mb_substr' ) ) {
+      $search_term = mb_substr( $search_term, 0, 200, 'UTF-8' );
+    } else {
+      $search_term = substr( $search_term, 0, 200 );
+    }
+    if ( '' !== $search_term ) {
+      return self::office_agents_select2_query_search( $office_id, $page, $api_limit, $search_term );
+    }
+    $params = array(
+      '_pagination' => 1,
+      '_page'       => $page,
+      '_limit'      => $api_limit,
+    );
+    $raw     = $fmc_api->GetAccountsByOffice( $office_id, $params );
+    $results = array();
+    if ( is_array( $raw ) ) {
+      foreach ( $raw as $r ) {
+        $opt = self::office_agents_select2_row( $r );
+        if ( $opt ) {
+          $results[] = $opt;
+        }
+      }
+    }
+    $more = false;
+    if ( null !== $fmc_api->total_pages && null !== $fmc_api->current_page ) {
+      $more = (int) $fmc_api->current_page < (int) $fmc_api->total_pages;
+    }
+    return array( 'results' => $results, 'more' => $more );
+  }
+
+  /**
+   * @return array{results:array<int,array{id:string,text:string}>,more:bool}
+   */
+  private static function office_agents_select2_query_search( $office_id, $page, $api_limit, $search_term ) {
+    global $fmc_api;
+    $escaped = self::sparkql_escape_char_literal( $search_term );
+    $filter  = "Name Eq contains('" . $escaped . "')";
+    $params  = array(
+      '_pagination' => 1,
+      '_page'       => $page,
+      '_limit'      => $api_limit,
+      '_filter'     => $filter,
+    );
+    $raw = $fmc_api->GetAccountsByOffice( $office_id, $params );
+    if ( false !== $raw && is_array( $raw ) ) {
+      $results = array();
+      foreach ( $raw as $r ) {
+        $opt = self::office_agents_select2_row( $r );
+        if ( $opt ) {
+          $results[] = $opt;
+        }
+      }
+      $more = false;
+      if ( null !== $fmc_api->total_pages && null !== $fmc_api->current_page ) {
+        $more = (int) $fmc_api->current_page < (int) $fmc_api->total_pages;
+      }
+      return array( 'results' => $results, 'more' => $more );
+    }
+    return self::office_agents_select2_query_search_client_scan( $office_id, $page, $api_limit, $search_term );
+  }
+
+  /**
+   * @return array{results:array<int,array{id:string,text:string}>,more:bool}
+   */
+  private static function office_agents_select2_query_search_client_scan( $office_id, $page, $api_limit, $search_term ) {
+    global $fmc_api;
+    $skip            = max( 0, ( $page - 1 ) * $api_limit );
+    $matched         = array();
+    $api_page        = 1;
+    $max_api_pages   = 40;
+    $total_pages     = 1;
+    $last_batch_size = 0;
+    while ( $api_page <= $max_api_pages && count( $matched ) < $api_limit ) {
+      $raw = $fmc_api->GetAccountsByOffice(
+        $office_id,
+        array(
+          '_pagination' => 1,
+          '_page'       => $api_page,
+          '_limit'      => 25,
+        )
+      );
+      if ( false === $raw || ! is_array( $raw ) ) {
+        break;
+      }
+      $last_batch_size = count( $raw );
+      if ( null !== $fmc_api->total_pages ) {
+        $total_pages = max( 1, (int) $fmc_api->total_pages );
+      }
+      foreach ( $raw as $r ) {
+        if ( ! is_array( $r ) ) {
+          continue;
+        }
+        $name = isset( $r['Name'] ) ? (string) $r['Name'] : '';
+        if ( function_exists( 'mb_stripos' ) ) {
+          if ( mb_stripos( $name, $search_term, 0, 'UTF-8' ) === false ) {
+            continue;
+          }
+        } elseif ( stripos( $name, $search_term ) === false ) {
+          continue;
+        }
+        $opt = self::office_agents_select2_row( $r );
+        if ( ! $opt ) {
+          continue;
+        }
+        if ( $skip > 0 ) {
+          --$skip;
+          continue;
+        }
+        if ( count( $matched ) < $api_limit ) {
+          $matched[] = $opt;
+        }
+      }
+      if ( count( $matched ) >= $api_limit ) {
+        break;
+      }
+      if ( $api_page >= $total_pages ) {
+        break;
+      }
+      ++$api_page;
+    }
+    $more = ( count( $matched ) === $api_limit ) && ( $api_page < $total_pages || $last_batch_size >= 25 );
+    return array( 'results' => $matched, 'more' => $more );
   }
 
   static function possible_destinations() {

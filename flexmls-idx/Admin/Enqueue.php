@@ -52,8 +52,9 @@ class Enqueue {
             $options['select2_turn_off'] = 0;
 
 		if($options['select2_turn_off'] !== "admin" && $options['select2_turn_off'] !== "all") {
-            wp_enqueue_script('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/js/select2.min.js');
-            wp_enqueue_style('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css');
+            // Full build includes compat modules (e.g. dropdownCss) required by admin_idx_link_select.js
+            wp_enqueue_script( 'select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/js/select2.full.min.js', array( 'jquery' ), '4.0.5-full', false );
+            wp_enqueue_style('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css', array(), '4.0.5-full' );
         }
 
 		$version = ( defined( 'FMC_DEV' ) && FMC_DEV ) ? false : FMC_PLUGIN_VERSION;
@@ -62,8 +63,15 @@ class Enqueue {
 		https://github.com/kallookoo/wp-color-picker-alpha/issues/35#issuecomment-670711991
 		*/
 
+		$flexmls_admin_deps = array( 'jquery', 'wp-color-picker' );
+		if ( $options['select2_turn_off'] !== 'admin' && $options['select2_turn_off'] !== 'all' ) {
+			$flexmls_admin_deps[] = 'select2-4.0.5';
+		}
+
+		$admin_js_path = dirname( __FILE__ ) . '/../assets/js/admin.js';
+		$admin_js_version = ( defined( 'FMC_DEV' ) && FMC_DEV ) ? false : ( file_exists( $admin_js_path ) ? filemtime( $admin_js_path ) : $version );
 		wp_register_script( 'flexmls_admin_script', plugins_url( 'assets/js/admin.js', dirname( __FILE__ ) ),
-			array( 'jquery', 'wp-color-picker' ), $version );
+			$flexmls_admin_deps, $admin_js_version );
 
 		$color_picker_strings = array(
 			'clear'            => __( 'Clear', 'flexmls-idx' ),
@@ -76,6 +84,28 @@ class Enqueue {
 		wp_localize_script( 'flexmls_admin_script', 'wpColorPickerL10n', $color_picker_strings );
 
 		wp_enqueue_script('flexmls_admin_script');
+
+		wp_localize_script(
+			'flexmls_admin_script',
+			'flexmlsIdxLinksSelect',
+			array(
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'fmc_ajax' ),
+				'action'  => 'flexmls_idx_links_select2',
+				'enabled' => \flexmlsConnect::idx_links_select2_enabled() ? 1 : 0,
+			)
+		);
+
+		wp_localize_script(
+			'flexmls_admin_script',
+			'flexmlsOfficeAgentsSelect',
+			array(
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'fmc_ajax' ),
+				'action'  => 'flexmls_office_agents_select2',
+				'enabled' => \flexmlsConnect::office_agents_select2_enabled() ? 1 : 0,
+			)
+		);
 
 		/*---------*/
 
@@ -161,8 +191,7 @@ class Enqueue {
 			$google_maps_no_enqueue = 1;
 		}
 		$has_maps_key = isset( $options[ 'google_maps_api_key' ] ) && ! empty( $options[ 'google_maps_api_key' ] ) && 0 === $google_maps_no_enqueue;
-		global $fmc_special_page_caught;
-		$is_listing_detail = ! empty( $fmc_special_page_caught['type'] ) && $fmc_special_page_caught['type'] === 'listing-details';
+		$is_listing_detail = self::page_has_listing_detail();
 		$fmc_connect_deps = array( 'jquery' );
 		if ( $has_maps_key && $is_listing_detail ) {
 			self::enqueue_google_maps( $options );
@@ -172,8 +201,8 @@ class Enqueue {
     if(!isset( $options[ 'select2_turn_off' ]))
         $options[ 'select2_turn_off' ] = 0;
     if($options['select2_turn_off'] !== "user" && $options['select2_turn_off'] !== "all")  {
-        wp_enqueue_script('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/js/select2.min.js');
-        wp_enqueue_style('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css');
+        wp_enqueue_script( 'select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/js/select2.full.min.js', array( 'jquery' ), '4.0.5-full', true );
+        wp_enqueue_style('select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css', array(), '4.0.5-full' );
     }
 
 		wp_enqueue_script( 'fmc_connect', plugins_url( 'assets/js/main.js', dirname( __FILE__ ) ), $fmc_connect_deps, FMC_PLUGIN_VERSION );
@@ -190,6 +219,75 @@ class Enqueue {
 		wp_enqueue_style( 'wp-jquery-ui-dialog' );
 		wp_enqueue_style( 'fmc_connect', plugins_url( 'assets/css/style.css', dirname( __FILE__ ) ), FMC_PLUGIN_VERSION );
 
+	}
+
+	/**
+	 * Whether the current request renders a listing detail page or widget.
+	 *
+	 * @return bool
+	 */
+	static function page_has_listing_detail() {
+		global $fmc_special_page_caught;
+
+		if ( ! empty( $fmc_special_page_caught['type'] ) && 'listing-details' === $fmc_special_page_caught['type'] ) {
+			return true;
+		}
+
+		if ( is_admin() || wp_doing_ajax() ) {
+			return false;
+		}
+
+		$post = get_post();
+		if ( $post instanceof \WP_Post ) {
+			if ( has_shortcode( $post->post_content, 'idx_listing_details' ) ) {
+				return true;
+			}
+			if ( function_exists( 'has_block' ) && has_block( 'flex/listing-details', $post ) ) {
+				return true;
+			}
+		}
+
+		return self::has_active_listing_detail_widget();
+	}
+
+	/**
+	 * Whether a listing detail widget is assigned to an active sidebar.
+	 *
+	 * @return bool
+	 */
+	static function has_active_listing_detail_widget() {
+		$sidebars = wp_get_sidebars_widgets();
+		if ( ! is_array( $sidebars ) ) {
+			return false;
+		}
+
+		foreach ( $sidebars as $sidebar_id => $widgets ) {
+			if ( 'wp_inactive_widgets' === $sidebar_id || ! is_array( $widgets ) ) {
+				continue;
+			}
+			foreach ( $widgets as $widget_id ) {
+				if ( false !== stripos( $widget_id, 'fmclistingdetails' ) ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Enqueue Google Maps when listing detail map markup is rendered (widget/shortcode/page-builder fallback).
+	 *
+	 * @param array|null $options Optional. FMC settings. Defaults to get_option( 'fmc_settings' ).
+	 */
+	static function maybe_enqueue_listing_detail_map( $options = null ) {
+		if ( $options === null ) {
+			$options = get_option( 'fmc_settings' );
+		}
+		if ( empty( $options['google_maps_api_key'] ) || ! empty( $options['google_maps_no_enqueue'] ) ) {
+			return;
+		}
+		self::enqueue_google_maps( $options );
 	}
 
 	/**

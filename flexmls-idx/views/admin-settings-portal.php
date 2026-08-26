@@ -150,5 +150,5 @@ $fmc_settings[ 'portal_force' ] = ( isset( $fmc_settings[ 'portal_force' ] ) && 
             </tr>
 		</tbody>
 	</table>
-	<p><?php wp_nonce_field( 'update_fmc_portal_action', 'update_fmc_portal_nonce' ); ?><button type="submit" class="button-primary">Save Portal Settings</button></p>
+	<?php \FlexMLS\Admin\Settings::floating_save_button( 'update_fmc_portal_action', 'update_fmc_portal_nonce', 'Save Portal Settings' ); ?>
 </form>

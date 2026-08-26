@@ -12,13 +12,33 @@ function flex_mls_gtb_cgb_editor_assets() {
 
     if(!function_exists("register_block_type"))
         return;
+
+    $fmc_opts = get_option( 'fmc_settings', array() );
+    if ( ! isset( $fmc_opts['select2_turn_off'] ) ) {
+        $fmc_opts['select2_turn_off'] = 0;
+    }
+    $block_js_deps = array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-block-editor', 'wp-components', 'jquery', 'fmc_gtb_global' );
+    $fmc_gtb_deps = array( 'jquery', 'jquery-ui-core' );
+    if ( $fmc_opts['select2_turn_off'] !== 'admin' && $fmc_opts['select2_turn_off'] !== 'all' ) {
+        wp_enqueue_script( 'select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/js/select2.full.min.js', array( 'jquery' ), '4.0.5-full', true );
+        wp_enqueue_style( 'select2-4.0.5', '//cdnjs.cloudflare.com/ajax/libs/select2/4.0.5/css/select2.min.css', array(), '4.0.5-full' );
+        $block_js_deps[] = 'select2-4.0.5';
+        $fmc_gtb_deps[] = 'select2-4.0.5';
+    }
+
+    $assets_dir = dirname( dirname( __FILE__ ) ) . '/assets/js/';
+    $flex_gtb_ver = file_exists( $assets_dir . 'flex_gtb.js' ) ? filemtime( $assets_dir . 'flex_gtb.js' ) : ( defined( 'FMC_PLUGIN_VERSION' ) ? FMC_PLUGIN_VERSION : null );
+    $blocks_ver = file_exists( $assets_dir . 'blocks.js' ) ? filemtime( $assets_dir . 'blocks.js' ) : ( defined( 'FMC_PLUGIN_VERSION' ) ? FMC_PLUGIN_VERSION : null );
+
+    wp_enqueue_script( 'fmc_gtb_global', plugins_url( 'assets/js/flex_gtb.js', dirname( __FILE__ ) ), $fmc_gtb_deps, $flex_gtb_ver );
+
     wp_enqueue_script(
         'flex_mls_gtb-cgb-block-js', // Handle.
         plugins_url( '/assets/js/blocks.js', dirname( __FILE__ ) ),
-        array( 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-block-editor', 'wp-components' ),
+        $block_js_deps,
+        $blocks_ver,
         true // Enqueue the script in the footer.
     );
-    wp_enqueue_script( 'fmc_gtb_global', plugins_url( 'assets/js/flex_gtb.js', dirname( __FILE__ ) ), array( 'jquery', 'jquery-ui-core' ) );
 
     $htmlListingDetails = $htmlPhotos = $htmlMarketStats = $htmlSearch = $htmlLocationLinks =
         $htmlIDXLinksWidget = $htmlLeadgen = $htmlSearchResults = $htmlAccount = $htmlAgents =
@@ -81,6 +101,18 @@ function flex_mls_gtb_cgb_editor_assets() {
         'ajaxurl' => admin_url( 'admin-ajax.php' ),
         'pluginurl' => plugins_url( '', dirname( __FILE__ ) ),
         'nonce' => wp_create_nonce( 'fmc_ajax' ),
+        'idxLinksSelect2' => array(
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'fmc_ajax' ),
+            'action'  => 'flexmls_idx_links_select2',
+            'enabled' => flexmlsConnect::idx_links_select2_enabled() ? 1 : 0,
+        ),
+        'officeAgentsSelect2' => array(
+            'ajaxurl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'fmc_ajax' ),
+            'action'  => 'flexmls_office_agents_select2',
+            'enabled' => flexmlsConnect::office_agents_select2_enabled() ? 1 : 0,
+        ),
         'htmlListingDetails' => $htmlListingDetails,
         'htmlPhotos' => $htmlPhotos,
         'htmlMarketStats' => $htmlMarketStats,

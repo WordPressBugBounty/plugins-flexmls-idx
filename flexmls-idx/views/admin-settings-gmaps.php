@@ -44,5 +44,5 @@ if( isset( $fmc_settings[ 'google_maps_no_enqueue' ] ) && 1 == $fmc_settings[ 'g
 			</tr>
 		</tbody>
 	</table>
-	<p><?php wp_nonce_field( 'update_google_maps_action', 'update_google_maps_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
+	<?php \FlexMLS\Admin\Settings::floating_save_button( 'update_google_maps_action', 'update_google_maps_nonce', 'Save Settings' ); ?>
 </form>

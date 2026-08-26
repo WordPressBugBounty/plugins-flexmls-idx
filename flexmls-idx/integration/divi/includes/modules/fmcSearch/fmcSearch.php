@@ -135,6 +135,35 @@ class FMCD_fmcSearch extends FMCD_module {
                 'property_type_enabled' => 'on'
               ),
           ),
+          'property_type_ui' => array(
+            'label'           => esc_html__( 'Property Type display', 'fmcd-divi' ),
+            'type'            => 'select',
+            'option_category' => 'basic_option',
+            'options'         => array(
+              'checkboxes' => esc_html__( 'Checkboxes (default)', 'fmcd-divi' ),
+              'tabs'       => esc_html__( 'Tabs', 'fmcd-divi' ),
+            ),
+            'default'         => 'checkboxes',
+            'description'     => esc_html__( 'Tabs at top of widget; one active type. Checkboxes: classic row.', 'fmcd-divi' ),
+            'toggle_slug'     => 'flexmls_search',
+            'sub_toggle'      => 'filters_mls',
+            'show_if'         => array(
+              'property_type_enabled' => 'on',
+            ),
+          ),
+          'show_property_subtypes' => array(
+            'label'       => esc_html__( 'Show Property Sub-Types', 'fmcd-divi' ),
+            'type'        => 'yes_no_button',
+            'options'     => $on_off_options,
+            'option_category' => 'basic_option',
+            'default'     => 'on',
+            'description' => esc_html__( 'When off, sub-type lists are hidden.', 'fmcd-divi' ),
+            'toggle_slug' => 'flexmls_search',
+            'sub_toggle'  => 'filters_mls',
+            'show_if'     => array(
+              'property_type_enabled' => 'on',
+            ),
+          ),
           'std_fields' => array(
             'label'           => esc_html__( 'Fields', 'fmcd-divi' ),
             'type'            => 'multiple_checkboxes',
@@ -180,6 +209,32 @@ class FMCD_fmcSearch extends FMCD_module {
             'toggle_slug'     => 'flexmls_search',
             'sub_toggle'      => 'layout_mls'
           ),
+          'search_layout' => array(
+            'label'           => esc_html__( 'Search bar layout', 'fmcd-divi' ),
+            'type'            => 'select',
+            'options'         => array(
+              'default'     => esc_html__( 'Default (stacked)', 'fmcd-divi' ),
+              'compact_row' => esc_html__( 'Compact row (hero-style)', 'fmcd-divi' ),
+            ),
+            'option_category' => 'basic_option',
+            'default'         => 'default',
+            'description'     => esc_html__( 'Horizontal only. First row fits core filters when space allows; many options add rows. Use wide widget, fewer fields, or Tabs for property types.', 'fmcd-divi' ),
+            'toggle_slug'     => 'flexmls_search',
+            'sub_toggle'      => 'layout_mls'
+          ),
+          'compact_submit_style' => array(
+            'label'           => esc_html__( 'Compact row: search button', 'fmcd-divi' ),
+            'type'            => 'select',
+            'options'         => array(
+              'full'      => esc_html__( 'Full text button', 'fmcd-divi' ),
+              'icon_only' => esc_html__( 'Magnifying glass (icon only)', 'fmcd-divi' ),
+            ),
+            'option_category' => 'basic_option',
+            'default'         => 'full',
+            'description'     => esc_html__( 'Only when layout is Compact row.', 'fmcd-divi' ),
+            'toggle_slug'     => 'flexmls_search',
+            'sub_toggle'      => 'layout_mls'
+          ),
           'width_' => array(
             'label'           => esc_html__( 'Widget Width', 'fmcd-divi' ),
             'type'            => 'range',
@@ -194,24 +249,6 @@ class FMCD_fmcSearch extends FMCD_module {
             'default'       => 450,
             'toggle_slug'     => 'flexmls_search',
             'sub_toggle'      => 'layout_mls',
-          ),
-          'title_font' => array(
-            'label'           => esc_html__( 'Title Font', 'fmcd-divi' ),
-            'type'            => 'select',
-            'options'         => $fonts,
-            'option_category' => 'basic_option',
-            'description'     => esc_html__( '', 'fmcd-divi' ),
-            'toggle_slug'     => 'flexmls_search',
-            'sub_toggle'      => 'style_mls'
-          ),
-          'field_font' => array(
-            'label'           => esc_html__( 'Field Font', 'fmcd-divi' ),
-            'type'            => 'select',
-            'options'         => $fonts,
-            'option_category' => 'basic_option',
-            'description'     => esc_html__( '', 'fmcd-divi' ),
-            'toggle_slug'     => 'flexmls_search',
-            'sub_toggle'      => 'style_mls'
           ),
           'border_style' => array(
             'label'           => esc_html__( 'Border Style', 'fmcd-divi' ),
@@ -232,8 +269,20 @@ class FMCD_fmcSearch extends FMCD_module {
             'toggle_slug'     => 'flexmls_search',
             'sub_toggle'      => 'style_mls'
           ),
+          'background_style' => array(
+            'label'           => esc_html__( 'Widget Background', 'fmcd-divi' ),
+            'type'            => 'select',
+            'options'         => array(
+              'solid'       => esc_html__( 'Solid color', 'fmcd-divi' ),
+              'transparent' => esc_html__( 'Transparent', 'fmcd-divi' ),
+            ),
+            'default'         => 'solid',
+            'option_category' => 'basic_option',
+            'toggle_slug'     => 'flexmls_search',
+            'sub_toggle'      => 'color_mls',
+          ),
           'background_color_' => array(
-            'label'             => esc_html__( 'Background', 'fmcd-divi' ),
+            'label'             => esc_html__( 'Background color', 'fmcd-divi' ),
             'type'              => 'color-alpha',
             'option_category' => 'basic_option',
             'default'           => '#ffffff',

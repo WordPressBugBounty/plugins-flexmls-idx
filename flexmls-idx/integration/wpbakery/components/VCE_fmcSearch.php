@@ -15,7 +15,6 @@ class VCE_fmcSearch extends VCE_component {
           extract($this->vars);
         }
 
-        $fonts = ['default', 'Arial', 'Verdana', 'Tahoma', 'Times', 'Georgia', 'Garamond'];
         $pp = '';
         $fmc_params = array(
             array(
@@ -183,18 +182,6 @@ class VCE_fmcSearch extends VCE_component {
             setTitle('Style'),
             array(
               'type' => 'select_tag',
-              'heading' => 'Title Font',
-              'value' => $fonts,
-              'param_name' => 'title_font',
-            ),
-            array(
-              'type' => 'select_tag',
-              'heading' => 'Field Font',
-              'value' => $fonts,
-              'param_name' => 'field_font',
-            ),
-            array(
-              'type' => 'select_tag',
               'heading' => 'Border Style',
               'value' => $border_style_options,
               'param_name' => 'border_style',
@@ -212,8 +199,19 @@ class VCE_fmcSearch extends VCE_component {
             ),
             setTitle('Color'),
             array(
+              'type' => 'select_tag',
+              'heading' => 'Widget background',
+              'value' => array(
+                array( 'value' => 'solid', 'display_text' => 'Solid color' ),
+                array( 'value' => 'transparent', 'display_text' => 'Transparent' ),
+              ),
+              'param_name' => 'background_style',
+              'option_value_attr' => 'value',
+              'option_display_attr' => 'display_text',
+            ),
+            array(
               'type' => 'colorpicker',
-              'heading' => 'Background',
+              'heading' => 'Background color',
               'param_name' => 'background_color',
               'value' => 'FFFFFF'
             ),

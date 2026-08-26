@@ -514,10 +514,10 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			echo "<div class='flexmls_connect__sr_left_column'>";
 
 			// Image
-			if ( count($sf['Photos']) >= 1 ) {
+			if ( count( $sf['Photos'] ?? array() ) >= 1 ) {
 
 				//Find primary photo and assign it to $main_photo_url variable.
-				 $count_photos = count($sf['Photos']);
+				 $count_photos = count( $sf['Photos'] ?? array() );
 
 				$i = 0;
 				while($i < $count_photos){
@@ -564,9 +564,9 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 
 			// Detail Links
-			$count_photos = count($sf['Photos']);
-			$count_videos = count($sf['Videos']);
-			$count_tours = count($sf['VirtualTours']);
+			$count_photos = count( $sf['Photos'] ?? array() );
+			$count_videos = count( $sf['Videos'] ?? array() );
+			$count_tours = count( $sf['VirtualTours'] ?? array() );
 
 			echo "<div class='flexmls_connect__sr_details'>";
 
@@ -620,7 +620,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			echo "<div class='flexmls_connect__sr_listing_facts_container'>";
 
 			// Open House
-			if ( count($sf['OpenHouses']) >= 1) {
+			if ( count( $sf['OpenHouses'] ?? array() ) >= 1) {
 				echo "<div class='flexmls_connect__sr_openhouse'>";
 					echo "<em>Open House</em> ({$sf['OpenHouses'][0]['Date']} - {$sf['OpenHouses'][0]['StartTime']})";
 				echo "</div>";
@@ -640,13 +640,13 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 				if ($field_id == 'CountyOrParish' and $exclude_county) {
 					continue;
 				}
-				if ($field_id == 'MlsStatus' and $sf[$field_id] == 'Active'){
+				if ($field_id == 'MlsStatus' && ( $sf[$field_id] ?? '' ) == 'Active'){
 					continue;
 				}
 
 				$zebra = (flexmlsConnect::is_odd($detail_count)) ? 'on' : 'off';
 
-				if ( flexmlsConnect::is_not_blank_or_restricted( $sf[$field_id] ) ) {
+				if ( flexmlsConnect::is_not_blank_or_restricted( $sf[$field_id] ?? '' ) ) {
 					$this_val = $sf[$field_id];
 
 					if ($field_id == "PropertyType") {
@@ -656,7 +656,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					if ($field_id == "PublicRemarks") {
 						$this_val = substr($this_val, 0, 75) . "...";
 					}
-					if ($field_id == 'MlsStatus' and $sf[$field_id] == 'Closed'){
+					if ($field_id == 'MlsStatus' && ( $sf[$field_id] ?? '' ) == 'Closed'){
 						$this_val = "<span style='color:Blue;font-weight:bold'>$this_val</span>";
 					}
 					elseif ($field_id == 'MlsStatus') {
@@ -686,7 +686,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 						echo "<div class='flexmls_connect__zebra'>";
 						echo "<span class='flexmls_connect__sr_idx'>";
 						if ($reqs[1]=='IDX'){
-							echo "<span style='float: right' class='flexmls_connect__badge' title='{$sf['ListOfficeName']}'>IDX</span>";
+							echo "<span style='float: right' class='flexmls_connect__badge' title='" . esc_attr( $sf['ListOfficeName'] ?? '' ) . "'>IDX</span>";
 						}
 						else {
 							echo "<img class='flexmls_connect__badge' style='background:none; border:none; float: right' src='{$reqs[1]}' alt='IDX' />";
@@ -701,7 +701,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 						$agent_info_parts = array();
 						
 						// Add email
-						$agent_info_parts[] = esc_html( $sf["ListAgentEmail"] );
+						$agent_info_parts[] = esc_html( $sf['ListAgentEmail'] ?? '' );
 						
 						// Add phone if required
 						if ( flexmlsConnect::mls_requires_agent_phone_in_search_results() ) {

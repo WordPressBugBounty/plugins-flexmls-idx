@@ -13,14 +13,17 @@
 
 <div class="flexmls-admin-field-row">
   <?php $this->label_tag('link', 'IDX Link:') ?>
-  <?php $this->select_tag( array(
-    'fmc_field' => 'link',
-    'collection' => $idx_links,
-    'option_value_attr' => 'LinkId',
-    'option_display_attr' => 'Name',
-    'class' => 'widefat',
-    'default' => $idx_links_default
-  )) ?>
+  <?php
+    $this->lazy_idx_links_select_tag(
+      array(
+        'fmc_field'           => 'link',
+        'only_saved_search'   => false,
+        'static_options'      => array(),
+        'class'               => 'widefat',
+        'default'             => isset( $idx_links_default ) ? $idx_links_default : null,
+      )
+    );
+  ?>
   <span class="description">Link used when search is executed</span>
 </div>
 
@@ -204,27 +207,11 @@
 
 <div class="flexmls-admin-field-row">
   <?php $this->label_tag('width', "Widget Width:") ?>
-  <?php $this->text_field_tag('width', array('class' => '', 'size' => '5')) ?>
-  px
+  <?php $this->text_field_tag('width', array('class' => '', 'size' => '7')) ?>
+  <span class="description">px (number uses legacy −40), <code>800px</code> for exact pixels, or <code>90%</code> / <code>100%</code></span>
 </div>
 
 <div class="flexmls-shortcode-section-title">Style</div>
-
-<div class="flexmls-admin-field-row">
-  <?php $this->label_tag('title_font', "Title Font:") ?>
-  <?php $this->select_tag( array(
-    'fmc_field' => 'title_font',
-    'collection' => fmcWidget::available_fonts()
-  ) ); ?>
-</div>
-
-<div class="flexmls-admin-field-row">
-  <?php $this->label_tag('field_font', "Field Font:") ?>
-  <?php $this->select_tag( array(
-    'fmc_field' => 'field_font',
-    'collection' => fmcWidget::available_fonts()
-  ) ); ?>
-</div>
 
 <div class="flexmls-admin-field-row">
   <?php $this->label_tag('border_style', "Border Style:") ?>
@@ -251,7 +238,26 @@
 <div class="flexmls-shortcode-section-title">Color</div>
 
 <div class="flexmls-admin-field-row">
-  <?php $this->label_tag('background_color', "Background:") ?>
+  <?php $this->label_tag('background_style', "Widget background:") ?>
+  <?php
+  $this->select_tag(
+    array(
+      'fmc_field'           => 'background_style',
+      'collection'          => array(
+        array( 'value' => 'solid', 'display_text' => 'Solid color' ),
+        array( 'value' => 'transparent', 'display_text' => 'Transparent' ),
+      ),
+      'option_value_attr'   => 'value',
+      'option_display_attr' => 'display_text',
+      'default'             => 'solid',
+      'class'               => 'flexmls_connect__setting_background_style',
+    )
+  );
+  ?>
+</div>
+
+<div class="flexmls-admin-field-row">
+  <?php $this->label_tag('background_color', "Background color:") ?>
   <?php $this->color_field_tag('background_color', "#FFFFFF" ) ?>
 </div>
 
@@ -265,8 +271,8 @@
   <?php $this->color_field_tag('field_text_color', "#000000" ) ?>
 </div>
 
-<div class="flexmls-admin-field-row">
-  <?php $this->label_tag('detailed_search_text_color', "Detailed Search:") ?>
+<div class="flexmls-admin-field-row flexmls_connect__disable_group_detailed_search">
+  <?php $this->label_tag('detailed_search_text_color', "Detailed Search Link Color:") ?>
   <?php $this->color_field_tag('detailed_search_text_color', "#000000" ) ?>
 </div>
 
@@ -294,7 +300,7 @@
 <input type='hidden' name='shortcode_fields_to_catch' value='title, link, buttontext, detailed_search,
   detailed_search_text, destination, user_sorting, location_search, property_type_enabled, property_type,
   std_fields, theme, orientation, width, title_font, field_font, border_style, widget_drop_shadow,
-  background_color, title_text_color, field_text_color, detailed_search_text_color, submit_button_shine,
+  background_style, background_color, title_text_color, field_text_color, detailed_search_text_color, submit_button_shine,
   submit_button_background, submit_button_text_color, allow_sold_searching, default_view, listings_per_page, allow_pending_searching' />
 
 <input type='hidden' name='widget' value='fmcSearch' />

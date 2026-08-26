@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.18.2
+Stable tag: 4.0
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,31 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+
+= 4.0 =
+Improvements & New Features:
+* Detect if Flexmls portal is disabled and notifying the plugin user
+* Added instructions for adding widgets to the Credential Page
+* Reorganized settings by moving Listing Summary and Listing Detail to their own tabs
+* Implemented No-JS SourceMLS method for improved compatibility
+* Added srcset support for listing images to improve loading performance
+* Added detection for Version 1 Listing Templates or Market Stats usage
+* Implemented AJAX Infinite Scroll for IDX Resource Selectors
+* Added a static 'Save Settings' button across all settings screens
+* Enabled full-size image viewing by clicking photos in Version 2 templates
+* Added Search Widget background color settings
+* Introduced a new One-Line IDX Search widget options
+* Added optional open house date/time display on Version 2 listing cards
+
+Efficiency Updates:
+* Fixed HTML printing issues in IDX Search iframe mode
+* Resolved invalid URL generation in SmartFrame search when Price is blank
+* Fixed a fatal error in the Listing Detail Widget when using Elementor
+* Updated Listing Detail Pages to correctly handle user-defined fields from API payloads
+* Expanded filtering capabilities for specific agent lists
+* Resolved various PHP warnings for compatibility
+* Fixed Google Maps not displaying in the Listing Detail widget
+
 = 3.18.2 = 
 Efficiency Updates:
 * Option to toggle 'Contact Agent' visibility on closed/sold listings.

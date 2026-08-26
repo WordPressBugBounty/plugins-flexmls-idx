@@ -6,9 +6,16 @@
       $phone_req  = in_array('phone', $api_prefs['RequiredFields']);
       $options     = get_option( 'fmc_settings', array() );
       $fmc_show_listing_lead_actions = flexmlsConnect::should_show_listing_lead_ctas( $sf, $options );
+      $v2_listing_photo_click_action = ( isset( $options['v2_listing_photo_click_action'] ) && in_array( $options['v2_listing_photo_click_action'], array( 'detail', 'modal' ), true ) )
+        ? $options['v2_listing_photo_click_action']
+        : 'modal';
+      $v2_listing_photo_modal_provider = ( isset( $options['v2_listing_photo_modal_provider'] ) && in_array( $options['v2_listing_photo_modal_provider'], array( 'auto', 'cbox', 'third_party', 'none' ), true ) )
+        ? $options['v2_listing_photo_modal_provider']
+        : 'auto';
+      $show_v2_photo_modal_button = ( 'modal' === $v2_listing_photo_click_action ) && ( 'none' !== $v2_listing_photo_modal_provider );
 ?>
 <?php $listing_display_price = flexmlsConnect::format_listing_standard_price_display( $sf ); ?>
-<div class="flexmls-listing-details flexmls-v2-widget flexmls-widthchange-wrapper flexmls-body-font">
+<div class="flexmls-listing-details flexmls-v2-widget flexmls-widthchange-wrapper flexmls-body-font" data-v2-photo-click-action="<?php echo esc_attr( $v2_listing_photo_click_action ); ?>" data-v2-photo-modal-provider="<?php echo esc_attr( $v2_listing_photo_modal_provider ); ?>">
 	<?php $has_search_return = ! empty( $_GET['search_referral_url'] ); ?>
 	<div class="flexmls-actions-wrapper listing-section <?php echo $has_search_return ? 'has-return-button' : ''; ?>">
 		<?php if ( $has_search_return ) : ?>
@@ -46,7 +53,7 @@
 			<div class="title-and-status-wrapper">
 				<h2 class="property-title flexmls-title-largest flexmls-primary-color-font flexmls-heading-font"><?php echo esc_html( $one_line_address ); ?></h2>
 
-				<?php if ( $sf['OnMarketDate'] ) : ?>
+				<?php if ( ! empty( $sf['OnMarketDate'] ?? '' ) ) : ?>
 					<?php if ( strtotime( $sf['OnMarketDate'] ) > strtotime( '-7 days' ) ) : ?>
 						<span class="new-listing-tag">New Listing</span>
 					<?php endif; ?>
@@ -64,11 +71,22 @@
 	</div>
 	<?php if ( $count_photos > 0 ) : ?>
 		<div class="slideshow-wrapper listing-section">
-			<div id="listing-slideshow" class="owl-carousel">
-				<?php foreach ( $sf['Photos'] as $index => $p ) : ?>
+			<div class="flexmls-v2-slideshow-frame">
+				<?php if ( $show_v2_photo_modal_button ) : ?>
+					<button type="button" class="photo_click flexmls-v2-photo-modal-trigger flexmls-btn flexmls-btn-sm flexmls-primary-color-font" aria-label="<?php esc_attr_e( 'View larger photo', 'flexmls-idx' ); ?>" title="<?php esc_attr_e( 'View larger photo', 'flexmls-idx' ); ?>">
+						<svg class="flexmls-v2-photo-modal-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+							<polyline points="9,4 4,4 4,9" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square" stroke-linejoin="miter" />
+							<polyline points="15,4 20,4 20,9" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square" stroke-linejoin="miter" />
+							<polyline points="4,15 4,20 9,20" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square" stroke-linejoin="miter" />
+							<polyline points="20,15 20,20 15,20" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="square" stroke-linejoin="miter" />
+						</svg>
+					</button>
+				<?php endif; ?>
+				<div id="listing-slideshow" class="owl-carousel">
+				<?php foreach ( ( $sf['Photos'] ?? array() ) as $index => $p ) : ?>
 					<?php if ( $index == 1 ) : ?>
 						<?php if ( $count_videos > 0 ) : ?>
-							<?php foreach ( $sf['Videos'] as $video ) : ?>
+							<?php foreach ( ( $sf['Videos'] ?? array() ) as $video ) : ?>
 								<?php if ( $video['Privacy'] == "Public" ) : ?>
 									<div class="listing-image listing-video">
 										<?php echo $this->iframe_from_html_or_url( $video['ObjectHtml'] ); ?>
@@ -77,7 +95,7 @@
 							<?php endforeach; ?>
 						<?php endif; ?>
 						<?php if ( $count_tours > 0 ) : ?>
-							<?php foreach ( $sf['VirtualTours'] as $vtour ) : ?>
+							<?php foreach ( ( $sf['VirtualTours'] ?? array() ) as $vtour ) : ?>
 								<?php if ( $vtour['Privacy'] == "Public" ) : ?>
 									<?php $vt_bg_photo = $index - 1; ?>
 									<div class="listing-image listing-vtour" style="background-image: url('<?php echo $sf['Photos'][$vt_bg_photo]['UriLarge']; ?>');">
@@ -108,7 +126,13 @@
 						$img_alt_attr = "Photo for listing #" . $sf['ListingId'];
 					}
 					?>
-					<img class="owl-lazy" data-src="<?php echo esc_url( $p['UriLarge'] ); ?>" alt="<?php echo esc_attr( $img_alt_attr ); ?>" />
+					<img class="owl-lazy" data-src="<?php echo esc_url( $p['UriLarge'] ); ?>" data-photo-index="<?php echo esc_attr( $index ); ?>" alt="<?php echo esc_attr( $img_alt_attr ); ?>" />
+				<?php endforeach; ?>
+				</div>
+			</div>
+			<div class="flexmls_connect__hidden">
+				<?php foreach ( ( $sf['Photos'] ?? array() ) as $p ) : ?>
+					<a href="<?php echo esc_url( $p['UriLarge'] ); ?>" data-connect-ajax="true" rel="p-<?php echo esc_attr( $sf['ListingKey'] ); ?>" title="<?php echo esc_attr( $p['Caption'] ); ?>"></a>
 				<?php endforeach; ?>
 			</div>
 		</div>
@@ -146,26 +170,26 @@
 					['field' => 'BathsTotal', 'label' => 'Baths'],
 				];
 
-				if ( flexmlsConnect::is_not_blank_or_restricted( $sf['BuildingAreaTotal'] ) ) {
+				if ( flexmlsConnect::is_not_blank_or_restricted( $sf['BuildingAreaTotal'] ?? '' ) ) {
 					$main_details []= ['field' => 'BuildingAreaTotal', 'label' => 'Square Footage', 'value' => number_format( $sf['BuildingAreaTotal'] )]; 
 				}
 
-				elseif ( flexmlsConnect::is_not_blank_or_restricted( $sf['LivingArea'] ) ) {
+				elseif ( flexmlsConnect::is_not_blank_or_restricted( $sf['LivingArea'] ?? '' ) ) {
 					$main_details []= ['field' => 'LivingArea', 'label' => 'Square Footage', 'value' => number_format( $sf['LivingArea'] )]; 
 				}
 
-				if ( flexmlsConnect::is_not_blank_or_restricted( $sf['LotSizeSquareFeet'] ) ) {
+				if ( flexmlsConnect::is_not_blank_or_restricted( $sf['LotSizeSquareFeet'] ?? '' ) ) {
 					$main_details []= ['field' => 'LotSizeSquareFeet', 'label' => 'Lot Size (sq. ft.)', 'value' => number_format( $sf['LotSizeSquareFeet'] ) ];
 				}
 
-				if ( flexmlsConnect::is_not_blank_or_restricted( $sf['MlsStatus'] ) ) {
+				if ( flexmlsConnect::is_not_blank_or_restricted( $sf['MlsStatus'] ?? '' ) ) {
 					$main_details []= ['field' => 'MlsStatus', 'label' => 'Status' ];
 				}
 
 			?>
 
 			<?php foreach ( $main_details as $detail ) : ?>
-				<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf[$detail['field']] ) ) : ?>
+				<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf[ $detail['field'] ] ?? '' ) ) : ?>
 					<?php $value = array_key_exists( 'value', $detail ) ? $detail['value'] : $sf[$detail['field']]; ?>
 					<span class="flexmls-detail">
 						<span class="detail-label flexmls-heading-font"><?php echo esc_html( $detail['label'] ); ?>:</span>
@@ -181,13 +205,13 @@
 					<span class="detail-value"><?php echo esc_html( $listing_display_price ); ?></span>
 				</span>
 			<?php endif; ?>
-			<?php if( flexmlsConnect::is_not_blank_or_restricted( $sf['OnMarketDate'] ) ) : ?>
+			<?php if( flexmlsConnect::is_not_blank_or_restricted( $sf['OnMarketDate'] ?? '' ) ) : ?>
 				<span class="flexmls-detail">
 					<span class="detail-label">List Date:</span>
 					<span class="detail-value"><?php echo esc_html( date( 'n/d/Y', strtotime( $sf['OnMarketDate'] ) ) ); ?></span>
 				</span>
 			<?php endif; ?>
-			<?php if( flexmlsConnect::is_not_blank_or_restricted( $sf['ListingUpdateTimestamp'] ) ) : ?>
+			<?php if( flexmlsConnect::is_not_blank_or_restricted( $sf['ListingUpdateTimestamp'] ?? '' ) ) : ?>
 				<span class="flexmls-detail">
 					<span class="detail-label">Last Modified:</span>
 					<span class="detail-value"><?php echo esc_html( date( 'n/d/Y', strtotime( $sf['ListingUpdateTimestamp'] ) ) ); ?></span>
@@ -198,7 +222,7 @@
 	  
 	<div class="overview-section listing-section">
 		<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Overview</h2>
-		<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['PublicRemarks'] ) ) : ?>
+		<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['PublicRemarks'] ?? '' ) ) : ?>
 			<h3 class="flexmls-title-large flexmls-heading-font overview-subhead">Description</h3>
 			<?php
 				$remarks_full = $sf['PublicRemarks'];
@@ -215,7 +239,7 @@
 					<span class="flexmls-description-full" style="display:none;"><?php echo $remarks_full; ?></span>
 				<?php endif; ?>
 			</div>
-			<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['Supplement'] ) ) : ?>
+			<?php if ( flexmlsConnect::is_not_blank_or_restricted( $sf['Supplement'] ?? '' ) ) : ?>
 				<?php
 					$supplement_full = $sf['Supplement'];
 					$supplement_plain = wp_strip_all_tags( $supplement_full );
@@ -335,6 +359,11 @@
 						if ( ! $parsed || $is_suppressed( $parsed['label'] ) ) {
 							continue;
 						}
+						$resolved_label = $this->resolve_listing_detail_label( $parsed['label'] );
+						if ( $resolved_label === null ) {
+							continue;
+						}
+						$parsed['label'] = $resolved_label;
 						$label_key = strtolower( $parsed['label'] );
 						if ( isset( $seen_labels[ $label_key ] ) ) {
 							continue;
@@ -358,10 +387,14 @@
 						$seen_labels[ strtolower( $item['label'] ) ] = true;
 					}
 					foreach ( $section_fields as $field_name => $field_value ) {
-						if ( $is_suppressed( $field_name ) ) {
+						if ( ! $this->should_show_custom_field_fallback( $field_name ) ) {
 							continue;
 						}
-						$label_key = strtolower( trim( $field_name ) );
+						$display_label = $this->resolve_listing_custom_field_label( $field_name );
+						if ( $is_suppressed( $display_label ) ) {
+							continue;
+						}
+						$label_key = strtolower( trim( $display_label ) );
 						if ( isset( $seen_labels[ $label_key ] ) ) {
 							continue;
 						}
@@ -369,20 +402,20 @@
 							$display_vals = array();
 							foreach ( $field_value as $val ) {
 								if ( $val === true || $val === 1 ) {
-									$display_vals[] = $format_detail_value( $val, $field_name, $norm );
+									$display_vals[] = $format_detail_value( $val, $display_label, $norm );
 								} elseif ( $val !== false && $val !== 0 ) {
-									$display_vals[] = $format_detail_value( $val, $field_name, $norm );
+									$display_vals[] = $format_detail_value( $val, $display_label, $norm );
 								}
 							}
 							if ( ! empty( $display_vals ) ) {
 								$seen_labels[ $label_key ] = true;
-								$all_property_details[ $norm ][] = array( 'label' => $field_name, 'value' => implode( ', ', $display_vals ) );
+								$all_property_details[ $norm ][] = array( 'label' => $display_label, 'value' => implode( ', ', $display_vals ) );
 							}
 						} else {
 							if ( $field_value !== false && $field_value !== 0 && $field_value !== '' ) {
 								$seen_labels[ $label_key ] = true;
-								$display_val = $format_detail_value( $field_value, $field_name, $norm );
-								$all_property_details[ $norm ][] = array( 'label' => $field_name, 'value' => $display_val );
+								$display_val = $format_detail_value( $field_value, $display_label, $norm );
+								$all_property_details[ $norm ][] = array( 'label' => $display_label, 'value' => $display_val );
 							}
 						}
 					}
@@ -548,16 +581,19 @@
 		</div>
 	</div>
 
-	<?php if ( $sf['DocumentsCount'] ) : ?>
+	<?php if ( ! empty( $sf['DocumentsCount'] ?? 0 ) ) : ?>
 		<div class="documents-section listing-section">
 			<h2 class="flexmls-title-larger flexmls-primary-color-font flexmls-heading-font">Documents</h2>
 			<div class="flexmls-documents-wrapper">
 				<?php $fmc_colorbox_extensions = [ 'gif', 'png' ]; ?>
-				<?php foreach ( $sf['Documents'] as $fmc_document ) : ?>
+				<?php foreach ( ( $sf['Documents'] ?? array() ) as $fmc_document ) : ?>
 					<?php if ($fmc_document['Privacy']=='Public') : ?>
 						<?php
 							$fmc_extension = explode( '.', $fmc_document['Uri'] );
 							$fmc_extension = ( $fmc_extension[ count( $fmc_extension ) - 1 ] );
+							// Default opens via .fmc_document_pdf click handler (window.open).
+							$fmc_file_image = $fmc_plugin_url . '/assets/images/docs_16.gif';
+							$fmc_docs_class = "class='fmc_document fmc_document_pdf'";
 							if ( $fmc_extension == 'pdf' ){
 								$fmc_file_image = $fmc_plugin_url . '/assets/images/pdf-tiny.gif';
 								$fmc_docs_class = "class='fmc_document fmc_document_pdf'";
@@ -565,9 +601,6 @@
 							elseif ( in_array( $fmc_extension, $fmc_colorbox_extensions ) ){
 								$fmc_file_image = $fmc_plugin_url . '/assets/images/image_16.gif';
 								$fmc_docs_class = "class='fmc_document fmc_document_colorbox'";
-							}
-							else{
-								$fmc_file_image = $fmc_plugin_url . '/assets/images/docs_16.gif';
 							}
 
 							echo "<div><a $fmc_docs_class value={$fmc_document['Uri']}><img src='{$fmc_file_image}' align='absmiddle' alt='View Document' title='View Document' /> {$fmc_document['Name']} &rsaquo;</a></div>";
@@ -579,7 +612,8 @@
 	<?php endif; ?>
 
 	<div class="map-section listing-section">
-		<?php if ( isset ( $options['google_maps_api_key'] ) && $options['google_maps_api_key'] && flexmlsConnect::is_not_blank_or_restricted($sf['Latitude']) && flexmlsConnect::is_not_blank_or_restricted($sf['Longitude']) ) : ?>
+		<?php if ( isset ( $options['google_maps_api_key'] ) && $options['google_maps_api_key'] && flexmlsConnect::is_not_blank_or_restricted( $sf['Latitude'] ?? '' ) && flexmlsConnect::is_not_blank_or_restricted( $sf['Longitude'] ?? '' ) ) : ?>
+			<?php \FlexMLS\Admin\Enqueue::maybe_enqueue_listing_detail_map( $options ); ?>
 			<div id='flexmls_connect__map_canvas' latitude='<?php echo esc_attr( $sf['Latitude'] ); ?>' longitude='<?php echo esc_attr( $sf['Longitude'] ); ?>'></div>
 		<?php endif; ?>
 	</div>
@@ -591,7 +625,7 @@
 			<?php $listing_office_label = flexmlsConnect::listing_detail_list_office_label( $sf ); ?>
 			<div class="flexmls-office-name">
 				<span class="flexmls-bold-label"><?php echo esc_html( $listing_office_label ) ; ?></span>
-				<?php echo esc_html( $sf["ListOfficeName"] ); ?>
+				<?php echo esc_html( $sf['ListOfficeName'] ?? '' ); ?>
 			</div>
 		<?php endif; ?>
 
@@ -599,7 +633,7 @@
 			<div class="flexmls-agent-name-and-label-wrapper">
 				<span class="flexmls-agent-name">
 					<span class="flexmls-bold-label">Listing Agent: </span>
-					<?php echo esc_html( $sf["ListAgentName"] ); ?>
+					<?php echo esc_html( $sf['ListAgentName'] ?? '' ); ?>
 
 					<?php if ( flexmlsConnect::mls_requires_agent_phone_in_listing_details() ) : ?>
 						<?php
@@ -611,7 +645,7 @@
 					<?php endif; ?>
 
 					<?php if ( flexmlsConnect::mls_requires_agent_email_in_listing_details() ) : ?>
-						<?php echo " |  " . esc_html( $sf["ListAgentEmail"] ); ?>
+						<?php echo " |  " . esc_html( $sf['ListAgentEmail'] ?? '' ); ?>
 					<?php endif; ?>
 
 				</span>

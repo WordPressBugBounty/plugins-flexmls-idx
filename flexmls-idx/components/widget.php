@@ -113,7 +113,7 @@ class fmcWidget extends WP_Widget {
 			$listing_summary_source = isset( $_REQUEST['source'] ) ? trim( (string) $_REQUEST['source'] ) : '';
 
 			foreach ($_REQUEST as $k => $v) {
-					if ( $k === 'action' || $k === 'nonce' || $k === 'fmc_render_token' ) {
+					if ( $k === 'action' || $k === 'nonce' || $k === 'fmc_render_token' || $k === 'agent_display' || $k === 'link_display' ) {
 							continue;
 					}
 
@@ -315,8 +315,221 @@ class fmcWidget extends WP_Widget {
     echo $output;
   }
 
+	/**
+	 * IDX link dropdown loaded via Select2 + AJAX (see flexmls_idx_links_select2).
+	 * Falls back to a full plain &lt;select&gt; when Select2 is turned off in plugin settings.
+	 *
+	 * @param array $args fmc_field, only_saved_search (bool), static_options (list of value+text), class?, default?
+	 */
+	protected function lazy_idx_links_select_tag( $args ) {
+		$fmc_field = isset( $args['fmc_field'] ) ? $args['fmc_field'] : null;
+		if ( ! $fmc_field ) {
+			return;
+		}
+		$only_saved = ! empty( $args['only_saved_search'] );
+		$class = array_key_exists( 'class', $args ) ? $args['class'] : 'widefat';
+		$default = array_key_exists( 'default', $args ) ? $args['default'] : null;
+		$static_options = array_key_exists( 'static_options', $args ) && is_array( $args['static_options'] ) ? $args['static_options'] : array();
+		$instance_value = $this->get_field_value( $fmc_field );
+		$selected_value = ( false !== $instance_value && null !== $instance_value ) ? $instance_value : $default;
+
+		if ( ! flexmlsConnect::idx_links_select2_enabled() ) {
+			$collection = array();
+			foreach ( $static_options as $o ) {
+				if ( ! is_array( $o ) || ! array_key_exists( 'value', $o ) ) {
+					continue;
+				}
+				$collection[] = array(
+					'value'         => $o['value'],
+					'display_text' => isset( $o['text'] ) ? $o['text'] : '',
+				);
+			}
+			$api_links = flexmlsConnect::get_all_idx_links( $only_saved );
+			if ( is_array( $api_links ) ) {
+				foreach ( $api_links as $l_d ) {
+					$collection[] = array(
+						'value'         => $l_d['LinkId'],
+						'display_text' => $l_d['Name'],
+					);
+				}
+			}
+			$this->select_tag(
+				array(
+					'fmc_field'           => $fmc_field,
+					'collection'          => $collection,
+					'option_value_attr'   => 'value',
+					'option_display_attr' => 'display_text',
+					'class'               => $class,
+					'default'             => $default,
+				)
+			);
+			return;
+		}
+
+		$sel_class = trim( $class . ' flexmls-admin-idx-link-select' );
+		$data_saved = $only_saved ? '1' : '0';
+		$output = '<select fmc-field="' . esc_attr( $fmc_field ) . '" fmc-type="select" class="' . esc_attr( $sel_class ) . '"'
+			. ' id="' . esc_attr( $this->get_field_id( $fmc_field ) ) . '"'
+			. ' name="' . esc_attr( $this->get_field_name( $fmc_field ) ) . '"'
+			. ' data-only-saved-search="' . esc_attr( $data_saved ) . '"'
+			. ' data-flexmls-idx-select="1">';
+
+		// Determine whether an explicit, real IDX link is saved vs. "use the account default".
+		// Empty, null, and the "default" sentinel all mean "use default". The placeholder option must
+		// use the "default" sentinel value (never a real LinkId) so that selecting the configured
+		// default link in Select2 is a genuine value change. Otherwise the chosen LinkId equals the
+		// pre-selected placeholder's value, select2:select never fires, and the field stays "Use Default".
+		$raw_instance = ( isset( $this->instance ) && is_array( $this->instance ) && array_key_exists( $fmc_field, $this->instance ) && null !== $this->instance[ $fmc_field ] )
+			? trim( (string) $this->instance[ $fmc_field ] )
+			: '';
+		$is_explicit_link = ( '' !== $raw_instance && 'default' !== $raw_instance );
+		if ( ! $is_explicit_link ) {
+			$selected_value = 'default';
+		}
+
+		foreach ( $static_options as $o ) {
+			if ( ! is_array( $o ) || ! array_key_exists( 'value', $o ) ) {
+				continue;
+			}
+			$v = $o['value'];
+			$t = isset( $o['text'] ) ? $o['text'] : '';
+			$sel = ( (string) $selected_value === (string) $v ) ? ' selected="selected"' : '';
+			$output .= '<option value="' . esc_attr( $v ) . '"' . $sel . '>' . esc_html( $t ) . '</option>';
+		}
+
+		$pref = $is_explicit_link ? flexmlsConnect::idx_links_select2_prefetch_option( $raw_instance ) : null;
+		if ( $pref ) {
+			$already = false;
+			foreach ( $static_options as $o ) {
+				if ( is_array( $o ) && isset( $o['value'] ) && (string) $o['value'] === (string) $pref['id'] ) {
+					$already = true;
+					break;
+				}
+			}
+			if ( ! $already ) {
+				$output .= '<option value="' . esc_attr( $pref['id'] ) . '" selected="selected">' . esc_html( $pref['text'] ) . '</option>';
+			}
+		} elseif ( ! $is_explicit_link ) {
+			$default_in_static = false;
+			foreach ( $static_options as $o ) {
+				if ( is_array( $o ) && isset( $o['value'] ) && (string) $o['value'] === 'default' ) {
+					$default_in_static = true;
+					break;
+				}
+			}
+			if ( ! $default_in_static ) {
+				$output .= '<option value="default" selected="selected">' . esc_html__( 'Use Default', 'flexmls-idx' ) . '</option>';
+			}
+		}
+
+		$output .= '</select>';
+		echo $output;
+	}
+
+	/**
+	 * Office agent dropdown (office role) via Select2 + AJAX (see flexmls_office_agents_select2).
+	 *
+	 * @param array $args fmc_field, static_options (value+text), class?, parent_input_value (string|array for toggled_inputs)?
+	 */
+	protected function lazy_office_agents_select_tag( $args ) {
+		$fmc_field = isset( $args['fmc_field'] ) ? $args['fmc_field'] : null;
+		if ( ! $fmc_field || ! flexmlsConnect::is_office() ) {
+			return;
+		}
+		global $fmc_api;
+		$class               = array_key_exists( 'class', $args ) ? $args['class'] : 'widefat';
+		$static_options      = array_key_exists( 'static_options', $args ) && is_array( $args['static_options'] ) ? $args['static_options'] : array();
+		$parent_input_value  = array_key_exists( 'parent_input_value', $args ) ? $args['parent_input_value'] : null;
+		if ( is_array( $parent_input_value ) ) {
+			$parent_input_value = wp_json_encode( $parent_input_value );
+		}
+		$parent_input_attr = $parent_input_value ? " data-parent-value='" . esc_attr( $parent_input_value ) . "'" : '';
+
+		$instance_value = $this->get_field_value( $fmc_field );
+		$selected_value = ( false !== $instance_value && null !== $instance_value ) ? $instance_value : null;
+
+		if ( ! flexmlsConnect::office_agents_select2_enabled() ) {
+			$collection = array();
+			foreach ( $static_options as $o ) {
+				if ( ! is_array( $o ) || ! array_key_exists( 'value', $o ) ) {
+					continue;
+				}
+				$collection[] = array(
+					'value'          => $o['value'],
+					'display_text'  => isset( $o['text'] ) ? $o['text'] : '',
+				);
+			}
+			$api_my_account = $fmc_api ? $fmc_api->GetMyAccount() : null;
+			if ( is_array( $api_my_account ) && ! empty( $api_my_account['OfficeId'] ) ) {
+				$roster = flexmlsConnect::get_accounts_by_office_all_pages( $api_my_account['OfficeId'] );
+				if ( is_array( $roster ) ) {
+					foreach ( $roster as $agent ) {
+						if ( ! is_array( $agent ) || empty( $agent['Id'] ) ) {
+							continue;
+						}
+						$collection[] = array(
+							'value'          => $agent['Id'],
+							'display_text'  => isset( $agent['Name'] ) ? $agent['Name'] : $agent['Id'],
+						);
+					}
+				}
+			}
+			$this->select_tag(
+				array(
+					'fmc_field'           => $fmc_field,
+					'collection'          => $collection,
+					'option_value_attr'   => 'value',
+					'option_display_attr' => 'display_text',
+					'class'               => $class,
+					'parent_input_value'  => array_key_exists( 'parent_input_value', $args ) ? $args['parent_input_value'] : null,
+				)
+			);
+			return;
+		}
+
+		$sel_class = trim( $class . ' flexmls-admin-office-agent-select' );
+		$output    = '<select fmc-field="' . esc_attr( $fmc_field ) . '" fmc-type="select" class="' . esc_attr( $sel_class ) . '"'
+			. ' id="' . esc_attr( $this->get_field_id( $fmc_field ) ) . '"'
+			. ' name="' . esc_attr( $this->get_field_name( $fmc_field ) ) . '"'
+			. ' data-flexmls-office-agent-select="1"'
+			. $parent_input_attr . '>';
+
+		foreach ( $static_options as $o ) {
+			if ( ! is_array( $o ) || ! array_key_exists( 'value', $o ) ) {
+				continue;
+			}
+			$v   = $o['value'];
+			$t   = isset( $o['text'] ) ? $o['text'] : '';
+			$sel = ( null !== $selected_value && (string) $selected_value === (string) $v ) ? ' selected="selected"' : '';
+			$output .= '<option value="' . esc_attr( $v ) . '"' . $sel . '>' . esc_html( $t ) . '</option>';
+		}
+
+		$explicit_saved = isset( $this->instance ) && is_array( $this->instance ) && array_key_exists( $fmc_field, $this->instance )
+			&& null !== $this->instance[ $fmc_field ] && '' !== trim( (string) $this->instance[ $fmc_field ] );
+
+		if ( $explicit_saved ) {
+			$pref = flexmlsConnect::office_agents_select2_prefetch_option( $this->instance[ $fmc_field ] );
+			if ( $pref ) {
+				$already = false;
+				foreach ( $static_options as $o ) {
+					if ( is_array( $o ) && isset( $o['value'] ) && (string) $o['value'] === (string) $pref['id'] ) {
+						$already = true;
+						break;
+					}
+				}
+				if ( ! $already ) {
+					$sel = ( null !== $selected_value && (string) $selected_value === (string) $pref['id'] ) ? ' selected="selected"' : '';
+					$output .= '<option value="' . esc_attr( $pref['id'] ) . '"' . $sel . '>' . esc_html( $pref['text'] ) . '</option>';
+				}
+			}
+		}
+
+		$output .= '</select>';
+		echo $output;
+	}
+
 	protected function get_field_value($field) {
-		if (is_array($this->instance) && array_key_exists($field, $this->instance)) {
+		if ( isset( $this->instance ) && is_array( $this->instance ) && array_key_exists( $field, $this->instance ) ) {
 			$value = $this->instance[$field];
 			return ($value === true || $value === false) ? $value : esc_attr($value);
 		} else {
@@ -378,9 +591,28 @@ class fmcWidget extends WP_Widget {
 		return ! empty( $this->widget_version );
 	}
 
+	/**
+	 * Whether the instance explicitly requests the Version 1 listing template
+	 * via widget_version="1" (overrides Style → Version 2).
+	 *
+	 * @param array|false $instance Widget/shortcode settings.
+	 * @return bool
+	 */
+	function is_widget_version_one( $instance = false ) {
+		if ( empty( $instance ) || ! is_array( $instance ) ) {
+			return false;
+		}
+		return isset( $instance['widget_version'] ) && (string) $instance['widget_version'] === '1';
+	}
+
 	function is_new_version_widget( $instance = false ) {
 		if ( empty( $instance ) && ! empty( $this->instance ) ) {
 			$instance = $this->instance;
+		}
+
+		// Explicit shortcode/widget opt-into Version 1 (e.g. widget_version="1").
+		if ( $this->is_widget_version_one( $instance ) ) {
+			return false;
 		}
 
 		if ( $this->has_new_version_widget() ) {

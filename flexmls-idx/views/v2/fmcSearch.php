@@ -8,16 +8,19 @@
 
 <?php echo $before_widget; ?>
 
+<?php if ( class_exists( 'flexmlsConnectPageCore' ) ) { flexmlsConnectPageCore::render_primary_color_styles_once(); } ?>
+
 <div class="flexmls_connect__search flexmls-v2-widget <?php echo esc_attr( $wrapper_class ); ?>
-  flexmls_connect__search_v2_<?php echo $orientation; ?>"
+  flexmls_connect__search_v2_<?php echo $orientation; ?> flexmls_connect__search_v2_instance_<?php echo esc_attr( (string) $rand ); ?>"
   style="
     color: <?php echo $field_text_color; ?>;
-    max-width: <?php echo $width; ?>px;
-    <?php if ( $field_font ) : ?>
-      font-family: <?php echo $field_font; ?>, sans-serif;
-      <?php endif; ?>
+    max-width: <?php echo esc_attr( $width ); ?>;
     <?php echo $border_radius; ?>
-    background-color: <?php echo $background_color ?>;
+    background-color: <?php echo esc_attr( $background_color ); ?>;
+    <?php if ( ! empty( $property_type_tab_background_color ) ) : ?>
+    --flexmls-property-type-tab-active-bg: <?php echo esc_attr( $property_type_tab_background_color ); ?>;
+    --flexmls-property-type-tab-active-color: <?php echo esc_attr( $property_type_tab_text_color ); ?>;
+    <?php endif; ?>
   ">
 
   <?php if ($destination == "remote") { ?>
@@ -27,22 +30,28 @@
       <?php echo $this_target; ?> role="search" aria-label="Property search form">
   <?php } ?>
 
-    <?php // title ?>
-    <div class='flexmls_connect__search_v2_title' style="color: <?php echo $title_text_color; ?>;
-      <?php if ( $title_font ) : ?>
-        font-family: <?php echo $title_font; ?>, sans-serif;
-      <?php endif; ?>
-      ">
+    <?php // title (above property type tabs when tabs are shown at top) ?>
+    <div class='flexmls_connect__search_v2_title' style="color: <?php echo $title_text_color; ?>;">
       <?php echo $title; ?>
     </div>
 
+    <?php if ( ! empty( $pt_render_top_horizontal ) ) : ?>
+    <div class="flexmls_connect__search_v2_property_types_top">
+      <?php require __DIR__ . '/_property_types.php'; ?>
+    </div>
+    <?php endif; ?>
+
     <?php
-      // property types for vertical layout
-      if($orientation == 'vertical') { require(__DIR__ . '/_property_types.php'); }
+      if ( ! empty( $pt_render_in_vertical_slot ) ) {
+        require __DIR__ . '/_property_types.php';
+      }
     ?>
     <?php if($default_view == "map"){   ?>
     <input type="hidden" name="view" value="map" />
     <?php } ?>
+
+    <div class="flexmls_connect__search_v2_main">
+
     <?php // Location Search ?>
 
     <?php if ($location_search == "on") { ?>
@@ -82,8 +91,9 @@
 
   <div class="flexmls_connect__righthand_filters_wrapper">
       <?php
-        // property types for horizontal layout
-        if($orientation == 'horizontal' || empty( $orientation ) ) { require(__DIR__ . '/_property_types.php'); }
+        if ( ! empty( $pt_render_in_righthand ) ) {
+          require __DIR__ . '/_property_types.php';
+        }
       ?>
 
       <?php if ($destination == "local" and $user_sorting == "on") { ?>
@@ -124,6 +134,8 @@
   </div>
 
     <?php echo $submit_return; ?>
+
+    </div><!-- .flexmls_connect__search_v2_main -->
 
   </form>
 </div>

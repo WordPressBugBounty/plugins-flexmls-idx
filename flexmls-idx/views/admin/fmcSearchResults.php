@@ -13,24 +13,21 @@
   <?php echo $special_neighborhood_title_ability; ?>
 </p>
 
-<?php
-  // IDX link
-  $api_links = flexmlsConnect::get_all_idx_links(true);
-?>
-
 <p>
   <label class="flexmls-admin-field-label" for="fmc_shortcode_field_link"><?php _e('Saved Search:'); ?></label>
-  <select fmc-field="link" fmc-type='select' id="fmc_shortcode_field_link" name="link">
-
-    <option value="">(None)</option>
-    <option value='default'>(Use Saved Default)</option>
-    <?php foreach ($api_links as $my_l): ?>
-      <option value="<?php echo $my_l['LinkId']; ?>">
-        <?php echo $my_l['Name']; ?>
-      </option>
-    <?php endforeach; ?>
-
-  </select>
+  <?php
+    $this->lazy_idx_links_select_tag(
+      array(
+        'fmc_field'         => 'link',
+        'only_saved_search' => true,
+        'static_options'    => array(
+          array( 'value' => '', 'text' => '(None)' ),
+          array( 'value' => 'default', 'text' => '(Use Saved Default)' ),
+        ),
+        'class'             => 'widefat',
+      )
+    );
+  ?>
   <br />
   <span class='description'>flexmls Saved Search to apply</span>
 </p>
@@ -56,23 +53,22 @@
   <span class='description'>Which listings to display</span>
 </p>
 
-<?php // roster ?>
-
-<?php if (isset($office_roster)): ?>
+<?php // roster (office accounts: lazy Select2 or full plain select when Select2 is off) ?>
+<?php if ( flexmlsConnect::is_office() ) : ?>
   <div class='flexmls_connect__roster'>
     <p>
       <label class="flexmls-admin-field-label" for="fmc_shortcode_field_agent"><?php _e('Agent:'); ?></label>
-      <select fmc-field="agent" fmc-type='select' id="fmc_shortcode_field_agent" name="agent">
-
-        <option value=''>  - Select One -  </option>
-
-        <?php foreach ($office_roster as $agent): ?>
-          <option value='<?php echo $agent['Id']; ?>'>
-            <?php echo htmlspecialchars($agent['Name']); ?>
-          </option>
-        <?php endforeach; ?>
-
-      </select>
+      <?php
+      $this->lazy_office_agents_select_tag(
+        array(
+          'fmc_field'      => 'agent',
+          'static_options' => array(
+            array( 'value' => '', 'text' => '  - Select One -  ' ),
+          ),
+          'class'          => 'widefat',
+        )
+      );
+      ?>
     </p>
   </div>
 <?php endif; ?>

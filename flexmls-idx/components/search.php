@@ -73,17 +73,15 @@ class fmcSearch_v1 extends fmcWidget {
     // theme="vert_round_dark"
     $orientation = (array_key_exists('orientation', $settings)) ? trim($settings['orientation']) : "horizontal" ;
 
-    $width = ($orientation == "horizontal") ? 760 : 360;
-    if( array_key_exists( 'width', $settings ) ){
-    	if( is_numeric( $settings[ 'width' ] ) ){
-        $width = trim($settings['width']) - 40;
-       }
-    }
+    $width = self::format_widget_max_width_css(
+      array_key_exists( 'width', $settings ) ? $settings['width'] : '',
+      $orientation
+    );
 
     $border_style = (array_key_exists('border_style', $settings)) ? trim($settings['border_style']) : "squared" ;
     $widget_drop_shadow = (array_key_exists('widget_drop_shadow', $settings)) ? trim($settings['widget_drop_shadow']) : "on" ;
 
-    $background_color = fmcSearch::get_setting_color('background_color');
+    $background_color = $this->resolve_widget_background_color();
     $title_text_color = fmcSearch::get_setting_color('title_text_color');
     $field_text_color = fmcSearch::get_setting_color('field_text_color');
     $detailed_search_text_color = fmcSearch::get_setting_color('detailed_search_text_color');
@@ -93,8 +91,6 @@ class fmcSearch_v1 extends fmcWidget {
     $submit_button_background = fmcSearch::get_setting_color('submit_button_background');
     $submit_button_text_color = fmcSearch::get_setting_color('submit_button_text_color');
 
-    $title_font = (array_key_exists('title_font', $settings)) ? trim($settings['title_font']) : "Arial" ;
-    $field_font = (array_key_exists('field_font', $settings)) ? trim($settings['field_font']) : "Arial" ;
     $destination = (array_key_exists('destination', $settings)) ? trim($settings['destination']) : "local" ;
     $default_view = (array_key_exists('default_view', $settings)) ? trim($settings['default_view']) : "list";
     $listings_per_page = (array_key_exists('listings_per_page', $settings)) ? trim($settings['listings_per_page']) : "10";
@@ -441,6 +437,13 @@ class fmcSearch_v1 extends fmcWidget {
       $vals = array_map( array('flexmlsConnect', 'remove_starting_equals') , $vals);
       $value = implode(",", $vals);
 
+      // a field the visitor left blank arrives as "Price=" and must not become a search
+      // condition, otherwise it is sent to the IDX link transform and comes back as an
+      // empty parameter (list_price=) that flexmls rejects
+      if ( flexmlsConnect::is_blank_search_value($value) ) {
+        continue;
+      }
+
       $query_conditions[$key] = array('v' => $value, 'o' => $operator);
 
     }
@@ -470,6 +473,9 @@ class fmcSearch_v1 extends fmcWidget {
 
     // take out all remaining placeholders
     $outbound_link = preg_replace('/\*(.*?)\*/', "", $outbound_link);
+
+    // dropping placeholders can leave valueless parameters behind, which flexmls rejects
+    $outbound_link = flexmlsConnect::clean_idx_link($outbound_link);
 
     $outbound_link = urlencode($outbound_link);
 
@@ -647,19 +653,6 @@ class fmcSearch_v1 extends fmcWidget {
         ),
 
       // style
-      'title_font' => array(
-        'label' => 'Title Font',
-        'type' => 'select',
-        'options' => flexmlsConnect::possible_fonts(),
-        'output' => 'text',
-        'section' => 'Style',
-      ),
-      'field_font' => array(
-        'label' => 'Field Font',
-        'type' => 'select',
-        'options' => flexmlsConnect::possible_fonts(),
-        'output' => 'text',
-      ),
       'border_style' => array(
         'label' => 'Border Style',
         'type' => 'select',
@@ -676,8 +669,18 @@ class fmcSearch_v1 extends fmcWidget {
         ),
 
       // color
+      'background_style' => array(
+        'label' => 'Widget background',
+        'type' => 'select',
+        'options' => array(
+          'solid' => 'Solid color',
+          'transparent' => 'Transparent',
+        ),
+        'output' => 'text',
+        'section' => 'Color',
+      ),
       'background_color' => array(
-        'label' => 'Background',
+        'label' => 'Background color',
         'type' => 'color',
         'output' => 'text',
         'section' => 'Color',
@@ -728,6 +731,25 @@ class fmcSearch_v1 extends fmcWidget {
 
   }
 
+  /**
+   * Resolved CSS value for the search widget outer background (solid hex/rgb or transparent).
+   */
+  protected function resolve_widget_background_color() {
+    $settings = $this->widget_settings;
+    if ( ! is_array( $settings ) ) {
+      return $this->get_setting_color( 'background_color' );
+    }
+    $style = array_key_exists( 'background_style', $settings ) ? trim( (string) $settings['background_style'] ) : '';
+    if ( 'transparent' === $style ) {
+      return 'transparent';
+    }
+    if ( array_key_exists( 'background_color', $settings ) && strcasecmp( trim( (string) $settings['background_color'] ), 'transparent' ) === 0 ) {
+      return 'transparent';
+    }
+
+    return $this->get_setting_color( 'background_color' );
+  }
+
   protected function get_setting_color($property) {
 
     $defaults = array(
@@ -751,7 +773,14 @@ class fmcSearch_v1 extends fmcWidget {
 
   static function min_max_verify($get, $get_param) {
 
-    $return = ( array_key_exists($get_param, $get) && is_numeric($get[$get_param]) ) ? $get[$get_param] : '';
+    if ( ! array_key_exists( $get_param, $get ) ) {
+      return '';
+    }
+    $raw = $get[ $get_param ];
+    if ( is_string( $raw ) ) {
+      $raw = str_replace( array( ',', '$', ' ' ), '', $raw );
+    }
+    $return = ( is_numeric( $raw ) ) ? $raw : '';
 
     return $return;
 
@@ -886,7 +915,7 @@ class fmcSearch_v1 extends fmcWidget {
     $standard_status = new fmcStandardStatus($fmc_api->GetStandardField("StandardStatus"));
 
     $vars = array();
-    $vars["idx_links"] = flexmlsConnect::get_all_idx_links();
+    $vars["idx_links"] = array();
     $vars["idx_links_default"] = $this->options->default_link();
     $vars["property_types"] = $this->get_view_property_types();
     $vars["selected_property_types"] = $this->get_selected_property_types();
@@ -898,7 +927,6 @@ class fmcSearch_v1 extends fmcWidget {
     $vars["orientation_options"] = $this->orientation_options();
     $vars["default_view_options"] = $this->default_view_options();
     $vars["listings_per_page_options"] = $this->listings_per_page_options();
-    $vars["fonts"] = flexmlsConnect::possible_fonts();
     $vars["border_style_options"] = $this->border_style_options();
     $vars["submit_button_options"] = $this->submit_button_options();
     $vars["mls_allows_sold_searching"] = $standard_status->allow_sold_searching();
@@ -908,7 +936,9 @@ class fmcSearch_v1 extends fmcWidget {
   }
 
   function integration_view_vars(){
-    return $this->admin_view_vars();
+    $vars = $this->admin_view_vars();
+    $vars['idx_links'] = flexmlsConnect::get_all_idx_links();
+    return $vars;
   }
 
   protected function on_off_options() {
@@ -1062,10 +1092,10 @@ class fmcSearch_v1 extends fmcWidget {
 					$display_text = $display_text['display_text'];
 				}
 
-        $output .= "<li data-connect-name='" . $id . "'>";
+        $output .= '<li data-connect-name="' . esc_attr( $id ) . '">';
         $output .= "<span class='remove' title='Remove this from the search'>&times;</span>";
         $output .= "<span class='ui-icon ui-icon-arrowthick-2-n-s'></span>";
-        $output .= $display_text;
+        $output .= esc_html( $display_text );
         $output .= "</li>";
       }
     }
@@ -1078,5 +1108,41 @@ class fmcSearch_v1 extends fmcWidget {
     $sold_searching = $this->options->allow_sold_searching();
     return $sold_searching != false ? $sold_searching : 'off';
   }
+
+	/**
+	 * Max-width CSS for the IDX Search widget outer wrapper.
+	 * Plain number: legacy pixels (value minus 40), e.g. 800 → 760px.
+	 * With %: percentage of container, e.g. 90% or 100% (clamped 1–100).
+	 * With px suffix: exact pixels, no subtraction, e.g. 800px.
+	 * Empty: 760px horizontal / 360px vertical.
+	 *
+	 * @param mixed  $width_raw   Saved widget width setting.
+	 * @param string $orientation horizontal|vertical
+	 * @return string Safe fragment for max-width, e.g. "720px" or "90%"
+	 */
+	public static function format_widget_max_width_css( $width_raw, $orientation ) {
+		$default_px = ( 'vertical' === $orientation ) ? 360 : 760;
+		$w = is_scalar( $width_raw ) ? trim( (string) $width_raw ) : '';
+		$w = strip_tags( $w );
+		if ( $w === '' ) {
+			return $default_px . 'px';
+		}
+		if ( preg_match( '/^\s*(\d+(?:\.\d+)?)\s*%\s*$/', $w, $m ) ) {
+			$pct = (float) $m[1];
+			if ( $pct < 1 || $pct > 100 ) {
+				return $default_px . 'px';
+			}
+			$out = rtrim( rtrim( sprintf( '%.4f', $pct ), '0' ), '.' );
+			return $out . '%';
+		}
+		if ( preg_match( '/^\s*(\d+(?:\.\d+)?)\s*px\s*$/i', $w, $m ) ) {
+			$px = (int) round( (float) $m[1] );
+			return max( 0, $px ) . 'px';
+		}
+		if ( is_numeric( $w ) ) {
+			return max( 0, (int) round( (float) $w ) - 40 ) . 'px';
+		}
+		return $default_px . 'px';
+	}
 
 }

@@ -66,6 +66,15 @@ class flexmlsSearchUtil {
 							'field' => 'ListingId',
 							'allow_or' => true
 					),
+					// ListAgentId is supplied by widgets (e.g. IDX Slideshow "Specific agent") so we filter on either ListAgentId or
+					// CoListAgentId. Registering it here keeps the auto-builder from also adding a strict ListAgentId-only Eq filter.
+					'ListAgentId' => array(
+							'input' => 'ListAgentId',
+							'operator' => 'Eq',
+							'field' => 'ListAgentId',
+							'type' => 'Character',
+							'condition' => '(ListAgentId Eq # Or CoListAgentId Eq #)'
+					),
 					'PropertyType' => array(
 							'input' => 'PropertyType',
 							'operator' => 'Eq',
@@ -256,6 +265,7 @@ class flexmlsSearchUtil {
 			$searchable_fields[] = 'MapOverlay';
 			$searchable_fields[] = 'ListingCart';
 			$searchable_fields[] = 'OpenHouses';
+			$searchable_fields[] = 'ListAgentId';
 			$searchable_fields[] = '"Address"."Community2"';
 
 			$searchable_fields = apply_filters( 'flexmls_searchable_fields', $searchable_fields );
@@ -346,12 +356,9 @@ class flexmlsSearchUtil {
 					}
 			}
 
-			// check for ListAgentId
-			$list_agent_id = static::fetch_input_data( 'ListAgentId', $input_source, $input_data );
-			if ($list_agent_id != null) {
-					$cleaned_raw_criteria['ListAgentId'] = $list_agent_id;
-					$search_criteria[] = "(ListAgentId Eq '{$list_agent_id}' Or CoListAgentId Eq '{$list_agent_id}')";
-			}
+			// ListAgentId is now handled via $catch_fields above with a (ListAgentId Or CoListAgentId) condition.
+			// The previous explicit block here added the OR predicate AFTER the loop already produced a strict
+			// ListAgentId Eq predicate, joining them with And and excluding co-listed-only listings. WP-204.
 
 			$pg = ( flexmlsConnect::wp_input_get_post('pg') && is_numeric( flexmlsConnect::wp_input_get_post('pg') ) ) ? intval( flexmlsConnect::wp_input_get_post('pg') ) : 1;
 			$cleaned_raw_criteria['pg'] = $pg;
@@ -576,15 +583,15 @@ class flexmlsSearchUtil {
 	}
 
 	public static function one_line_without_zip_address( $data ) {
-		$listing = $data['StandardFields'];
-		$first_line_address = (flexmlsConnect::is_not_blank_or_restricted($listing['UnparsedFirstLineAddress'])) ? $listing['UnparsedFirstLineAddress'] : "";
+		$listing = isset( $data['StandardFields'] ) && is_array( $data['StandardFields'] ) ? $data['StandardFields'] : array();
+		$first_line_address = ( isset( $listing['UnparsedFirstLineAddress'] ) && flexmlsConnect::is_not_blank_or_restricted( $listing['UnparsedFirstLineAddress'] ) ) ? $listing['UnparsedFirstLineAddress'] : "";
 		$second_line_address = "";
 
-		if ( flexmlsConnect::is_not_blank_or_restricted($listing['City']) ) {
+		if ( isset( $listing['City'] ) && flexmlsConnect::is_not_blank_or_restricted( $listing['City'] ) ) {
 			$second_line_address .= "{$listing['City']}, ";
 		}
 
-		if ( flexmlsConnect::is_not_blank_or_restricted($listing['StateOrProvince']) ) {
+		if ( isset( $listing['StateOrProvince'] ) && flexmlsConnect::is_not_blank_or_restricted( $listing['StateOrProvince'] ) ) {
 			$second_line_address .= "{$listing['StateOrProvince']} ";
 		}
 

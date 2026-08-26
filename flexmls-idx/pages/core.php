@@ -60,6 +60,15 @@ class flexmlsConnectPageCore {
                 'field' => 'ListingId',
                 'allow_or' => true
             ),
+            // ListAgentId is supplied by widgets (e.g. IDX Slideshow "Specific agent") so we filter on either ListAgentId or
+            // CoListAgentId. Registering it here keeps the auto-builder from also adding a strict ListAgentId-only Eq filter.
+            'ListAgentId' => array(
+                'input' => 'ListAgentId',
+                'operator' => 'Eq',
+                'field' => 'ListAgentId',
+                'type' => 'Character',
+                'condition' => '(ListAgentId Eq # Or CoListAgentId Eq #)'
+            ),
             'PropertyType' => array(
                 'input' => 'PropertyType',
                 'operator' => 'Eq',
@@ -251,6 +260,7 @@ class flexmlsConnectPageCore {
         $searchable_fields[] = 'MapOverlay';
         $searchable_fields[] = 'ListingCart';
         $searchable_fields[] = 'OpenHouses';
+        $searchable_fields[] = 'ListAgentId';
         $searchable_fields[] = '"Address"."Community2"';
 
         $searchable_fields = apply_filters( 'flexmls_searchable_fields', $searchable_fields );
@@ -341,12 +351,9 @@ class flexmlsConnectPageCore {
             }
         }
 
-        // check for ListAgentId
-        $list_agent_id = $this->fetch_input_data( 'ListAgentId' );
-        if ($list_agent_id != null) {
-            $cleaned_raw_criteria['ListAgentId'] = $list_agent_id;
-            $search_criteria[] = "(ListAgentId Eq '{$list_agent_id}' Or CoListAgentId Eq '{$list_agent_id}')";
-        }
+        // ListAgentId is now handled via $catch_fields above with a (ListAgentId Or CoListAgentId) condition.
+        // The previous explicit block here added the OR predicate AFTER the loop already produced a strict
+        // ListAgentId Eq predicate, joining them with And and excluding co-listed-only listings. WP-204.
 
         $this->field_value_count = $field_value_count;
 
@@ -565,6 +572,23 @@ class flexmlsConnectPageCore {
     }
 
 		/**
+		 * Request-scoped force of Version 1 templates (e.g. shortcode widget_version="1").
+		 * Does not change saved Style settings.
+		 *
+		 * @var bool
+		 */
+		private static $force_v1_template = false;
+
+		/**
+		 * Force Version 1 listing templates for the remainder of this request (or until cleared).
+		 *
+		 * @param bool $force True to force V1; false to clear the override.
+		 */
+		public static function force_v1_template( $force = true ) {
+			self::$force_v1_template = (bool) $force;
+		}
+
+		/**
 		 * Optional URL override for support / troubleshooting (does not change saved settings).
 		 * ?v2=1 or ?v2=true => force Version 2; ?v2=0 or ?v2=false => force Version 1.
 		 * Any other value is ignored and saved settings apply.
@@ -592,6 +616,9 @@ class flexmlsConnectPageCore {
 		 * @return bool
 		 */
 		public static function is_v2_template_active() {
+			if ( self::$force_v1_template ) {
+				return false;
+			}
 			$override = self::v2_url_template_override();
 			if ( $override !== null ) {
 				return $override;
@@ -604,21 +631,68 @@ class flexmlsConnectPageCore {
 			return self::is_v2_template_active();
 		}
 
+		static $primary_color_styles_emitted = false;
+
+		static function render_primary_color_styles_once() {
+			if ( self::$primary_color_styles_emitted ) {
+				return;
+			}
+			$options = get_option( 'fmc_settings' );
+			if ( empty( $options['search_listing_template_primary_color'] ) ) {
+				return;
+			}
+			self::$primary_color_styles_emitted = true;
+			$primary_color = $options['search_listing_template_primary_color'];
+			$primary_text  = self::contrasting_text_color( $primary_color );
+			?>
+			<style type="text/css">
+				.flexmls_connect__search {
+					--flexmls-property-type-tab-active-bg: <?php echo esc_html( $primary_color ); ?>;
+					--flexmls-property-type-tab-active-color: <?php echo esc_html( $primary_text ); ?>;
+				}
+			</style>
+			<?php
+		}
+
+		static function contrasting_text_color( $hex ) {
+			$hex = ltrim( (string) $hex, '#' );
+			if ( strlen( $hex ) === 3 ) {
+				$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+			}
+			if ( strlen( $hex ) !== 6 || ! ctype_xdigit( $hex ) ) {
+				return '#ffffff';
+			}
+			$r = hexdec( substr( $hex, 0, 2 ) ) / 255;
+			$g = hexdec( substr( $hex, 2, 2 ) ) / 255;
+			$b = hexdec( substr( $hex, 4, 2 ) ) / 255;
+			$lin = function( $c ) {
+				return ( $c <= 0.03928 ) ? ( $c / 12.92 ) : pow( ( $c + 0.055 ) / 1.055, 2.4 );
+			};
+			$luminance = 0.2126 * $lin( $r ) + 0.7152 * $lin( $g ) + 0.0722 * $lin( $b );
+			return ( $luminance > 0.55 ) ? '#1a1a1a' : '#ffffff';
+		}
+
 		function render_template_styles() {
 			$options = get_option( 'fmc_settings' );
 			$has_primary_color = ! empty( $options['search_listing_template_primary_color'] );
 			$has_heading_font = ! empty( $options['search_listing_template_heading_font'] ) && $options['search_listing_template_heading_font'] != 'default';
 			$has_body_font = ! empty( $options['search_listing_template_body_font'] ) && $options['search_listing_template_body_font'] != 'default';
 			$has_customized_settings = $has_primary_color || $has_heading_font || $has_body_font;
+			$primary_color = $has_primary_color ? $options['search_listing_template_primary_color'] : '';
+			$primary_text_color = $has_primary_color ? self::contrasting_text_color( $primary_color ) : '';
 			?>
       <?php if ( $has_customized_settings ) : ?>
         <style type="text/css">
 					<?php if ( $has_primary_color ) : ?>
 	          .flexmls-primary-color-font {
-	            color: <?php echo esc_html( $options['search_listing_template_primary_color'] ); ?> !important;
+	            color: <?php echo esc_html( $primary_color ); ?> !important;
 	          }
 	          .flexmls-primary-color-background {
-	            background-color: <?php echo esc_html( $options['search_listing_template_primary_color'] ); ?> !important;
+	            background-color: <?php echo esc_html( $primary_color ); ?> !important;
+	          }
+	          .flexmls_connect__search {
+	            --flexmls-property-type-tab-active-bg: <?php echo esc_html( $primary_color ); ?>;
+	            --flexmls-property-type-tab-active-color: <?php echo esc_html( $primary_text_color ); ?>;
 	          }
 					<?php endif; ?>
 					<?php if ( $has_body_font ) : ?>

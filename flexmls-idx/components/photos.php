@@ -445,10 +445,10 @@ class fmcPhotos extends fmcWidget {
         $total_listings++;
         $show_idx_badge = "";
 
-        $listing = $li['StandardFields'];
+        $listing = isset( $li['StandardFields'] ) && is_array( $li['StandardFields'] ) ? $li['StandardFields'] : array();
 
         //Get MlsId for MLS IDX Share Listings
-        $hyperlink_conditions['m'] = $listing['MlsId'];
+        $hyperlink_conditions['m'] = $listing['MlsId'] ?? '';
 
         $listing_address = flexmlsConnect::format_listing_street_address($li);
         $first_line_address = $listing_address[0];
@@ -457,28 +457,29 @@ class fmcPhotos extends fmcWidget {
 
         $price = flexmlsConnect::format_listing_standard_price_display( $listing );
 
-        if( flexmlsConnect::is_not_blank_or_restricted($listing['BuildingAreaTotal']) ) {
+        if( flexmlsConnect::is_not_blank_or_restricted( $listing['BuildingAreaTotal'] ?? '' ) ) {
             $sf_sqft_value = $listing['BuildingAreaTotal'];
-        } elseif( flexmlsConnect::is_not_blank_or_restricted($listing['LivingArea']) ){
+        } elseif( flexmlsConnect::is_not_blank_or_restricted( $listing['LivingArea'] ?? '' ) ){
             $sf_sqft_value = $listing['LivingArea'];
         } else {
             $sf_sqft_value = '';
         }
 
 
-        if ($source != "my" and $source != "my_office" and flexmlsConnect::get_office_id() != $listing['ListOfficeId'] ) {
+        if ($source != "my" and $source != "my_office" and flexmlsConnect::get_office_id() != ( $listing['ListOfficeId'] ?? '' ) ) {
           if (array_key_exists('IdxLogoSmall', $api_system_info['Configuration'][0]) && !empty($api_system_info['Configuration'][0]['IdxLogoSmall'])) {
-            $show_idx_badge = "<img src='{$api_system_info['Configuration'][0]['IdxLogoSmall']}' class='flexmls_connect__badge_image' title='{$listing['ListOfficeName']}' alt='IDX Logo' />";
+            $show_idx_badge = "<img src='{$api_system_info['Configuration'][0]['IdxLogoSmall']}' class='flexmls_connect__badge_image' title='" . esc_attr( $listing['ListOfficeName'] ?? '' ) . "' alt='IDX Logo' />";
           }
           else {
-            $show_idx_badge = "<span class='flexmls_connect__badge' title='{$listing['ListOfficeName']}'>IDX</span>";
+            $show_idx_badge = "<span class='flexmls_connect__badge' title='" . esc_attr( $listing['ListOfficeName'] ?? '' ) . "'>IDX</span>";
           }
         }
 
         $relevant_info_line = "";
 
         if ($display == "open_houses") {
-          $relevant_info_line = $listing['OpenHouses'][0]['Date'] . " " . $listing['OpenHouses'][0]['StartTime'];
+          $open_houses = $listing['OpenHouses'] ?? array();
+          $relevant_info_line = isset( $open_houses[0] ) ? $open_houses[0]['Date'] . " " . $open_houses[0]['StartTime'] : '';
         }
         else {
           $relevant_info_line = $price;
@@ -493,7 +494,7 @@ class fmcPhotos extends fmcWidget {
 
         $office_line = "";
         if ( flexmlsConnect::mls_requires_office_name_in_search_results() and !$only_our_listings ) {
-          $office_line = "<small>Listing office: {$listing['ListOfficeName']}</small>";
+          $office_line = "<small>Listing office: " . esc_html( $listing['ListOfficeName'] ?? '' ) . "</small>";
         }
 
         // WP-717: This being and `elseif` meant that the extra fields were *never* shown if the above is true.
@@ -504,9 +505,9 @@ class fmcPhotos extends fmcWidget {
             if ( ! in_array( $fi, $show_additional_fields, true ) ) {
               continue;
             }
-            if ( $fi === "beds" && flexmlsConnect::is_not_blank_or_restricted( $listing['BedsTotal'] ) ) {
+            if ( $fi === "beds" && flexmlsConnect::is_not_blank_or_restricted( $listing['BedsTotal'] ?? '' ) ) {
               $show_additional_field_line[] = "{$listing['BedsTotal']} beds";
-            } elseif ( $fi === "baths" && flexmlsConnect::is_not_blank_or_restricted( $listing['BathsTotal'] ) ) {
+            } elseif ( $fi === "baths" && flexmlsConnect::is_not_blank_or_restricted( $listing['BathsTotal'] ?? '' ) ) {
               $show_additional_field_line[] = "{$listing['BathsTotal']} baths";
             } elseif ( $fi === "sqft" && ! empty( $sf_sqft_value ) ) {
               $show_additional_field_line[] = number_format( $sf_sqft_value ) . " sqft";
@@ -551,8 +552,8 @@ class fmcPhotos extends fmcWidget {
         $photo_return = '';
 
         $photo_count = 0;
-        if(is_array($listing['Photos'])){
-          foreach ($listing['Photos'] as $photo) {
+        if(is_array($listing['Photos'] ?? null)){
+          foreach ( ( $listing['Photos'] ?? array() ) as $photo ) {
             $photo_count++;
             if ($photo_count == 1) {
               continue;
@@ -569,7 +570,7 @@ class fmcPhotos extends fmcWidget {
 
           // default to the first photo given if the primary isn't set
           if (empty($main_photo_urilarge)) {
-            if(count($listing['Photos']) > 0) {
+            if(count( $listing['Photos'] ?? array() ) > 0) {
               $main_photo_caption = htmlspecialchars($listing['Photos'][0]['Caption'], ENT_QUOTES);
               $main_photo_uri640 = $listing['Photos'][0]['Uri640'];
               $main_photo_urilarge = $listing['Photos'][0]['UriLarge'];
@@ -858,12 +859,12 @@ class fmcPhotos extends fmcWidget {
     );
   }
 
-  private function set_office_roster($api, $account, $isFeature = false){
+  private function set_office_roster( $api, $account, $isFeature = false ) {
     $office_roster = array();
 
-    if ($isFeature && ! empty( $account['OfficeId'] ) ) {
-      $accounts = $api->GetAccountsByOffice( $account['OfficeId'] );
-      if( ! empty($accounts)){
+    if ( $isFeature && ! empty( $account['OfficeId'] ) ) {
+      $accounts = flexmlsConnect::get_accounts_by_office_all_pages( $account['OfficeId'] );
+      if ( is_array( $accounts ) ) {
         $office_roster = $accounts;
       }
     }
@@ -874,6 +875,8 @@ class fmcPhotos extends fmcWidget {
 
   function settings_form($instance) {
     global $fmc_api;
+
+    $this->instance = $instance;
 
     $settings = new Photo_Settings($instance);
 
@@ -928,14 +931,10 @@ class fmcPhotos extends fmcWidget {
       return flexmlsConnect::widget_not_available($fmc_api, true);
     }
 
-    $office_roster = $this->set_office_roster($fmc_api, $api_my_account, $roster_feature);
-
-/*     if ($roster_feature) {
-      $accounts = $fmc_api->GetAccountsByOffice( $api_my_account['OfficeId'] );
-      if( ! empty($accounts)){
-        $office_roster = $accounts;
-      }
-    } */
+    $office_roster = array();
+    if ( ! flexmlsConnect::is_office() ) {
+      $office_roster = $this->set_office_roster( $fmc_api, $api_my_account, $roster_feature );
+    }
 
     if (empty($source)) {
       $source = "location";
@@ -958,24 +957,24 @@ class fmcPhotos extends fmcWidget {
         ";
 
     if (!$fmc_api->HasBasicRole()) {
-      $api_links = flexmlsConnect::get_all_idx_links();
-
       $return .= "
         <p>
           <label for='".$this->get_field_id('link')."'>" . __('IDX Link:') . "</label>
-          <select fmc-field='link' fmc-type='select' id='".$this->get_field_id('link')."' name='".$this->get_field_name('link')."'>
-              ";
-
-      $is_selected = ($link == "default") ? $selected_code : "";
-      $return .= "<option value='default'{$is_selected}>(Use Saved Default)</option>";
-
-      foreach ($api_links as $my_l) {
-        $is_selected = ($my_l['LinkId'] == $link) ? $selected_code : "";
-        $return .= "<option value='{$my_l['LinkId']}'{$is_selected}>{$my_l['Name']}</option>";
-      }
-
+          ";
+      ob_start();
+      $this->lazy_idx_links_select_tag(
+        array(
+          'fmc_field'         => 'link',
+          'only_saved_search' => false,
+          'static_options'    => array(
+            array( 'value' => 'default', 'text' => '(Use Saved Default)' ),
+          ),
+          'class'             => 'widefat',
+        )
+      );
+      $return .= ob_get_clean();
       $return .= "
-            </select><br /><span class='description'>Link used when a listing is viewed</span>
+            <br /><span class='description'>Link used when a listing is viewed</span>
         </p>
         ";
     }
@@ -1087,20 +1086,37 @@ class fmcPhotos extends fmcWidget {
 
       <div class='flexmls_connect__roster'{$hidden_roster}>
         <p>
-        <label for='".$this->get_field_id('agent')."'>" . __('Agent:') . "
+        <label for='".$this->get_field_id('agent')."'>" . __('Agent:') . "</label>
+        ";
+
+    if ( flexmlsConnect::is_office() ) {
+      ob_start();
+      $this->lazy_office_agents_select_tag(
+        array(
+          'fmc_field'      => 'agent',
+          'static_options' => array(
+            array( 'value' => '', 'text' => '  - Select One -  ' ),
+          ),
+          'class'          => 'widefat',
+        )
+      );
+      $return .= ob_get_clean();
+    } else {
+      $return .= "
           <select fmc-field='agent' fmc-type='select' id='".$this->get_field_id('agent')."' name='".$this->get_field_name('agent')."'>
             <option value=''>  - Select One -  </option>
             ";
 
-      foreach ($office_roster as $a) {
-        $is_selected = ($a['Id'] == $agent) ? $selected_code : "";
-        $return .= "<option value='{$a['Id']}'{$is_selected}>". htmlspecialchars($a['Name']) ."</option>";
+      foreach ( $office_roster as $a ) {
+        $is_selected = ( $a['Id'] == $agent ) ? $selected_code : '';
+        $return .= "<option value='{$a['Id']}'{$is_selected}>" . htmlspecialchars( $a['Name'] ) . '</option>';
       }
 
-      $return .= "
-          </select>
-        </label>
+      $return .= '
+          </select>';
+    }
 
+    $return .= "
         </p>
       </div>
 

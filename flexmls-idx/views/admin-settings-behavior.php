@@ -8,16 +8,9 @@ if ( ! is_array( $fmc_settings ) ) {
 }
 
 $fmc_settings[ 'default_titles' ] = isset( $fmc_settings[ 'default_titles' ] ) ? $fmc_settings[ 'default_titles' ] : 1;
-$fmc_settings[ 'multiple_summaries' ] = ( isset( $fmc_settings[ 'multiple_summaries' ] ) && 1 == $fmc_settings[ 'multiple_summaries' ] ) ? 1 : 0;
 $fmc_settings[ 'contact_notifications' ] = ( isset( $fmc_settings[ 'contact_notifications' ] ) && 1 == $fmc_settings[ 'contact_notifications' ] ) ? 1 : 0;
-$fmc_settings[ 'allow_sold_searching' ] = ( isset( $fmc_settings[ 'allow_sold_searching' ] ) && 1 == $fmc_settings[ 'allow_sold_searching' ] ) ? 1 : 0;
-$fmc_settings[ 'listing_detail_expand_sections' ] = isset( $fmc_settings[ 'listing_detail_expand_sections' ] ) ? (int) $fmc_settings[ 'listing_detail_expand_sections' ] : 0;
-$fmc_settings[ 'listing_detail_show_more_info' ] = isset( $fmc_settings[ 'listing_detail_show_more_info' ] ) ? (int) $fmc_settings[ 'listing_detail_show_more_info' ] : 1;
-$fmc_settings[ 'listing_detail_contact_on_closed' ] = isset( $fmc_settings[ 'listing_detail_contact_on_closed' ] ) ? (int) $fmc_settings[ 'listing_detail_contact_on_closed' ] : 1;
 $fmc_settings[ 'neigh_template' ] = isset( $fmc_settings[ 'neigh_template' ] ) ? $fmc_settings[ 'neigh_template' ] : '';
 $fmc_settings[ 'destwindow' ] = isset( $fmc_settings[ 'destwindow' ] ) ? $fmc_settings[ 'destwindow' ] : '';
-$fmc_settings[ 'listlink' ] = isset( $fmc_settings[ 'listlink' ] ) ? $fmc_settings[ 'listlink' ] : '';
-$fmc_settings[ 'listpref' ] = isset( $fmc_settings[ 'listpref' ] ) ? $fmc_settings[ 'listpref' ] : 'listpref';
 $fmc_settings[ 'destlink' ] = isset( $fmc_settings[ 'destlink' ] ) ? $fmc_settings[ 'destlink' ] : '';
 $fmc_settings[ 'destpref' ] = isset( $fmc_settings[ 'destpref' ] ) ? $fmc_settings[ 'destpref' ] : 'own';
 $fmc_settings[ 'permabase' ] = isset( $fmc_settings[ 'permabase' ] ) ? $fmc_settings[ 'permabase' ] : 'idx';
@@ -93,92 +86,17 @@ add_thickbox();
 					</p>
 				</td>
 			</tr>
-			<tr>
-				<th scope="row">
-					<label for="multiple_summaries_y">Multiple Summary Lists</label>
-				</th>
-				<td>
-					<p>
-						<label for="multiple_summaries_y"><input type="radio" name="fmc_settings[multiple_summaries]" id="multiple_summaries_y" value="1" <?php checked( $fmc_settings[ 'multiple_summaries' ], 1 ); ?>> Allow multiple lists per page</label><br />
-						<label for="multiple_summaries_n"><input type="radio" name="fmc_settings[multiple_summaries]" id="multiple_summaries_n" value="0" <?php checked( $fmc_settings[ 'multiple_summaries' ], 0 ); ?>> Do not allow multiple lists per page</label>
-					</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
-					<label for="listpref_page">Listing Not Available Page</label>
-				</th>
-				<td>
-					<p>
-						<label for="listpref_default"><input type="radio" name="fmc_settings[listpref]" id="listpref_default" value="listpref" <?php checked( $fmc_settings[ 'listpref' ], 'listpref' ); ?>> Show Default Message: <em>This listing is no longer available</em></label><br />
-						<label for="listpref_page"><input type="radio" name="fmc_settings[listpref]" id="listpref_page" value="page" <?php checked( $fmc_settings[ 'listpref' ], 'page' ); ?>> Mimic the contents of this page:</label> <select name="fmc_settings[listlink]"><?php
-							$all_public_pages = get_posts( array(
-								'order' => 'ASC',
-								'orderby' => 'menu_order name',
-								'nopaging' => true,
-								'post_type' => 'page'
-							) );
-							$all_public_pages = is_array( $all_public_pages ) ? $all_public_pages : array();
-							foreach( $all_public_pages as $template ): ?>
-								<option value="<?php echo $template->ID; ?>" <?php selected( $template->ID, $fmc_settings[ 'listlink' ] ); ?>><?php
-									echo $template->post_title;
-									if( $fmc_settings[ 'listlink' ] == $template->ID ){
-										echo ' (Current Default)';
-									}
-								?></option>
-							<?php endforeach; ?>
-						?></select>
-					</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
-					<label for="allow_sold_searching_y">Sold & Pending Listings Search</label>
-				</th>
-				<td>
-					<p>
-						<label for="allow_sold_searching_y"><input type="radio" name="fmc_settings[allow_sold_searching]" id="allow_sold_searching_y" value="1" <?php checked( $fmc_settings[ 'allow_sold_searching' ], 1 ); ?>> Yes, allow visitors to search for sold & pending listings</label><br />
-						<label for="allow_sold_searching_n"><input type="radio" name="fmc_settings[allow_sold_searching]" id="allow_sold_searching_n" value="0" <?php checked( $fmc_settings[ 'allow_sold_searching' ], 0 ); ?>> No, do not allow searches for sold & pending listings</label>
-					</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
-					<label for="listing_detail_expand_sections_y">Expand all listing detail page sections by default</label>
-				</th>
-				<td>
-					<p>
-						<label for="listing_detail_expand_sections_y"><input type="radio" name="fmc_settings[listing_detail_expand_sections]" id="listing_detail_expand_sections_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_expand_sections' ], 1 ); ?>> Yes, show all sections expanded</label><br />
-						<label for="listing_detail_expand_sections_n"><input type="radio" name="fmc_settings[listing_detail_expand_sections]" id="listing_detail_expand_sections_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_expand_sections' ], 0 ); ?>> No, show other sections collapsed (users can expand each)</label>
-					</p>
-					<p class="description">Address Information, Location Tax &amp; Legal, General Property Information, and Property Features are always expanded. When set to No, remaining sections (e.g. Contract Information, Kitchen Features) start collapsed to reduce scrolling.</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
-					<label for="listing_detail_show_more_info_y">Show &quot;More Information&quot; section on listing detail pages</label>
-				</th>
-				<td>
-					<p>
-						<label for="listing_detail_show_more_info_y"><input type="radio" name="fmc_settings[listing_detail_show_more_info]" id="listing_detail_show_more_info_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_show_more_info' ], 1 ); ?>> Yes, show the More Information section</label><br />
-						<label for="listing_detail_show_more_info_n"><input type="radio" name="fmc_settings[listing_detail_show_more_info]" id="listing_detail_show_more_info_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_show_more_info' ], 0 ); ?>> No, hide the More Information section</label>
-					</p>
-					<p class="description">When No, the expandable &quot;More Information&quot; block is not displayed on listing detail pages.</p>
-				</td>
-			</tr>
-			<tr>
-				<th scope="row">
-					<label for="listing_detail_contact_on_closed_y">Contact on sold &amp; closed listings</label>
-				</th>
-				<td>
-					<p>
-						<label for="listing_detail_contact_on_closed_y"><input type="radio" name="fmc_settings[listing_detail_contact_on_closed]" id="listing_detail_contact_on_closed_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_contact_on_closed' ], 1 ); ?>> Yes, show the Contact button on sold &amp; closed listings</label><br />
-						<label for="listing_detail_contact_on_closed_n"><input type="radio" name="fmc_settings[listing_detail_contact_on_closed]" id="listing_detail_contact_on_closed_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_contact_on_closed' ], 0 ); ?>> No, hide it on sold &amp; closed listings</label>
-					</p>
-				</td>
-			</tr>
 		</tbody>
 	</table>
+	<?php
+	$all_public_pages = get_posts( array(
+		'order' => 'ASC',
+		'orderby' => 'menu_order name',
+		'nopaging' => true,
+		'post_type' => 'page'
+	) );
+	$all_public_pages = is_array( $all_public_pages ) ? $all_public_pages : array();
+	?>
 	<h3>Linking &amp; Link Settings</h3>
 	<table class="form-table">
 		<tbody>
@@ -314,47 +232,6 @@ add_thickbox();
 			<input type="hidden" name="fmc_settings[property_types]" value="<?php echo implode( ',', $property_types_letters ); ?>">
 		</tbody>
 	</table>
-	<h3>Search Results Page (Version 1 Template Only)</h3>
-	<p>Customize which fields are shown on the search results page. Drag the fields to change their order.</p>
-	<table class="form-table">
-		<tbody>
-			<tr>
-				<th scope="row">
-					<label>Search Results Fields</label>
-				</th>
-				<td>
-					<?php
-						$SparkFields = new \SparkAPI\StandardFields();
-						$property_fields = $SparkFields->get_standard_fields();
-
-						$json_fields = json_encode( isset( $fmc_settings[ 'search_results_fields' ] ) && is_array( $fmc_settings[ 'search_results_fields' ] ) ? $fmc_settings[ 'search_results_fields' ] : array() );
-
-						// Template that will be populated with $jsonFields data through js
-						$json_template  = '<div id="flexmls_connect__field_{{field_id}}" class="flexmls_connect__admin_srf_row">';
-						$json_template .= '<span class="flexmls_connect__admin_srf_field_col">{{field_id}}</span>';
-						$json_template .= '<input class="flexmls_connect__admin_srf_display_col" type="text" name="fmc_settings[search_results_fields][{{field_id}}]" value="{{display_name}}">';
-						$json_template .= '<a class="flexmls_connect__admin_srf_delete" href="#">Delete</a>';
-						$json_template .= '</div>';
-					?>
-					<div id="flexmls_connect__admin_srf_table" class="flexmls_connect__admin_srf_table" data-fields='<?php echo $json_fields; ?>' data-template='<?php echo $json_template; ?>'>
-						<div class="flexmls_connect__admin_srf_labels">
-							<div class="flexmls_connect__admin_srf_label flexmls_connect__admin_srf_field_col">Field ID</div>
-							<div class="flexmls_connect__admin_srf_label flexmls_connect__admin_srf_display_col">Display Name</div>
-						</div>
-					</div>
-					<br />
-					<select data-placeholder="Add a new field..." class="chosen-select flexmls_connect__admin_srf_add_new" style="width:350px;" tabindex="4">
-						<option value=""></option>
-						<?php if( is_array( $property_fields ) ): ?>
-							<?php foreach( $property_fields[ 0 ] as $property_key => $property_val ): ?>
-								<option value="<?php echo $property_key; ?>"><?php echo $property_val[ 'Label' ]; ?></option>
-							<?php endforeach; ?>
-						<?php endif; ?>
-					</select>
-				</td>
-			</tr>
-		</tbody>
-	</table>
     <h3>Select2 Scripts</h3>
     <p>By default, Flexmls plugin loads Select2 scripts. If there are conflicts with other plugins or themes, turn off loading it.</p>
     <table class="form-table">
@@ -381,7 +258,7 @@ add_thickbox();
     <?php endif; ?>
     
     
-    <p><?php wp_nonce_field( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce' ); ?><button type="submit" class="button-primary">Save Settings</button></p>
+    <?php \FlexMLS\Admin\Settings::floating_save_button( 'update_fmc_behavior_action', 'update_fmc_behavior_nonce', 'Save Settings' ); ?>
 </form>
 
 <style>
