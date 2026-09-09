@@ -774,7 +774,7 @@ class fmcPhotos extends fmcWidget {
 
   private function set_display_day_options(){
     $options = array(
-        null => "1 (3 on Monday)",
+        '' => "1 (3 on Monday)",
         1 => 1,
         2 => 2,
         3 => 3,

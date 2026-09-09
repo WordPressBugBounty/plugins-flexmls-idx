@@ -776,10 +776,10 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
       // map details, if present
       if ( isset ( $options['google_maps_api_key'] ) && $options['google_maps_api_key'] && flexmlsConnect::is_not_blank_or_restricted( $sf['Latitude'] ?? '' ) && flexmlsConnect::is_not_blank_or_restricted( $sf['Longitude'] ?? '' ) ){
-      \FlexMLS\Admin\Enqueue::maybe_enqueue_listing_detail_map( $options );
       echo "<div class='flexmls_connect__tab_group' id='flexmls_connect__map_group'>
-        <div id='flexmls_connect__map_canvas' latitude='{$sf['Latitude']}' longitude='{$sf['Longitude']}'></div>
+        <div id='flexmls_connect__map_canvas' latitude='{$sf['Latitude']}' longitude='{$sf['Longitude']}' data-fmc-map-lazy='1'></div>
         </div>";
+      \FlexMLS\Admin\Enqueue::print_listing_detail_map_lazy_config_script( $options );
       }
 
 

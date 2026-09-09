@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 4.0
+Stable tag: 4.0.1
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,14 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+
+= 4.0.1 = 
+Efficiency Updates:
+* Implemented lazy-loading for listing detail maps to improve page performance
+* Added support for displaying Open House End Times in the V2 Listing Summary and Template
+* Addressed various warnings for PHP version 8.5
+* Resolved an issue where the IDX Link Select2 dropdown failed to initialize in the WordPress Widgets and Customizer areas
+* Implemented various security hardening measures and authentication stability improvements
 
 = 4.0 =
 Improvements & New Features:

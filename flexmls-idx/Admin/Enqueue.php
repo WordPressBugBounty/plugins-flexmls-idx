@@ -184,19 +184,13 @@ class Enqueue {
             );
         }
 
-		// Google Maps: only enqueue when a map is shown on load (listing detail or search with default_view=map).
-		// Search results with default_view=list (map closed) load the API when user clicks "Open Map" to avoid billing every page load.
+		// Google Maps: enqueue on page load only for search with default_view=map.
+		// Search results with default_view=list and listing detail maps load the API when opened or scrolled into view.
 		$google_maps_no_enqueue = 0;
 		if( isset( $options[ 'google_maps_no_enqueue' ] ) && 1 == $options[ 'google_maps_no_enqueue' ] ){
 			$google_maps_no_enqueue = 1;
 		}
-		$has_maps_key = isset( $options[ 'google_maps_api_key' ] ) && ! empty( $options[ 'google_maps_api_key' ] ) && 0 === $google_maps_no_enqueue;
-		$is_listing_detail = self::page_has_listing_detail();
 		$fmc_connect_deps = array( 'jquery' );
-		if ( $has_maps_key && $is_listing_detail ) {
-			self::enqueue_google_maps( $options );
-			$fmc_connect_deps[] = 'fmc-google-maps-bootstrap';
-		}
 
     if(!isset( $options[ 'select2_turn_off' ]))
         $options[ 'select2_turn_off' ] = 0;
@@ -276,18 +270,52 @@ class Enqueue {
 	}
 
 	/**
-	 * Enqueue Google Maps when listing detail map markup is rendered (widget/shortcode/page-builder fallback).
+	 * Maps JavaScript API URL for lazy-load injection.
 	 *
-	 * @param array|null $options Optional. FMC settings. Defaults to get_option( 'fmc_settings' ).
+	 * @param array|null $options Optional. FMC settings.
+	 * @return string
 	 */
-	static function maybe_enqueue_listing_detail_map( $options = null ) {
+	static function get_google_maps_api_url( $options = null ) {
+		if ( $options === null ) {
+			$options = get_option( 'fmc_settings' );
+		}
+		if ( empty( $options['google_maps_api_key'] ) ) {
+			return '';
+		}
+		return 'https://maps.googleapis.com/maps/api/js?key=' . $options['google_maps_api_key'] . '&libraries=marker&loading=async&callback=fmcGmapsReady';
+	}
+
+	/**
+	 * Lazy-load config for client-side Maps API injection.
+	 *
+	 * @param array|null $options Optional. FMC settings.
+	 * @return array|null
+	 */
+	static function get_google_maps_lazy_load_config( $options = null ) {
 		if ( $options === null ) {
 			$options = get_option( 'fmc_settings' );
 		}
 		if ( empty( $options['google_maps_api_key'] ) || ! empty( $options['google_maps_no_enqueue'] ) ) {
+			return null;
+		}
+		$maps_url = self::get_google_maps_api_url( $options );
+		if ( $maps_url === '' ) {
+			return null;
+		}
+		return array( 'maps_url' => $maps_url );
+	}
+
+	/**
+	 * Output window.fmcListingDetailMapLazyConfig for listing detail lazy-load.
+	 *
+	 * @param array|null $options Optional. FMC settings.
+	 */
+	static function print_listing_detail_map_lazy_config_script( $options = null ) {
+		$config = self::get_google_maps_lazy_load_config( $options );
+		if ( $config === null ) {
 			return;
 		}
-		self::enqueue_google_maps( $options );
+		echo '<script type="text/javascript">window.fmcListingDetailMapLazyConfig=' . wp_json_encode( $config ) . ';</script>';
 	}
 
 	/**

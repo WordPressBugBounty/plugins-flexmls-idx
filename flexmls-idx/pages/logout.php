@@ -3,13 +3,7 @@
 class flexmlsConnectPageLogout {
 
 	function pre_tasks( $tag ){
-		if( !headers_sent() ){
-			setcookie( 'spark_oauth', json_encode( array() ), array(
-				'expires' => time() - DAY_IN_SECONDS,
-				'path' => '/',
-				'samesite' => 'Lax'
-			) );
-		}
+		\flexmlsConnectPortalUser::set_spark_oauth_cookie( json_encode( array() ), time() - DAY_IN_SECONDS );
 		wp_redirect( home_url() );
 		exit;
 	}

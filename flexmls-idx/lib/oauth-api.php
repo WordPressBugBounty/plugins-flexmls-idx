@@ -124,24 +124,90 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
     return home_url( 'index.php/oauth/callback' );
   }
 
+	public static function spark_oauth_cookie_options( $expires ){
+		return array(
+			'expires'  => $expires,
+			'path'     => '/',
+			'secure'   => is_ssl(),
+			'httponly' => true,
+			'samesite' => 'Lax',
+		);
+	}
+
+	public static function set_spark_oauth_cookie( $value, $expires ){
+		if( headers_sent() ){
+			return false;
+		}
+		return setcookie( 'spark_oauth', $value, self::spark_oauth_cookie_options( $expires ) );
+	}
+
+	private function parse_spark_oauth_raw(){
+		global $spark_oauth_global;
+
+		if( isset( $_COOKIE[ 'spark_oauth' ] ) && '' !== $_COOKIE[ 'spark_oauth' ] ){
+			$decoded = json_decode( stripslashes( $_COOKIE[ 'spark_oauth' ] ), true );
+			if( is_array( $decoded ) ){
+				return $decoded;
+			}
+		}
+
+		if( !empty( $spark_oauth_global ) && is_array( $spark_oauth_global ) ){
+			return $spark_oauth_global;
+		}
+
+		return array();
+	}
+
+	private function get_spark_oauth(){
+		$spark_oauth = $this->parse_spark_oauth_raw();
+		if( $this->spark_oauth_has_token( $spark_oauth ) ){
+			return $spark_oauth;
+		}
+		return null;
+	}
+
+	private function spark_oauth_has_token( $spark_oauth ){
+		return !empty( $this->get_oauth_access_token( $spark_oauth ) );
+	}
+
+	private function get_oauth_access_token( $spark_oauth ){
+		if( !is_array( $spark_oauth ) ){
+			return '';
+		}
+		if( !empty( $spark_oauth[ 'last_token' ] ) ){
+			return $spark_oauth[ 'last_token' ];
+		}
+		if( !empty( $spark_oauth[ 'access_token' ] ) ){
+			return $spark_oauth[ 'access_token' ];
+		}
+		return '';
+	}
+
+	private function is_portal_user_service( $service ){
+		return 0 === strpos( $service, 'my/' )
+			|| 0 === strpos( $service, 'savedsearches' )
+			|| 0 === strpos( $service, 'listingcarts' );
+	}
+
+	private function clear_spark_oauth_cookie(){
+		global $spark_oauth_global;
+		$spark_oauth_global = array();
+		self::set_spark_oauth_cookie( '', time() - DAY_IN_SECONDS );
+		unset( $_COOKIE[ 'spark_oauth' ] );
+	}
+
   /**
   * Returns if the user is logged in or not.
   * @return bool If user is logged in
   */
 	public function is_logged_in(){
-		global $spark_oauth_global;
-		$spark_oauth = array();
-		if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-			$spark_oauth = $_COOKIE[ 'spark_oauth' ];
+		if( !empty( $this->get_spark_oauth() ) ){
+			return true;
 		}
-		if( empty( $spark_oauth ) ){
-			$spark_oauth = $spark_oauth_global;
+		if( isset( $_COOKIE[ 'spark_oauth' ] ) && '' !== $_COOKIE[ 'spark_oauth' ] ){
+			$this->clear_spark_oauth_cookie();
 		}
-		if( !isset( $_COOKIE[ 'spark_oauth' ] ) && empty( $spark_oauth ) ){
-			return false;
-		}
-		return true;
-		//return ($this->get_info() ? true: false);
+		return false;
 	}
 
   /**
@@ -149,13 +215,7 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
   * Does NOT delete any cookies which may exist.
   */
 	public function log_out(){
-		if( !headers_sent() ){
-			setcookie( 'spark_oauth', json_encode( array() ), array(
-				'expires' => time() - DAY_IN_SECONDS,
-				'path' => '/',
-				'samesite' => 'Lax'
-			) );
-		}
+		self::set_spark_oauth_cookie( json_encode( array() ), time() - DAY_IN_SECONDS );
 		$OAuth = new \SparkAPI\OAuth();
 		//$OAuth->log_out();
 		$request = $OAuth->sign_request( array(
@@ -250,6 +310,9 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
   * @return Array
   */
 	public function get_info(){
+		if( !$this->is_logged_in() ){
+			return null;
+		}
 		if( !isset( $this->user_info ) ){
 			$me = $this->get_from_api( 'GET', 'my/contact', 10 * MINUTE_IN_SECONDS, array( '_select' => 'DisplayName' ) );
 			if( 1 == $me[ 'success' ] ){
@@ -287,14 +350,7 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
   */
 	function Grant( $code, $type = 'authorization_code' ){
 		global $spark_oauth_global;
-		$spark_oauth = array();
-		if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-			$spark_oauth = $_COOKIE[ 'spark_oauth' ];
-			$spark_oauth = json_decode( stripslashes( $_COOKIE[ 'spark_oauth' ] ), true );
-		}
-		if( empty( $spark_oauth ) ){
-			$spark_oauth = $spark_oauth_global;
-		}
+		$spark_oauth = $this->parse_spark_oauth_raw();
 		$body = array(
 			'client_id' => $this->oauth_key,
 			'client_secret' => $this->oauth_secret,
@@ -317,13 +373,7 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 				'last_token' => $response[ 'access_token' ],
 				'refresh_token' => $response[ 'refresh_token' ]
 			);
-			if( !headers_sent() ){
-				setcookie( 'spark_oauth', json_encode( $spark_oauth_global ), array(
-					'expires' => time() + 30 * DAY_IN_SECONDS,
-					'path' => '/',
-					'samesite' => 'Lax'
-				) );
-			}
+			self::set_spark_oauth_cookie( json_encode( $spark_oauth_global ), time() + 30 * DAY_IN_SECONDS );
 			//$this->SetAccessToken( $response[ 'access_token' ] );
 			//$this->SetRefreshToken( $response[ 'refresh_token' ] );
 			if( is_callable( $this->access_change_callback ) ){
@@ -335,18 +385,21 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 	}
 
 	function make_api_call( $method, $service, $cache_time = 0, $params = array(), $post_data = null, $a_retry = false ){
-		global $spark_oauth_global;
-		$spark_oauth = array();
-		if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-			$spark_oauth = $_COOKIE[ 'spark_oauth' ];
-			$spark_oauth = json_decode( stripslashes( $_COOKIE[ 'spark_oauth' ] ), true );
-		}
-		if( empty( $spark_oauth ) ){
-			$spark_oauth = $spark_oauth_global;
+		$spark_oauth = $this->get_spark_oauth();
+		$oauth_token = $this->get_oauth_access_token( $spark_oauth );
+
+		if( $this->is_portal_user_service( $service ) && empty( $oauth_token ) ){
+			return array(
+				'D' => array(
+					'Success' => false,
+					'Code' => 401,
+					'Message' => 'Portal login required',
+				),
+			);
 		}
 
-		if( isset( $spark_oauth[ 'last_token' ] ) ){
-			$this->api_headers[ 'Authorization' ] = 'OAuth ' . $spark_oauth[ 'last_token' ];
+		if( !empty( $oauth_token ) ){
+			$this->api_headers[ 'Authorization' ] = 'OAuth ' . $oauth_token;
 		}
 
 		$seconds_to_cache = \FlexMLS\Admin\Formatter::parse_cache_time( $cache_time );
@@ -400,10 +453,13 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 			if( array_key_exists( 'D', $json ) ){
 				if( true == $json[ 'D' ][ 'Success' ] && 'GET' == strtoupper( $method ) && $service != 'oauth2/grant' ){
 					//set_transient( 'flexmls_query_' . $request[ 'transient_name' ], $json, $seconds_to_cache );
-				} elseif( isset( $json[ 'D' ][ 'Code' ] ) && 1020 == $json[ 'D' ][ 'Code' ] ){
-					delete_transient( 'flexmls_auth_token' );
-					if( method_exists( $this, 'generate_auth_token' ) && $this->generate_auth_token() ){
-						$json = $this->make_api_call( $method, $service, 0, array(), null, false );
+				} elseif( ! $a_retry && $this->response_requires_auth_token_refresh( $json ) ){
+					if( ! \FlexMLS\Admin\ConnectionPause::should_block_auto_token_refresh() ){
+						delete_transient( 'flexmls_auth_token' );
+						$SparkAPI = new \SparkAPI\Core();
+						if( $SparkAPI->generate_auth_token( 'auto' ) ){
+							$json = $this->make_api_call( $method, $service, 0, $params, $post_data, true );
+						}
 					}
 				}
 			}
@@ -411,50 +467,58 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 		return $json;
 	}
 
+	/**
+	 * Whether an API failure should clear the cached AuthToken and retry once.
+	 *
+	 * @param mixed $json Decoded API response.
+	 * @return bool
+	 */
+	protected function response_requires_auth_token_refresh( $json ) {
+		if ( ! is_array( $json ) || ! isset( $json['D'] ) || ! is_array( $json['D'] ) ) {
+			return false;
+		}
+		$d = $json['D'];
+		if ( isset( $d['Success'] ) && true == $d['Success'] ) {
+			return false;
+		}
+		$code = isset( $d['Code'] ) ? (int) $d['Code'] : 0;
+		if ( 1010 === $code || 1015 === $code ) {
+			return false;
+		}
+		if ( 1020 === $code ) {
+			return true;
+		}
+		$message = isset( $d['Message'] ) ? (string) $d['Message'] : '';
+		if ( '' !== $message && preg_match( '/auth\s*token|session\s*token|token.*(expired|invalid)|(expired|invalid).*token/i', $message ) ) {
+			return true;
+		}
+		return false;
+	}
+
 	function SetAccessToken( $token ){
 		global $spark_oauth_global;
-		$spark_oauth = array();
-		if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-			$spark_oauth = $_COOKIE[ 'spark_oauth' ];
-			$spark_oauth = json_decode( stripslashes( $_COOKIE[ 'spark_oauth' ] ), true );
-		}
-		if( empty( $spark_oauth ) ){
-			$spark_oauth = $spark_oauth_global;
+		$spark_oauth = $this->parse_spark_oauth_raw();
+		if( !is_array( $spark_oauth ) ){
+			$spark_oauth = array();
 		}
 
 		$spark_oauth[ 'access_token' ] = $token;
 		$spark_oauth_global[ 'access_token' ] = $token;
 		$spark_oauth[ 'last_token' ] = $token;
 		$spark_oauth_global[ 'last_token' ] = $token;
-		if( !headers_sent() ){
-			setcookie( 'spark_oauth', json_encode( $spark_oauth ), array(
-				'expires' => time() + 30 * DAY_IN_SECONDS,
-				'path' => '/',
-				'samesite' => 'Lax'
-			) );
-		}
+		self::set_spark_oauth_cookie( json_encode( $spark_oauth ), time() + 30 * DAY_IN_SECONDS );
 	}
 
 	function SetRefreshToken($token) {
 		global $spark_oauth_global;
-		$spark_oauth = array();
-		if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-			$spark_oauth = $_COOKIE[ 'spark_oauth' ];
-			$spark_oauth = json_decode( stripslashes( $_COOKIE[ 'spark_oauth' ] ), true );
-		}
-		if( empty( $spark_oauth ) ){
-			$spark_oauth = $spark_oauth_global;
+		$spark_oauth = $this->parse_spark_oauth_raw();
+		if( !is_array( $spark_oauth ) ){
+			$spark_oauth = array();
 		}
 
 		$spark_oauth[ 'refresh_token' ] = $token;
 		$spark_oauth_global[ 'refresh_token' ] = $token;
-		if( !headers_sent() ){
-			setcookie( 'spark_oauth', json_encode( $spark_oauth ), array(
-				'expires' => time() + 30 * DAY_IN_SECONDS,
-				'path' => '/',
-				'samesite' => 'Lax'
-			) );
-		}
+		self::set_spark_oauth_cookie( json_encode( $spark_oauth ), time() + 30 * DAY_IN_SECONDS );
 	}
 
 	function sign_request( $request ){
@@ -516,18 +580,7 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 	}
 
   function ReAuthenticate() {
-
-  	global $spark_oauth_global;
-	$spark_oauth = array();
-	if( isset( $_COOKIE[ 'spark_oauth' ] ) ){
-		$spark_oauth = $_COOKIE[ 'spark_oauth' ];
-		$spark_oauth = json_decode( stripslashes( $_COOKIE[ 'spark_oauth' ] ), true );
-	}
-	if( empty( $spark_oauth ) ){
-		$spark_oauth = $spark_oauth_global;
-	}
-
-	$spark_oauth[ 'refresh_token' ] = $token;
+	$spark_oauth = $this->parse_spark_oauth_raw();
     if ( isset( $spark_oauth[ 'refresh_token' ] ) && !empty( $spark_oauth[ 'refresh_token' ] ) ) {
       return $this->Grant(unserialize( $spark_oauth[ 'refresh_token' ] ), 'refresh_token');
     }

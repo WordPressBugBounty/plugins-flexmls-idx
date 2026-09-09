@@ -403,9 +403,13 @@ class Core {
 	public function generate_auth_token( $context = 'auto' ) {
 		$auth_token = get_transient( 'flexmls_auth_token' );
 		if ( $auth_token ) {
-			delete_transient( 'flexmls_auth_failures_timestamps' );
-			\FlexMLS\Admin\ConnectionPause::clear_state();
-			return $auth_token;
+			if ( $this->cached_auth_token_is_usable( $auth_token ) ) {
+				delete_transient( 'flexmls_auth_failures_timestamps' );
+				\FlexMLS\Admin\ConnectionPause::clear_state();
+				return $auth_token;
+			}
+			// Corrupt or expired cached session — force a new /session.
+			delete_transient( 'flexmls_auth_token' );
 		}
 
 		if ( \FlexMLS\Admin\ConnectionPause::should_block_auto_session( $context ) ) {
@@ -428,7 +432,10 @@ class Core {
 
 		if ( ! $have_lock ) {
 			$auth_token = $this->wait_for_transient( 'flexmls_auth_token', self::AUTH_POLL_MAX_WAIT );
-			return $auth_token ? $auth_token : $this->generate_auth_token( $context );
+			if ( $auth_token && $this->cached_auth_token_is_usable( $auth_token ) ) {
+				return $auth_token;
+			}
+			return $this->generate_auth_token( $context );
 		}
 
 		$failures_timestamps = get_transient( 'flexmls_auth_failures_timestamps' ) ?: array();
@@ -550,6 +557,64 @@ class Core {
 	 */
 	private function is_valid_response( $response ) {
 		return is_array( $response ) && isset( $response['D']['Success'] ) && true === wp_validate_boolean( $response['D']['Success'] );
+	}
+
+	/**
+	 * Whether a cached session payload still has a usable AuthToken.
+	 *
+	 * @param mixed $auth_token Value from the flexmls_auth_token transient.
+	 * @return bool
+	 */
+	private function cached_auth_token_is_usable( $auth_token ) {
+		if ( ! is_array( $auth_token ) ) {
+			return false;
+		}
+		$token = '';
+		if ( isset( $auth_token['D']['Results'][0]['AuthToken'] ) ) {
+			$token = (string) $auth_token['D']['Results'][0]['AuthToken'];
+		}
+		if ( '' === $token ) {
+			return false;
+		}
+		if ( isset( $auth_token['D']['Results'][0]['Expires'] ) ) {
+			$expires = strtotime( (string) $auth_token['D']['Results'][0]['Expires'] );
+			if ( false !== $expires && $expires <= time() ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Whether an API failure should clear the cached AuthToken and retry once.
+	 *
+	 * Spark typically returns 1020 for expired sessions, but other auth/session
+	 * failures historically left a dead token cached until manual clear.
+	 * Do not refresh on permanent credential failures (1010 / 1015).
+	 *
+	 * @param mixed $json Decoded API response.
+	 * @return bool
+	 */
+	protected function response_requires_auth_token_refresh( $json ) {
+		if ( ! is_array( $json ) || ! isset( $json['D'] ) || ! is_array( $json['D'] ) ) {
+			return false;
+		}
+		$d = $json['D'];
+		if ( isset( $d['Success'] ) && wp_validate_boolean( $d['Success'] ) ) {
+			return false;
+		}
+		$code = isset( $d['Code'] ) ? (int) $d['Code'] : 0;
+		if ( 1010 === $code || 1015 === $code ) {
+			return false;
+		}
+		if ( 1020 === $code ) {
+			return true;
+		}
+		$message = isset( $d['Message'] ) ? (string) $d['Message'] : '';
+		if ( '' !== $message && preg_match( '/auth\s*token|session\s*token|token.*(expired|invalid)|(expired|invalid).*token/i', $message ) ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -759,7 +824,14 @@ class Core {
 		$auth_token_generated = $this->generate_auth_token();
 
 		if ( ! $auth_token_generated ) {
-			return array( 'D' => array( 'Success' => false ) );
+			$failure = array( 'Success' => false );
+			if ( null !== $this->last_error_code && '' !== (string) $this->last_error_code ) {
+				$failure['Code'] = $this->last_error_code;
+			}
+			if ( null !== $this->last_error_mess && '' !== (string) $this->last_error_mess ) {
+				$failure['Message'] = $this->last_error_mess;
+			}
+			return array( 'D' => $failure );
 		}
 
 		// Create the request object.
@@ -799,7 +871,7 @@ class Core {
 				}
 			}
 
-			if ( isset( $json['D']['Code'] ) && 1020 === intval( $json['D']['Code'] ) && ! $a_retry ) {
+			if ( ! $a_retry && $this->response_requires_auth_token_refresh( $json ) ) {
 				if ( ! \FlexMLS\Admin\ConnectionPause::should_block_auto_token_refresh() ) {
 					delete_transient( 'flexmls_auth_token' );
 					if ( $this->generate_auth_token( 'auto' ) ) {

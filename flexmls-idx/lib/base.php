@@ -778,12 +778,14 @@ class flexmlsConnect {
       $query_parts = explode("&", $query_string ?? '');
       $manual = array();
       foreach ($query_parts as $p) {
-        list($k, $v) = array_pad(@explode("=", $p, 2),-2,null);
-        if (array_key_exists($k, $manual)) {
-          $manual[$k] .= ",".urldecode($v);
+        if ( $p === '' || false === strpos( $p, '=' ) ) {
+          continue;
         }
-        else {
-          $manual[$k] = urldecode($v);
+        list( $k, $v ) = explode( '=', $p, 2 );
+        if ( array_key_exists( $k, $manual ) ) {
+          $manual[ $k ] .= ',' . urldecode( $v );
+        } else {
+          $manual[ $k ] = urldecode( $v );
         }
       }
       if ( array_key_exists($key, $manual) ) {

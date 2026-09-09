@@ -238,7 +238,7 @@ class fmcSearchResults_v1 extends fmcWidget {
     );
 
     $vars["display_day_options"] = array(
-            null => "1 (3 on Monday)",
+            '' => "1 (3 on Monday)",
             1 => 1,
             2 => 2,
             3 => 3,
@@ -380,7 +380,7 @@ class fmcSearchResults_v1 extends fmcWidget {
         'recent_sales'  => 'Recent Sales',
       ),
       'display_day_options'                => array(
-        null => '1 (3 on Monday)',
+        '' => '1 (3 on Monday)',
         1    => 1,
         2    => 2,
         3    => 3,

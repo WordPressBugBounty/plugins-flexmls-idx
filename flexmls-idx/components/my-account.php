@@ -229,6 +229,9 @@ class fmcAccount extends fmcWidget {
 		global $fmc_api_portal;
 		//$searches = $fmc_api_portal->GetSavedSearches();
 		$info = $fmc_api_portal->get_info();
+		if( empty( $info ) || empty( $info[ 'Id' ] ) ){
+			return;
+		}
 		$searches = $fmc_api_portal->GetMySavedSearches( $info[ 'Id' ] );
 		if( $searches ) :
 			?>
@@ -249,6 +252,9 @@ class fmcAccount extends fmcWidget {
   private function display_name(){
     global $fmc_api_portal;
     $info = $fmc_api_portal->get_info();
+    if( empty( $info ) || empty( $info[ 'DisplayName' ] ) ){
+      return;
+    }
     ?>
       <a href='#' style='float: right;' class=flexmls_connect_log_out>Sign Out</a>
       <span style='font-weight:bold; font-size: 1.2em;'>

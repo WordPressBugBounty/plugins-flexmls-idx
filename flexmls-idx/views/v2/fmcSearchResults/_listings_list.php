@@ -131,17 +131,16 @@
 					$open_houses = ( isset( $sf['OpenHouses'] ) && is_array( $sf['OpenHouses'] ) ) ? $sf['OpenHouses'] : array();
 					$next_open_house = ! empty( $open_houses[0] ) && is_array( $open_houses[0] ) ? $open_houses[0] : null;
 					?>
-					<?php if ( $display_open_house_datetime && $next_open_house && ( ! empty( $next_open_house['Date'] ) || ! empty( $next_open_house['StartTime'] ) ) ) : ?>
+					<?php if ( $display_open_house_datetime && $next_open_house && ( ! empty( $next_open_house['Date'] ) || ! empty( $next_open_house['StartTime'] ) || ! empty( $next_open_house['EndTime'] ) ) ) : ?>
 						<?php
-						$open_house_parts = array_filter(
-							array(
-								isset( $next_open_house['Date'] ) ? $next_open_house['Date'] : '',
-								isset( $next_open_house['StartTime'] ) ? $next_open_house['StartTime'] : '',
-							)
-						);
+						$open_house_date  = isset( $next_open_house['Date'] ) ? $next_open_house['Date'] : '';
+						$open_house_start = isset( $next_open_house['StartTime'] ) ? $next_open_house['StartTime'] : '';
+						$open_house_end   = isset( $next_open_house['EndTime'] ) ? $next_open_house['EndTime'] : '';
+						$open_house_time  = trim( $open_house_start . ( $open_house_start && $open_house_end ? ' - ' : '' ) . $open_house_end );
+						$open_house_display = trim( $open_house_date . ( $open_house_date && $open_house_time ? ' - ' : '' ) . $open_house_time );
 						?>
 						<div class="flexmls-open-house-datetime-wrapper">
-							<span class="flexmls-bold-label">Open House: </span><?php echo esc_html( implode( ' - ', $open_house_parts ) ); ?>
+							<span class="flexmls-bold-label">Open House: </span><?php echo esc_html( $open_house_display ); ?>
 						</div>
 					<?php endif; ?>
 					<div class="flexmls-last-modified-and-idx-wrapper">

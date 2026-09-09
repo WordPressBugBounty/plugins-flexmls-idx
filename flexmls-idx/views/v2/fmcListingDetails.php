@@ -613,8 +613,20 @@
 
 	<div class="map-section listing-section">
 		<?php if ( isset ( $options['google_maps_api_key'] ) && $options['google_maps_api_key'] && flexmlsConnect::is_not_blank_or_restricted( $sf['Latitude'] ?? '' ) && flexmlsConnect::is_not_blank_or_restricted( $sf['Longitude'] ?? '' ) ) : ?>
-			<?php \FlexMLS\Admin\Enqueue::maybe_enqueue_listing_detail_map( $options ); ?>
-			<div id='flexmls_connect__map_canvas' latitude='<?php echo esc_attr( $sf['Latitude'] ); ?>' longitude='<?php echo esc_attr( $sf['Longitude'] ); ?>'></div>
+			<?php
+			$listing_map_height = '500px';
+			if ( ! empty( $options['map_height'] ) ) {
+				if ( strpos( $options['map_height'], 'px' ) !== false || strpos( $options['map_height'], '%' ) !== false ) {
+					$listing_map_height = $options['map_height'];
+				} else {
+					$listing_map_height = intval( $options['map_height'] ) . 'px';
+				}
+			}
+			?>
+			<div class="flexmls-listing-map-wrapper">
+				<div id="flexmls_connect__map_canvas" class="flex-map" data-fmc-map-lazy="1" style="height:<?php echo esc_attr( $listing_map_height ); ?>;" latitude="<?php echo esc_attr( $sf['Latitude'] ); ?>" longitude="<?php echo esc_attr( $sf['Longitude'] ); ?>"></div>
+				<?php \FlexMLS\Admin\Enqueue::print_listing_detail_map_lazy_config_script( $options ); ?>
+			</div>
 		<?php endif; ?>
 	</div>
 

@@ -73,7 +73,7 @@ $fmc_settings[ 'search_results_display_open_house_datetime' ] = ( isset( $fmc_se
 							Show the next open house date and time on Version 2 listing summary and search results cards.
 						</label>
 					</p>
-					<p class="description">When enabled, listings with an upcoming open house display the date and start time (for example, <code>Open House: 08/22/2026 - 1:00 PM</code>).</p>
+					<p class="description">When enabled, listings with an upcoming open house display the date and time range (for example, <code>Open House: 08/22/2026 - 1:00 PM - 4:00 PM</code>).</p>
 				</td>
 			</tr>
 		</tbody>
