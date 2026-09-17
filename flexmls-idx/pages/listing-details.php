@@ -450,7 +450,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
 
       if ( $show_listing_lead_actions && isset($api_my_account['Name']) && isset($api_my_account['Emails'][0]['Address'])) : ?>
         <button onclick="flexmls_connect.scheduleShowing({
-          'id': '<?php addslashes($sf['ListingKey']) ?>',
+          'id': '<?php echo addslashes( $sf['ListingKey'] ?? '' ); ?>',
+          'listingKey': '<?php echo addslashes( $sf['ListingKey'] ?? '' ); ?>',
+          'listingId': '<?php echo addslashes( $sf['ListingId'] ?? '' ); ?>',
           'title': 'Schedule a Showing',
           'subject': '<?php echo $one_line_address_add_slashes; ?> - MLS# <?php echo addslashes($sf['ListingId']); ?>',
           'agentName': '<?php echo addslashes($api_my_account['Name'])?>',
@@ -472,6 +474,8 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
         'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
         'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
         'id': '<?php echo addslashes($sf['ListingId']); ?>',
+        'listingId': '<?php echo addslashes( $sf['ListingId'] ?? '' ); ?>',
+        'listingKey': '<?php echo addslashes( $sf['ListingKey'] ?? '' ); ?>',
         'phoneRequired': <?php echo $phone_req ? 'true' : 'false'; ?>,
         'addressRequired': <?php echo $address_req ? 'true' : 'false'; ?>
         <?php if( isset($options['contact_disclaimer']) ) : ?>

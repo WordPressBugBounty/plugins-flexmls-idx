@@ -33,6 +33,11 @@ class flexmlsPortalPopup{
       return;
     }
 
+    // Visitor clicked "Not Now" — respect timed snooze (when force login is off).
+    if ( ! $options->portal_force() && self::is_snoozed() ) {
+      return;
+    }
+
   //    Since headers have already been sent, need to update cookie values in javascript
     echo "<input class='flexmlsConnect_cookie' value=$page type='hidden'  />";
 
@@ -54,6 +59,51 @@ class flexmlsPortalPopup{
 
   }
 
+  /**
+   * Cookie name used after the visitor clicks "Not Now".
+   */
+  static function snooze_cookie_name() {
+    return 'flexmls_portal_snooze';
+  }
+
+  /**
+   * Allowed snooze duration units.
+   *
+   * @return array
+   */
+  static function snooze_units() {
+    return array( 'minutes', 'hours', 'days', 'weeks', 'months' );
+  }
+
+  /**
+   * Numeric snooze amount. Default 7.
+   */
+  static function snooze_amount() {
+    $options = new Fmc_Settings;
+    $amount = intval( $options->portal_snooze_amount() );
+    if ( $amount < 1 ) {
+      $amount = intval( $options->portal_snooze_days() );
+    }
+    return $amount > 0 ? $amount : 7;
+  }
+
+  /**
+   * Snooze unit. Default days.
+   */
+  static function snooze_unit() {
+    $options = new Fmc_Settings;
+    $unit = $options->portal_snooze_unit();
+    return in_array( $unit, self::snooze_units(), true ) ? $unit : 'days';
+  }
+
+  /**
+   * Whether the visitor is within an active "Not Now" snooze window.
+   */
+  static function is_snoozed() {
+    $name = self::snooze_cookie_name();
+    return isset( $_COOKIE[ $name ] ) && '1' === (string) $_COOKIE[ $name ];
+  }
+
   static function timeout_time_left(){
     global $fmc_api_portal;
     $options = get_option('fmc_settings');
@@ -71,6 +121,9 @@ class flexmlsPortalPopup{
       <input id="portal_seconds" type=hidden value ="<?php echo $seconds; ?>" />
       <input id="portal_show" type=hidden value ="<?php echo $show_now; ?>" />
       <input id="portal_required" type=hidden value="<?php echo $options['portal_force']; ?>" />
+      <input id="portal_snooze_amount" type=hidden value="<?php echo esc_attr( self::snooze_amount() ); ?>" />
+      <input id="portal_snooze_unit" type=hidden value="<?php echo esc_attr( self::snooze_unit() ); ?>" />
+      <input id="portal_snooze_cookie" type=hidden value="<?php echo esc_attr( self::snooze_cookie_name() ); ?>" />
       <input id="portal_position_x" type=hidden value="<?php echo $options['portal_position_x'];?>" />
       <input id="portal_position_y" type=hidden value="<?php echo $options['portal_position_y'];?>" />
       <input id="portal_link" type=hidden value="<?php echo $Link;?>" />
@@ -84,7 +137,7 @@ class flexmlsPortalPopup{
 
   static function no_thanks(){
     flexmls_verify_ajax_nonce();
-    //Cookie values must be deleted in javascript
+    //Cookie values must be deleted/set in javascript
     ob_clean();
     exit('SUCCESS');
   }

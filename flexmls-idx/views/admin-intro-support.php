@@ -2,6 +2,43 @@
 
 defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
+$fmc_can_view_installation_info = current_user_can( \FlexMLS\Admin\Settings::SETTINGS_CAPABILITY );
+
+?>
+
+<div class="support-content">
+	<h3>FBS Products Support</h3>
+	<table>
+		<tr>
+			<td>Email:</td>
+			<td><a href="<?php echo antispambot( 'mailto:idxsupport@flexmls.com' ); ?>"><?php echo antispambot( 'idxsupport@flexmls.com' ); ?></td>
+		</tr>
+		<tr>
+			<td>Online:</td>
+			<td><a href="https://fbsidx.com/help" target="_blank">fbsidx.com/help</a></td>
+		</tr>
+		<tr>
+			<td>Phone:</td>
+			<td>888-525-4747 x.171</td>
+		</tr>
+		<tr>
+			<td><strong>Hours of operation:</strong> 8am - 5pm Central Time</td>
+		</tr>
+	</table>
+
+	<div class="getting-started">
+		<h3 class="bg-blue-head">Getting Started with your WordPress Plugin</h3>
+		<p>Visit our <a href="https://fbsidx.com/help/plugin" target="_blank">online help center here</a> for step by step instructions.</p>
+	</div>
+
+<?php
+// Installation Information fingerprints the server, plugin inventory, and API key.
+// Only administrators may load this section (and the work that gathers it).
+if ( ! $fmc_can_view_installation_info ) {
+	echo '</div>';
+	return;
+}
+
 global $wp_version;
 $options = get_option( 'fmc_settings' );
 $options = is_array( $options ) ? $options : array();
@@ -109,37 +146,12 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 
 ?>
 
-<div class="support-content">
-	<h3>FBS Products Support</h3>
-	<table>
-		<tr>
-			<td>Email:</td>
-			<td><a href="<?php echo antispambot( 'mailto:idxsupport@flexmls.com' ); ?>"><?php echo antispambot( 'idxsupport@flexmls.com' ); ?></td>
-		</tr>
-		<tr>
-			<td>Online:</td>
-			<td><a href="https://fbsidx.com/help" target="_blank">fbsidx.com/help</a></td>
-		</tr>
-		<tr>
-			<td>Phone:</td>
-			<td>888-525-4747 x.171</td>
-		</tr>
-		<tr>
-			<td><strong>Hours of operation:</strong> 8am - 5pm Central Time</td>
-		</tr>
-	</table>
-
-	<div class="getting-started">
-		<h3 class="bg-blue-head">Getting Started with your WordPress Plugin</h3>
-		<p>Visit our <a href="https://fbsidx.com/help/plugin" target="_blank">online help center here</a> for step by step instructions.</p>
-	</div>
-
 	<div class="installation-info">
 		<h3 class="bg-blue-head">Installation Information <button type="button" class="button button-secondary" id="flexmls-copy-installation-info" style="background-color: #fff; color: var(--wp-admin-theme-color); margin-left: 10px; vertical-align: middle;">Copy to clipboard</button></h3>
 		<div class="content" id="flexmls-installation-info-content">
-			<p><strong>Website URL:</strong> <?php echo home_url(); ?></p>
-			<p><strong>WordPress URL:</strong> <?php echo site_url(); ?></p>
-			<p><strong>WordPress Version:</strong> <?php echo $wp_version; ?></p>
+			<p><strong>Website URL:</strong> <?php echo esc_url( home_url() ); ?></p>
+			<p><strong>WordPress URL:</strong> <?php echo esc_url( site_url() ); ?></p>
+			<p><strong>WordPress Version:</strong> <?php echo esc_html( $wp_version ); ?></p>
 			<p><strong>Flexmls&reg; IDX Plugin Version:</strong> <?php
 			if ( $fmc_update_info === null ) {
 				// Current or update check not available — show version only.
@@ -156,30 +168,30 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 			}
 			?></p>
 			<p><strong>Plugin Key:</strong> <?php echo isset( $options['api_key'] ) && $options['api_key'] !== '' ? esc_html( $options['api_key'] ) : '—'; ?></p>
-			<p><strong>Web Server:</strong> <?php 
-				$server_software = $_SERVER[ 'SERVER_SOFTWARE' ];
+			<p><strong>Web Server:</strong> <?php
+				$server_software = isset( $_SERVER['SERVER_SOFTWARE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_SOFTWARE'] ) ) : 'Unknown';
 				// Check if nginx is detected and add link to nginx configuration guidance
 				if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() ) {
-					printf( '%s - <a href="%s#nginx-configuration-guidance" title="View nginx configuration guidance">nginx configuration help</a>', 
-						$server_software, 
-						admin_url( 'admin.php?page=fmc_admin_settings' ) 
+					printf( '%s - <a href="%s#nginx-configuration-guidance" title="View nginx configuration guidance">nginx configuration help</a>',
+						esc_html( $server_software ),
+						esc_url( admin_url( 'admin.php?page=fmc_admin_settings' ) )
 					);
 				} else {
-					echo $server_software;
+					echo esc_html( $server_software );
 				}
 			?></p>
-			<p><strong>PHP Version:</strong> <?php echo phpversion(); ?></p>
+			<p><strong>PHP Version:</strong> <?php echo esc_html( phpversion() ); ?></p>
 			<p><strong>Theme:</strong> <?php
 				if( $active_theme->get( 'ThemeURI' ) ){
 					printf( "<a href=\"%s\" target=\"_blank\">%s</a> (Version %s)",
-						$active_theme->get( 'ThemeURI' ),
-						$active_theme->get( 'Name' ),
-						$active_theme->get( 'Version' )
+						esc_url( $active_theme->get( 'ThemeURI' ) ),
+						esc_html( $active_theme->get( 'Name' ) ),
+						esc_html( $active_theme->get( 'Version' ) )
 					);
 				} else {
 					printf( "%s (Version %s)",
-						$active_theme->get( 'Name' ),
-						$active_theme->get( 'Version' )
+						esc_html( $active_theme->get( 'Name' ) ),
+						esc_html( $active_theme->get( 'Version' ) )
 					);
 				}
 			?></p>
@@ -189,14 +201,14 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 					$parent_theme = wp_get_theme( $parent_theme );
 					if( $parent_theme->get( 'ThemeURI' ) ){
 						printf( "<a href=\"%s\" target=\"_blank\">%s</a> (Version %s)",
-							$parent_theme->get( 'ThemeURI' ),
-							$parent_theme->get( 'Name' ),
-							$parent_theme->get( 'Version' )
+							esc_url( $parent_theme->get( 'ThemeURI' ) ),
+							esc_html( $parent_theme->get( 'Name' ) ),
+							esc_html( $parent_theme->get( 'Version' ) )
 						);
 					} else {
 						printf( "%s (Version %s)",
-							$parent_theme->get( 'Name' ),
-							$parent_theme->get( 'Version' )
+							esc_html( $parent_theme->get( 'Name' ) ),
+							esc_html( $parent_theme->get( 'Version' ) )
 						);
 					}
 				} else {
@@ -246,7 +258,7 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 			<p><strong>WP_DEBUG_LOG:</strong> <?php echo ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) ? 'Yes' : 'No'; ?></p>
 			<?php endif; ?>
 			<p><strong>WP Cron Disabled:</strong> <?php echo ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) ? 'Yes' : 'No'; ?></p>
-			<p><strong>API Credentials (Flexmls IDX):</strong> <?php
+			<p><strong>Plugin Credentials (Flexmls IDX):</strong> <?php
 				$api_configured = ! empty( $options['api_key'] ) && ! empty( $options['api_secret'] );
 				echo $api_configured ? 'Configured' : 'Not configured';
 			?></p>
@@ -270,7 +282,10 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 				$tracked_count = is_array( $tracked ) ? count( $tracked ) : 0;
 				echo esc_html( (string) $tracked_count );
 			?></p>
-			<p><strong>cURL Version:</strong> <?php $curl_version = curl_version(); echo $curl_version[ 'version' ]; ?></p>
+			<p><strong>cURL Version:</strong> <?php
+				$curl_version = function_exists( 'curl_version' ) ? curl_version() : false;
+				echo ( is_array( $curl_version ) && ! empty( $curl_version['version'] ) ) ? esc_html( $curl_version['version'] ) : 'N/A';
+			?></p>
 			<p><strong>Permalinks:</strong> <?php echo ( get_option( 'permalink_structure' ) ? 'Yes' : 'No' ); ?></p>
 			<p><strong>Active Plugins:</strong></p>
 			<?php if ( ! empty( $active_plugins ) ): ?>
@@ -305,11 +320,11 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 						<?php
 							printf(
 								'<li><a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a>%s</li>',
-								$deactivated_plugin[ 'PluginURI' ],
-								$deactivated_plugin[ 'Name' ],
-								$deactivated_plugin[ 'Version' ],
-								$deactivated_plugin[ 'AuthorURI' ],
-								$deactivated_plugin[ 'Author' ],
+								esc_url( $deactivated_plugin[ 'PluginURI' ] ),
+								esc_html( $deactivated_plugin[ 'Name' ] ),
+								esc_html( $deactivated_plugin[ 'Version' ] ),
+								esc_url( $deactivated_plugin[ 'AuthorURI' ] ),
+								esc_html( $deactivated_plugin[ 'Author' ] ),
 								in_array( $plugin_file, $known_plugin_conflicts ) ? $known_plugin_conflicts_tag : ''
 							);
 						?>

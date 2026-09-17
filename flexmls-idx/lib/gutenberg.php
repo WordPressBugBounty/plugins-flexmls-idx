@@ -42,7 +42,7 @@ function flex_mls_gtb_cgb_editor_assets() {
 
     $htmlListingDetails = $htmlPhotos = $htmlMarketStats = $htmlSearch = $htmlLocationLinks =
         $htmlIDXLinksWidget = $htmlLeadgen = $htmlSearchResults = $htmlAccount = $htmlAgents =
-            "<b>Flex connection error! Have you entered Flexmls® API credentials?</b>";
+            "<b>Flex connection error! Have you entered Flexmls® plugin credentials?</b>";
     $instance = array("_instance_type" => "shortcode", "_is_gutenberg_new" => true);
 
     if(class_exists("fmcListingDetails")) {
@@ -218,7 +218,7 @@ function FlexMlsCallback($attributes )
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $server_output = curl_exec($ch);
         $err = curl_error($ch);
-        curl_close ($ch);
+        // CurlHandle is closed automatically when destroyed (curl_close deprecated in PHP 8.5).
         $output = flexmlsJSON::json_decode($server_output);
         if (is_array($output) && isset($output['body'])) {
             echo $output['body'];

@@ -6,6 +6,34 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 class Settings {
 
 	/**
+	 * Capability required to read or write plugin settings, including API credentials.
+	 */
+	const SETTINGS_CAPABILITY = 'manage_options';
+
+	/**
+	 * Whether the current request is an authorized save for the given nonce field.
+	 *
+	 * A nonce proves the request was intentional, not that the sender is allowed to
+	 * make it, so capability is checked alongside it. The credentials form lives on
+	 * the fmc_admin_intro page, which is reachable with `edit_posts`, so every save
+	 * branch must gate on SETTINGS_CAPABILITY independently.
+	 *
+	 * @param string $nonce_name   Name of the nonce field in $_POST.
+	 * @param string $nonce_action Action the nonce was created for.
+	 * @return bool
+	 */
+	private static function is_authorized_save( $nonce_name, $nonce_action ){
+		if( empty( $_POST ) || ! isset( $_POST[ $nonce_name ] ) ){
+			return false;
+		}
+		if( ! current_user_can( self::SETTINGS_CAPABILITY ) ){
+			return false;
+		}
+		$nonce = sanitize_text_field( wp_unslash( $_POST[ $nonce_name ] ) );
+		return (bool) wp_verify_nonce( $nonce, $nonce_action );
+	}
+
+	/**
 	 * Outputs the nonce fields and submit button for a settings form.
 	 *
 	 * The button is pinned to the corner of the viewport by
@@ -46,8 +74,12 @@ class Settings {
 				</div>
 
 				<!-- <div class="wp-badge">Version <?php // echo FMC_PLUGIN_VERSION; ?></div> -->
+				<?php
+				$fmc_can_manage = current_user_can( self::SETTINGS_CAPABILITY );
+				$fmc_intro_tab_label = $fmc_can_manage ? 'Credentials' : 'Get Started';
+				?>
 				<h2 class="nav-tab-wrapper wp-clearfix">
-					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=api' ); ?>" class="nav-tab<?php echo ( 'api' == $tab ? ' nav-tab-active' : '' ); ?>">Credentials</a>
+					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=api' ); ?>" class="nav-tab<?php echo ( 'api' == $tab ? ' nav-tab-active' : '' ); ?>"><?php echo esc_html( $fmc_intro_tab_label ); ?></a>
 
 					<a href="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ); ?>" class="nav-tab<?php echo ( 'support' == $tab ? ' nav-tab-active' : '' ); ?>">Support</a>
 
@@ -79,10 +111,17 @@ class Settings {
 	}
 
 	public static function admin_menu_cb_neighborhood(){
+		if( ! current_user_can( self::SETTINGS_CAPABILITY ) ){
+			wp_die( esc_html__( 'Sorry, you are not allowed to access this page.', 'fmcdomain' ) );
+		}
+
 		$fmc_settings = get_option( 'fmc_settings' );
+		if( ! is_array( $fmc_settings ) ){
+			$fmc_settings = array();
+		}
 		$system = new \SparkAPI\System();
 
-		if( !empty( $_POST ) && isset( $_POST[ 'create_neighborhood_draft_nonce' ] ) && wp_verify_nonce( $_POST[ 'create_neighborhood_draft_nonce' ], 'create_neighborhood_draft_action' ) ){
+		if( self::is_authorized_save( 'create_neighborhood_draft_nonce', 'create_neighborhood_draft_action' ) ){
 			$new_template_id = wp_insert_post( array(
 				'post_title' => 'Neighborhood Template Draft',
 				'post_type' => 'page'
@@ -97,8 +136,8 @@ class Settings {
 				);
 			}
 		}
-		if( !empty( $_POST ) && isset( $_POST[ 'add_neighborhood_nonce' ] ) && wp_verify_nonce( $_POST[ 'add_neighborhood_nonce' ], 'add_neighborhood_action' ) ){
-			$loc = $system->parse_location_search_string( stripcslashes( $_POST[ 'location' ] ) );
+		if( self::is_authorized_save( 'add_neighborhood_nonce', 'add_neighborhood_action' ) ){
+			$loc = $system->parse_location_search_string( stripcslashes( isset( $_POST[ 'location' ] ) ? $_POST[ 'location' ] : '' ) );
 			if( empty( $loc ) ){
 				echo '	<div class="notice notice-error">
 							<p>Your new page was not created because you did not select a location. Please try again.</p>
@@ -298,14 +337,24 @@ class Settings {
 	}
 
 	public static function update_settings(){
+		// Hooked on plugins_loaded, which also fires for front-end and logged-out
+		// requests. Nothing here should run outside wp-admin.
+		if( ! is_admin() ){
+			return;
+		}
+
 		$fmc_settings = get_option( 'fmc_settings' );
+		if( ! is_array( $fmc_settings ) ){
+			$fmc_settings = array();
+		}
+		$did_change = false;
 
 		// Save API Credentials
-		if( !empty( $_POST ) && isset( $_POST[ 'update_api_credentials_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_api_credentials_nonce' ], 'update_api_credentials_action' ) ){
-			$old_api_key = $fmc_settings[ 'api_key' ];
-			$old_api_secret = $fmc_settings[ 'api_secret' ];
+		if( self::is_authorized_save( 'update_api_credentials_nonce', 'update_api_credentials_action' ) ){
+			$old_api_key = isset( $fmc_settings[ 'api_key' ] ) ? $fmc_settings[ 'api_key' ] : '';
+			$old_api_secret = isset( $fmc_settings[ 'api_secret' ] ) ? $fmc_settings[ 'api_secret' ] : '';
 
-			$new_api_key = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_key' ] );
+			$new_api_key = isset( $_POST[ 'fmc_settings' ][ 'api_key' ] ) ? sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_key' ] ) : '';
 			$new_api_secret = isset( $_POST[ 'fmc_settings' ][ 'api_secret' ] ) ? sanitize_text_field( $_POST[ 'fmc_settings' ][ 'api_secret' ] ) : '';
 			// When already connected, empty secret means "keep existing" (e.g. form locked or user left blank)
 			$SparkAPI = new \SparkAPI\Core();
@@ -316,6 +365,8 @@ class Settings {
 
 			$fmc_settings[ 'api_key' ] = $new_api_key;
 			$fmc_settings[ 'api_secret' ] = $new_api_secret;
+			$did_change = true;
+			// Persisted before clear_cache()/generate_auth_token() below, which read the option.
 			update_option( 'fmc_settings', $fmc_settings );
 
 			$SparkAPI = new \SparkAPI\Core();
@@ -327,7 +378,7 @@ class Settings {
 		}
 
 		// User clears cache
-		if( !empty( $_POST ) && isset( $_POST[ 'clear_api_cache_nonce' ] ) && wp_verify_nonce( $_POST[ 'clear_api_cache_nonce' ], 'clear_api_cache_action' ) ){
+		if( self::is_authorized_save( 'clear_api_cache_nonce', 'clear_api_cache_action' ) ){
 			$SparkAPI = new \SparkAPI\Core();
 			$SparkAPI->clear_cache( true );
 			$auth_token = $SparkAPI->generate_auth_token( 'manual' );
@@ -337,11 +388,13 @@ class Settings {
 		}
 
 		// User saves Behavior settings
-		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_behavior_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_behavior_nonce' ], 'update_fmc_behavior_action' ) ){
+		if( self::is_authorized_save( 'update_fmc_behavior_nonce', 'update_fmc_behavior_action' ) ){
+			$did_change = true;
 			$do_flush_rewrites = false;
-			$old_permabase = $fmc_settings[ 'permabase' ];
-			$old_destlink = $fmc_settings[ 'destlink' ];
-			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+			$old_permabase = isset( $fmc_settings[ 'permabase' ] ) ? $fmc_settings[ 'permabase' ] : '';
+			$old_destlink = isset( $fmc_settings[ 'destlink' ] ) ? $fmc_settings[ 'destlink' ] : '';
+			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
+			foreach( $posted_settings as $key => $val ){
 				switch( $key ){
 					case 'default_titles':
 					case 'contact_notifications':
@@ -377,7 +430,10 @@ class Settings {
 						$fmc_settings[ $key ] = $val;
 						$types = explode( ',', $val );
 						foreach( $types as $type ){
-							$fmc_settings[ 'property_type_label_' . $type ] = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'property_type_label_' . $type ] );
+							$label_key = 'property_type_label_' . $type;
+							if( isset( $posted_settings[ $label_key ] ) ){
+								$fmc_settings[ $label_key ] = sanitize_text_field( $posted_settings[ $label_key ] );
+							}
 						}
 						break;
 					case 'search_results_fields':
@@ -432,8 +488,10 @@ class Settings {
 		}
 
 		// User saves Search Results settings
-		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_search_results_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_search_results_nonce' ], 'update_fmc_search_results_action' ) ){
-			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+		if( self::is_authorized_save( 'update_fmc_search_results_nonce', 'update_fmc_search_results_action' ) ){
+			$did_change = true;
+			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
+			foreach( $posted_settings as $key => $val ){
 				switch( $key ){
 					case 'multiple_summaries':
 					case 'allow_sold_searching':
@@ -459,8 +517,10 @@ class Settings {
 		}
 
 		// User saves Listing Detail settings
-		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_listing_detail_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_listing_detail_nonce' ], 'update_fmc_listing_detail_action' ) ){
-			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+		if( self::is_authorized_save( 'update_fmc_listing_detail_nonce', 'update_fmc_listing_detail_action' ) ){
+			$did_change = true;
+			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
+			foreach( $posted_settings as $key => $val ){
 				switch( $key ){
 					case 'listing_detail_expand_sections':
 					case 'listing_detail_show_more_info':
@@ -491,8 +551,10 @@ class Settings {
 
 
 		// User saves style settings
-		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_style_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_style_nonce' ], 'update_fmc_style_action' ) ){
-			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+		if( self::is_authorized_save( 'update_fmc_style_nonce', 'update_fmc_style_action' ) ){
+			$did_change = true;
+			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
+			foreach( $posted_settings as $key => $val ){
 				switch( $key ){
 					case 'search_listing_template_version':
 					case 'market_stat_version':
@@ -508,8 +570,32 @@ class Settings {
 		}
 
 		// User saves Oauth/Portal settings
-		if( !empty( $_POST ) && isset( $_POST[ 'update_fmc_portal_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_fmc_portal_nonce' ], 'update_fmc_portal_action' ) ){
-			foreach( $_POST[ 'fmc_settings' ] as $key => $val ){
+		if( self::is_authorized_save( 'update_fmc_portal_nonce', 'update_fmc_portal_action' ) ){
+			$did_change = true;
+			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
+
+			$old_oauth_key = isset( $fmc_settings[ 'oauth_key' ] ) ? $fmc_settings[ 'oauth_key' ] : '';
+			$old_oauth_secret = isset( $fmc_settings[ 'oauth_secret' ] ) ? $fmc_settings[ 'oauth_secret' ] : '';
+			$had_oauth = ( '' !== (string) $old_oauth_key && '' !== (string) $old_oauth_secret );
+
+			$SparkAPI = new \SparkAPI\Core();
+			$auth_token = $SparkAPI->generate_auth_token();
+
+			// Only accept OAuth credential updates when a working plugin key is connected.
+			if ( $auth_token ) {
+				if ( array_key_exists( 'oauth_key', $posted_settings ) ) {
+					$new_oauth_key = sanitize_text_field( $posted_settings[ 'oauth_key' ] );
+					$new_oauth_secret = isset( $posted_settings[ 'oauth_secret' ] ) ? sanitize_text_field( $posted_settings[ 'oauth_secret' ] ) : '';
+					// When already configured, empty secret means "keep existing" (form locked or user left blank).
+					if ( $had_oauth && '' === $new_oauth_secret ) {
+						$new_oauth_secret = $old_oauth_secret;
+					}
+					$fmc_settings[ 'oauth_key' ] = $new_oauth_key;
+					$fmc_settings[ 'oauth_secret' ] = $new_oauth_secret;
+				}
+			}
+
+			foreach( $posted_settings as $key => $val ){
 				switch( $key ){
 					case 'portal_carts':
 					case 'portal_saving_searches':
@@ -523,8 +609,15 @@ class Settings {
 					case 'search_page':
 						$fmc_settings[ $key ] = preg_replace( '/[^0-9]/', '', $val );
 						break;
-					case 'oauth_key':
-					case 'oauth_secret':
+					case 'portal_snooze_amount':
+						$amount = intval( preg_replace( '/[^0-9]/', '', $val ) );
+						$fmc_settings[ $key ] = $amount > 0 ? $amount : 7;
+						break;
+					case 'portal_snooze_unit':
+						$allowed_units = array( 'minutes', 'hours', 'days', 'weeks', 'months' );
+						$unit = sanitize_text_field( $val );
+						$fmc_settings[ $key ] = in_array( $unit, $allowed_units, true ) ? $unit : 'days';
+						break;
 					case 'portal_position_x':
 					case 'portal_position_y':
 						$fmc_settings[ $key ] = sanitize_text_field( $val );
@@ -537,33 +630,52 @@ class Settings {
 						break;
 				}
 			}
-			if( !isset( $_POST[ 'fmc_settings' ][ 'portal_carts' ] ) ){
+			if( !isset( $posted_settings[ 'portal_carts' ] ) ){
 				$fmc_settings[ 'portal_carts' ] = 0;
 			}
-			if( !isset( $_POST[ 'fmc_settings' ][ 'portal_saving_searches' ] ) ){
+			if( !isset( $posted_settings[ 'portal_saving_searches' ] ) ){
 				$fmc_settings[ 'portal_saving_searches' ] = 0;
 			}
-			if( !isset( $_POST[ 'fmc_settings' ][ 'portal_search' ] ) ){
+			if( !isset( $posted_settings[ 'portal_search' ] ) ){
 				$fmc_settings[ 'portal_search' ] = 0;
 			}
-			if( !isset( $_POST[ 'fmc_settings' ][ 'portal_listing' ] ) ){
+			if( !isset( $posted_settings[ 'portal_listing' ] ) ){
 				$fmc_settings[ 'portal_listing' ] = 0;
 			}
-			if( !isset( $_POST[ 'fmc_settings' ][ 'portal_force' ] ) ){
+			if( !isset( $posted_settings[ 'portal_force' ] ) ){
 				$fmc_settings[ 'portal_force' ] = 0;
+			}
+			if ( ! isset( $fmc_settings[ 'portal_snooze_amount' ] ) || ! is_numeric( $fmc_settings[ 'portal_snooze_amount' ] ) || intval( $fmc_settings[ 'portal_snooze_amount' ] ) < 1 ) {
+				if ( isset( $fmc_settings[ 'portal_snooze_days' ] ) && is_numeric( $fmc_settings[ 'portal_snooze_days' ] ) && intval( $fmc_settings[ 'portal_snooze_days' ] ) >= 1 ) {
+					$fmc_settings[ 'portal_snooze_amount' ] = intval( $fmc_settings[ 'portal_snooze_days' ] );
+				} else {
+					$fmc_settings[ 'portal_snooze_amount' ] = 7;
+				}
+			}
+			$allowed_snooze_units = array( 'minutes', 'hours', 'days', 'weeks', 'months' );
+			if ( ! isset( $fmc_settings[ 'portal_snooze_unit' ] ) || ! in_array( $fmc_settings[ 'portal_snooze_unit' ], $allowed_snooze_units, true ) ) {
+				$fmc_settings[ 'portal_snooze_unit' ] = 'days';
 			}
 			add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
 		}
 
 		// User saves Google settings
-		if( !empty( $_POST ) && isset( $_POST[ 'update_google_maps_nonce' ] ) && wp_verify_nonce( $_POST[ 'update_google_maps_nonce' ], 'update_google_maps_action' ) ){
-			$fmc_settings[ 'google_maps_api_key' ] = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'google_maps_api_key' ] );
-			$fmc_settings[ 'map_height' ] = sanitize_text_field( $_POST[ 'fmc_settings' ][ 'map_height' ] );
-			$fmc_settings[ 'google_maps_no_enqueue' ] = ( isset( $_POST[ 'fmc_settings' ][ 'google_maps_no_enqueue' ] ) ? 1 : 0 );
+		if( self::is_authorized_save( 'update_google_maps_nonce', 'update_google_maps_action' ) ){
+			$did_change = true;
+			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
+			if( isset( $posted_settings[ 'google_maps_api_key' ] ) ){
+				$fmc_settings[ 'google_maps_api_key' ] = sanitize_text_field( $posted_settings[ 'google_maps_api_key' ] );
+			}
+			if( isset( $posted_settings[ 'map_height' ] ) ){
+				$fmc_settings[ 'map_height' ] = sanitize_text_field( $posted_settings[ 'map_height' ] );
+			}
+			$fmc_settings[ 'google_maps_no_enqueue' ] = ( isset( $posted_settings[ 'google_maps_no_enqueue' ] ) ? 1 : 0 );
 			add_action( 'admin_notices', array( '\FlexMLS\Admin\Settings', 'did_update_settings' ) );
 		}
 
-		update_option( 'fmc_settings', $fmc_settings );
+		if( $did_change ){
+			update_option( 'fmc_settings', $fmc_settings );
+		}
 	}
 
 }

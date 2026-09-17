@@ -3,17 +3,26 @@
 defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 $fmc_settings = get_option( 'fmc_settings' );
+if ( ! is_array( $fmc_settings ) ) {
+	$fmc_settings = array();
+}
 $SparkAPI = new \SparkAPI\Core();
 $auth_token = $SparkAPI->generate_auth_token();
 
 updateUserOptions($auth_token);
 
+// This page is registered with `edit_posts` so authors can read the widget
+// instructions below. Credentials are administrator-only: users without
+// manage_options must not see the key, Connected badge, or receive a save nonce.
+$fmc_can_manage_credentials = current_user_can( \FlexMLS\Admin\Settings::SETTINGS_CAPABILITY );
+
 ?>
+<?php if ( $fmc_can_manage_credentials ): ?>
 <h3><?php echo $auth_token ? 'Your Key & Secret:' : 'Activate Your Key & Secret'; ?><?php if( $auth_token ): ?> <span class="fmc-admin-badge fmc-admin-badge-success">Connected</span><?php endif; ?></h3>
 <?php if ( ! $auth_token ): ?>
 <p>Enter your Flexmls&reg; Key & Secret credentials below to connect your website, then click Save Credentials. If entered correctly, you will see a green button above that says Connected:</p>
 <?php endif; ?>
-<form action="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=api' ); ?>" method="post" id="fmc-credentials-form" class="<?php echo $auth_token ? 'fmc-credentials-locked' : ''; ?>">
+<form action="<?php echo admin_url( 'admin.php?page=fmc_admin_intro&tab=api' ); ?>" method="post" id="fmc-credentials-form" class="<?php echo $auth_token ? 'fmc-credentials-locked' : ''; ?>" autocomplete="off">
 	<table class="form-table">
 		<tbody>
 			<tr>
@@ -22,7 +31,7 @@ updateUserOptions($auth_token);
 				</th>
 				<td class="fmc-credentials-key-cell">
 					<span class="fmc-credentials-input-wrap">
-						<input type="text" class="regular-text" name="fmc_settings[api_key]" id="api_key" value="<?php echo esc_attr($fmc_settings[ 'api_key' ]); ?>" autocomplete="off" <?php echo $auth_token ? 'readonly' : ''; ?> required>
+						<input type="text" class="regular-text" name="fmc_settings[api_key]" id="api_key" value="<?php echo esc_attr( isset( $fmc_settings[ 'api_key' ] ) ? $fmc_settings[ 'api_key' ] : '' ); ?>" autocomplete="one-time-code" autocorrect="off" autocapitalize="off" spellcheck="false" <?php echo $auth_token ? 'readonly' : ''; ?> required>
 						<?php if ( $auth_token ): ?>
 						<button type="button" class="fmc-credentials-lock-btn button button-secondary" id="fmc-credentials-lock-btn" title="<?php esc_attr_e( 'Click to unlock and edit credentials', 'flexmls-idx' ); ?>" aria-label="<?php esc_attr_e( 'Unlock to edit', 'flexmls-idx' ); ?>">
 							<span class="dashicons dashicons-lock"></span>
@@ -40,7 +49,7 @@ updateUserOptions($auth_token);
 					<?php /* When locked we do not output the secret to the page; backend preserves it when POST has no secret. */ ?>
 					<input type="password" class="regular-text" id="api_secret" value="" placeholder="<?php esc_attr_e( 'Enter new secret to change', 'flexmls-idx' ); ?>" autocomplete="new-password" style="display:none;">
 					<?php else: ?>
-					<input type="password" class="regular-text" name="fmc_settings[api_secret]" id="api_secret" value="<?php echo esc_attr($fmc_settings[ 'api_secret' ]); ?>" autocomplete="off" required>
+					<input type="password" class="regular-text" name="fmc_settings[api_secret]" id="api_secret" value="" placeholder="<?php esc_attr_e( 'Enter your secret', 'flexmls-idx' ); ?>" autocomplete="new-password" required>
 					<?php endif; ?>
 				</td>
 			</tr>
@@ -49,6 +58,12 @@ updateUserOptions($auth_token);
 	<p><?php wp_nonce_field( 'update_api_credentials_action', 'update_api_credentials_nonce' ); ?><button type="submit" class="button-primary">Save Credentials</button></p>
 </form>
 <hr />
+<?php elseif ( ! $auth_token ): ?>
+<p>This site is not yet connected to Flexmls&reg;. Please ask a site administrator to enter the Key &amp; Secret on this page, or visit the <a href="<?php echo esc_url( admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ) ); ?>">Support</a> tab for help.</p>
+<?php else: ?>
+<p>Add a Flexmls&reg; widget to a page using the instructions below.</p>
+<hr />
+<?php endif; ?>
 <?php if ( $auth_token ): ?>
 <?php
 $active_plugin_files = get_option( 'active_plugins', array() );
@@ -251,7 +266,7 @@ $instruction_image_url = function( $filename ) use ( $instructions_img_dir, $ins
 	function unlock() {
 		form.classList.remove('fmc-credentials-locked');
 		keyInput.removeAttribute('readonly');
-		keyInput.setAttribute('autocomplete', 'off');
+		keyInput.setAttribute('autocomplete', 'one-time-code');
 		secretRow.style.display = '';
 		if (secretInput) {
 			secretInput.setAttribute('name', 'fmc_settings[api_secret]');
@@ -363,7 +378,7 @@ $instruction_image_url = function( $filename ) use ( $instructions_img_dir, $ins
 	border-radius: 4px;
 }
 </style>
-<?php else: ?>
+<?php elseif ( $fmc_can_manage_credentials ): ?>
 <div class="key-content">
 	<h3>Don't have a Key & Secret?</h3>
 	<p>Fill out this <a href="https://fbsproducts.com/form/wordpress-plugin-secret-key-request/" target="_blank">quick form</a> or call 866-320-9977 to talk with an IDX Specialist.</p>

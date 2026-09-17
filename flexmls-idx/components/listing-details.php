@@ -26,6 +26,97 @@ class fmcListingDetails extends fmcWidget {
 
     }
 
+  /**
+   * Resolve listing agent/office emails from Spark. Never trust POST recipients.
+   *
+   * @param string $listing_key Spark ListingKey.
+   * @param string $listing_id  MLS ListingId.
+   * @return array{found:bool,agent:string,office:string}
+   */
+  function resolve_mls_listing_emails( $listing_key = '', $listing_id = '' ) {
+    global $fmc_api;
+
+    $emails = array(
+      'found'  => false,
+      'agent'  => '',
+      'office' => '',
+    );
+
+    $listing_key = sanitize_text_field( (string) $listing_key );
+    $listing_id  = sanitize_text_field( (string) $listing_id );
+
+    if ( '' === $listing_key && '' === $listing_id ) {
+      return $emails;
+    }
+
+    $filter = '';
+    if ( '' !== $listing_key ) {
+      $filter = "ListingKey Eq '" . str_replace( "'", "''", $listing_key ) . "'";
+    } else {
+      $filter = "ListingId Eq '" . str_replace( "'", "''", $listing_id ) . "'";
+    }
+
+    $result = $fmc_api->GetListings(
+      array(
+        '_filter' => $filter,
+        '_limit'  => 1,
+        '_select' => 'ListAgentEmail,ListOfficeEmail,ListingKey,ListingId',
+      )
+    );
+
+    if ( ! is_array( $result ) || empty( $result[0]['StandardFields'] ) || ! is_array( $result[0]['StandardFields'] ) ) {
+      return $emails;
+    }
+
+    $emails['found'] = true;
+    $sf              = $result[0]['StandardFields'];
+    if ( ! empty( $sf['ListAgentEmail'] ) && is_string( $sf['ListAgentEmail'] ) ) {
+      $emails['agent'] = $sf['ListAgentEmail'];
+    }
+    if ( ! empty( $sf['ListOfficeEmail'] ) && is_string( $sf['ListOfficeEmail'] ) ) {
+      $emails['office'] = $sf['ListOfficeEmail'];
+    }
+
+    return $emails;
+  }
+
+  /**
+   * Strip CR/LF (and encoded variants) from values used in mail headers.
+   *
+   * @param string $value Raw header value.
+   * @return string
+   */
+  function sanitize_mail_header_value( $value ) {
+    $value = (string) $value;
+    $value = str_ireplace( array( '%0a', '%0d' ), '', $value );
+    return str_replace( array( "\r", "\n" ), '', $value );
+  }
+
+  /**
+   * Pick Mls recipient from Spark listing data (agent, then office).
+   *
+   * @param array $resolved From resolve_mls_listing_emails().
+   * @return string Empty if neither is usable.
+   */
+  function mls_recipient_from_resolved( $resolved ) {
+    if ( ! is_array( $resolved ) ) {
+      return '';
+    }
+    if ( flexmlsConnect::is_not_blank_or_restricted( $resolved['agent'] ?? '' ) ) {
+      $email = sanitize_email( $resolved['agent'] );
+      if ( is_email( $email ) ) {
+        return $email;
+      }
+    }
+    if ( flexmlsConnect::is_not_blank_or_restricted( $resolved['office'] ?? '' ) ) {
+      $email = sanitize_email( $resolved['office'] );
+      if ( is_email( $email ) ) {
+        return $email;
+      }
+    }
+    return '';
+  }
+
   function schedule_showing($attr = array()) {
     flexmls_verify_ajax_nonce();
     global $fmc_api;
@@ -34,7 +125,6 @@ class fmcListingDetails extends fmcWidget {
       die( 'Unable to load account.' );
     }
     $send_email = isset( $api_my_account['Emails'][0]['Address'] ) ? $api_my_account['Emails'][0]['Address'] : '';
-    $mytest = flexmlsConnect::wp_input_get_post('flexmls_connect__important');
 
     //This is our bot blocker... if it is set, then pretend like everything went okay
     if (!empty($_POST['flexmls_connect__important'])){
@@ -43,46 +133,58 @@ class fmcListingDetails extends fmcWidget {
 
     $action = isset( $api_my_account['UserType'] ) ? $api_my_account['UserType'] : '';
 
-    if ($action=="Mls"){
-        if (flexmlsConnect::is_not_blank_or_restricted(flexmlsConnect::wp_input_get_post('flexmls_connect__to'))){
-            $send_email=flexmlsConnect::wp_input_get_post('flexmls_connect__to');
-        }
-        elseif (flexmlsConnect::is_not_blank_or_restricted(flexmlsConnect::wp_input_get_post('flexmls_connect__to_office'))){
-            $send_email=flexmlsConnect::wp_input_get_post('flexmls_connect__to_office');
-        }
-        else{
-            $action = "SendToMls";
-        }
+    if ( $action === 'Mls' ) {
+      $listing_key = flexmlsConnect::wp_input_get_post( 'flexmls_connect__listing_key' );
+      $listing_id  = flexmlsConnect::wp_input_get_post( 'flexmls_connect__listing_id' );
+      $resolved    = $this->resolve_mls_listing_emails( $listing_key, $listing_id );
+      if ( empty( $resolved['found'] ) ) {
+        die( 'There was an error sending the e-mail: Listing not found.' );
+      }
+      $send_email = $this->mls_recipient_from_resolved( $resolved );
+      if ( '' === $send_email ) {
+        // No listing agent/office email in Spark — fall back to Spark message_me for the Mls account.
+        $action = 'SendToMls';
+      }
     }
 
     try {
-      if(filter_var(flexmlsConnect::wp_input_get_post('flexmls_connect__from'), FILTER_VALIDATE_EMAIL) === FALSE) {
-        throw new Exception("From e-mail is invalid");
+      $from_email = sanitize_email( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__from' ) );
+      $from_name  = sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__from_name' ) );
+      $subject    = $this->sanitize_mail_header_value( sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__subject' ) ) );
+      $message_in = (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__message' );
+      $page_lead  = esc_url_raw( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__page_lead' ) );
+      $phone      = sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__phone' ) );
+      $to_name    = sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__to_name' ) );
+
+      if ( ! is_email( $from_email ) ) {
+        throw new Exception( 'From e-mail is invalid' );
       }
-      if ($action=='Mls'){
-        $headers = 'From: '. flexmlsConnect::wp_input_get_post('flexmls_connect__from') . "\r\n";
-        $message = flexmlsConnect::wp_input_get_post('flexmls_connect__message') . "\r\n\r\n". flexmlsConnect::wp_input_get_post('flexmls_connect__from_name').' <'. flexmlsConnect::wp_input_get_post('flexmls_connect__from') . ">\r\n";
-        $message .= 'Sent From Page: ' . flexmlsConnect::wp_input_get_post('flexmls_connect__page_lead') . "\r\n";
-        wp_mail( flexmlsConnect::wp_input_get_post('flexmls_connect__to'), flexmlsConnect::wp_input_get_post('flexmls_connect__subject'), $message, $headers);
-        die("SUCCESS");
+      if ( $action === 'Mls' ) {
+        if ( ! is_email( $send_email ) ) {
+          throw new Exception( 'Unable to resolve listing agent e-mail.' );
+        }
+        $headers  = 'From: ' . $this->sanitize_mail_header_value( $from_email ) . "\r\n";
+        $message  = $message_in . "\r\n\r\n" . $from_name . ' <' . $from_email . ">\r\n";
+        $message .= 'Sent From Page: ' . $page_lead . "\r\n";
+        wp_mail( $send_email, $subject, $message, $headers );
+        die( 'SUCCESS' );
       } else {
-          $subject = flexmlsConnect::wp_input_get_post('flexmls_connect__subject');
           $body =  "This message has been auto-generated by your wordpress site.\n\n This person has scheduled a show:\n";
-          $body .= "This message was sent from this page: " . flexmlsConnect::wp_input_get_post('flexmls_connect__page_lead') . "\n";
-          $body .= "To Agent: " . flexmlsConnect::wp_input_get_post('flexmls_connect__to_name') . "\n";
-          $body .= "Name: " . flexmlsConnect::wp_input_get_post('flexmls_connect__from_name') . "\n";
-          $body .= "Email: " . flexmlsConnect::wp_input_get_post('flexmls_connect__from'). "\n\n";
-          $body .= "Phone: " . flexmlsConnect::wp_input_get_post('flexmls_connect__phone'). "\n\n";
+          $body .= "This message was sent from this page: " . $page_lead . "\n";
+          $body .= "To Agent: " . $to_name . "\n";
+          $body .= "Name: " . $from_name . "\n";
+          $body .= "Email: " . $from_email . "\n\n";
+          $body .= "Phone: " . $phone . "\n\n";
           $body .= "Message:\n";
-          $body .= flexmlsConnect::wp_input_get_post('flexmls_connect__message');
+          $body .= $message_in;
 
           $Contact = array();
-          $Contact['DisplayName'] = flexmlsConnect::wp_input_get_post('flexmls_connect__from_name');
-          $Contact['PrimaryEmail'] = flexmlsConnect::wp_input_get_post('flexmls_connect__from');
-          $Contact['PrimaryPhoneNumber'] = flexmlsConnect::wp_input_get_post('flexmls_connect__phone');
+          $Contact['DisplayName'] = $from_name;
+          $Contact['PrimaryEmail'] = $from_email;
+          $Contact['PrimaryPhoneNumber'] = $phone;
           flexmlsConnect::add_contact($Contact);
-          if (flexmlsConnect::message_me($subject, $body, flexmlsConnect::wp_input_get_post('flexmls_connect__from'))){
-            die("SUCCESS");
+          if ( flexmlsConnect::message_me( $subject, $body, $from_email ) ) {
+            die( 'SUCCESS' );
           }
           else {
             throw new Exception("An Error occured while attempting to contact the site.");
@@ -104,7 +206,6 @@ class fmcListingDetails extends fmcWidget {
       die( 'Unable to load account.' );
     }
     $send_email = isset( $api_my_account['Emails'][0]['Address'] ) ? $api_my_account['Emails'][0]['Address'] : '';
-    $mytest = flexmlsConnect::wp_input_get_post('flexmls_connect__important');
 
     //This is our bot blocker... if it is set, then pretend like everything went okay
     if (!empty($_POST['flexmls_connect__important'])){
@@ -113,49 +214,62 @@ class fmcListingDetails extends fmcWidget {
 
     $action = isset( $api_my_account['UserType'] ) ? $api_my_account['UserType'] : '';
 
-    if ($action=="Mls"){
-        if (flexmlsConnect::is_not_blank_or_restricted(flexmlsConnect::wp_input_get_post('flexmls_connect__to_agent'))){
-            $send_email=flexmlsConnect::wp_input_get_post('flexmls_connect__to_agent');
-        }
-        elseif (flexmlsConnect::is_not_blank_or_restricted(flexmlsConnect::wp_input_get_post('flexmls_connect__to_office'))){
-            $send_email=flexmlsConnect::wp_input_get_post('flexmls_connect__to_office');
-        }
-        else{
-            $action = "SendToMls";
-        }
+    if ( $action === 'Mls' ) {
+      $listing_key = flexmlsConnect::wp_input_get_post( 'flexmls_connect__listing_key' );
+      $listing_id  = flexmlsConnect::wp_input_get_post( 'flexmls_connect__listing_id' );
+      // Legacy contact form posted ListingId as flexmls_connect__mytype.
+      if ( empty( $listing_id ) ) {
+        $listing_id = flexmlsConnect::wp_input_get_post( 'flexmls_connect__mytype' );
+      }
+      $resolved = $this->resolve_mls_listing_emails( $listing_key, $listing_id );
+      if ( empty( $resolved['found'] ) ) {
+        die( 'There was an error sending the e-mail: Listing not found.' );
+      }
+      $send_email = $this->mls_recipient_from_resolved( $resolved );
+      if ( '' === $send_email ) {
+        $action = 'SendToMls';
+      }
     }
 
     try{
-      if (filter_var(flexmlsConnect::wp_input_get_post('flexmls_connect__from'), FILTER_VALIDATE_EMAIL) === FALSE) {
-          throw new Exception("From e-mail is invalid");
+      $from_email = sanitize_email( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__from' ) );
+      $from_name  = sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__from_name' ) );
+      $subject    = $this->sanitize_mail_header_value( sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__subject' ) ) );
+      $message_in = (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__message' );
+      $page_lead  = esc_url_raw( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__page_lead' ) );
+      $phone      = sanitize_text_field( (string) flexmlsConnect::wp_input_get_post( 'flexmls_connect__phone' ) );
+
+      if ( ! is_email( $from_email ) ) {
+          throw new Exception( 'From e-mail is invalid' );
       }
-      if ($action=='Mls'){
-        $headers = 'From: '. flexmlsConnect::wp_input_get_post('flexmls_connect__from') . "\r\n";
-        $message = flexmlsConnect::wp_input_get_post('flexmls_connect__message') . "\r\n\r\n". flexmlsConnect::wp_input_get_post('flexmls_connect__from_name');
-        wp_mail($send_email, flexmlsConnect::wp_input_get_post('flexmls_connect__subject'), $message, $headers);
-        die("SUCCESS");
+      if ( $action === 'Mls' ) {
+        if ( ! is_email( $send_email ) ) {
+          throw new Exception( 'Unable to resolve listing agent e-mail.' );
+        }
+        $headers = 'From: ' . $this->sanitize_mail_header_value( $from_email ) . "\r\n";
+        $message = $message_in . "\r\n\r\n" . $from_name;
+        wp_mail( $send_email, $subject, $message, $headers );
+        die( 'SUCCESS' );
       }
       else{
 
-        $subject = flexmlsConnect::wp_input_get_post('flexmls_connect__subject');
-
         $body =  "This message has been auto-generated by your wordpress site." . PHP_EOL; 
         $body .= "The following person has attempted to contact you:" . PHP_EOL;
-        $body .= "This message was sent from this page: " . flexmlsConnect::wp_input_get_post('flexmls_connect__page_lead') . "\n";
-        $body .= "Name: " . flexmlsConnect::wp_input_get_post('flexmls_connect__from_name') . PHP_EOL;
-        $body .= "Email: " . flexmlsConnect::wp_input_get_post('flexmls_connect__from'). PHP_EOL;
-        $body .= "Phone: " . flexmlsConnect::wp_input_get_post('flexmls_connect__phone'). PHP_EOL;
+        $body .= "This message was sent from this page: " . $page_lead . "\n";
+        $body .= "Name: " . $from_name . PHP_EOL;
+        $body .= "Email: " . $from_email . PHP_EOL;
+        $body .= "Phone: " . $phone . PHP_EOL;
         $body .= "Message:" . PHP_EOL;
 
-        $body .= flexmlsConnect::wp_input_get_post('flexmls_connect__message');
+        $body .= $message_in;
         $Contact = array();
-        $Contact['DisplayName'] = flexmlsConnect::wp_input_get_post('flexmls_connect__from_name');
-        $Contact['PrimaryEmail'] = flexmlsConnect::wp_input_get_post('flexmls_connect__from');
-        $Contact['PrimaryPhoneNumber'] = flexmlsConnect::wp_input_get_post('flexmls_connect__phone');
+        $Contact['DisplayName'] = $from_name;
+        $Contact['PrimaryEmail'] = $from_email;
+        $Contact['PrimaryPhoneNumber'] = $phone;
 
         flexmlsConnect::add_contact($Contact);
-        if (flexmlsConnect::message_me($subject, $body, flexmlsConnect::wp_input_get_post('flexmls_connect__from'))){
-          die("SUCCESS");
+        if ( flexmlsConnect::message_me( $subject, $body, $from_email ) ) {
+          die( 'SUCCESS' );
         }
         else {
           throw new Exception("An Error occured while attempting to contact the site.");

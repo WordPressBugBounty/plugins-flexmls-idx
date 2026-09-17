@@ -47,6 +47,8 @@ class Update {
 			'oauth_secret' => '',
 			'permabase' => 'idx',
 			'portal_mins' => '',
+			'portal_snooze_amount' => 7,
+			'portal_snooze_unit' => 'days',
 			'portal_position_x' => 'center',
 			'portal_position_y' => 'center',
 			'search_page' => ''

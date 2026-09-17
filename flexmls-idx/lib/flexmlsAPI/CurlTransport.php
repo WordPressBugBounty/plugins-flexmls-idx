@@ -15,8 +15,8 @@ class flexmlsAPI_CurlTransport extends flexmlsAPI_CoreTransport implements flexm
   }
 
   function __destruct() {
-    // clean cURL up
-    curl_close($this->ch);
+    // CurlHandle is closed automatically when destroyed (curl_close deprecated in PHP 8.5).
+    $this->ch = null;
   }
 
   function make_request($request = array()) {

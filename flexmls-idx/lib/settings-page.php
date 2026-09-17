@@ -246,6 +246,14 @@ class flexmlsConnectSettings {
       $options['portal_mins'] = ((is_numeric($input['portal_mins']) and $input['portal_mins']>=0) ? intval($input['portal_mins']) : null);
       $detail_page = ((is_numeric($input['detail_page']) and $input['detail_page']>=0) ? intval($input['detail_page']) : null);
       $options['search_page'] = ((is_numeric($input['search_page']) and $input['search_page']>=0) ? $input['search_page'] : null);
+      $options['portal_snooze_amount'] = ( isset( $input['portal_snooze_amount'] ) && is_numeric( $input['portal_snooze_amount'] ) && intval( $input['portal_snooze_amount'] ) >= 1 )
+	      ? intval( $input['portal_snooze_amount'] )
+	      : ( isset( $input['portal_snooze_days'] ) && is_numeric( $input['portal_snooze_days'] ) && intval( $input['portal_snooze_days'] ) >= 1
+		      ? intval( $input['portal_snooze_days'] )
+		      : 7 );
+      $allowed_snooze_units = array( 'minutes', 'hours', 'days', 'weeks', 'months' );
+      $snooze_unit = isset( $input['portal_snooze_unit'] ) ? sanitize_text_field( $input['portal_snooze_unit'] ) : 'days';
+      $options['portal_snooze_unit'] = in_array( $snooze_unit, $allowed_snooze_units, true ) ? $snooze_unit : 'days';
 
       $options['portal_position_x'] = $input['portal_position_x'];
       $options['portal_position_y'] = $input['portal_position_y'];

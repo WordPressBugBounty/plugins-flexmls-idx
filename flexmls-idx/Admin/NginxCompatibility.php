@@ -454,14 +454,15 @@ class NginxCompatibility {
 	 * AJAX handler to get nginx configuration rules with custom parameters
 	 */
 	public static function ajax_get_nginx_rules() {
-		// Verify nonce for security
-		if ( ! wp_verify_nonce( $_POST['nonce'], 'fmc_nginx_rules_nonce' ) ) {
-			wp_die( 'Security check failed' );
+		check_ajax_referer( 'fmc_nginx_rules_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
 		}
 
 		// Get parameters from AJAX request
-		$permabase = sanitize_text_field( $_POST['permabase'] );
-		$destlink = sanitize_text_field( $_POST['destlink'] );
+		$permabase = isset( $_POST['permabase'] ) ? sanitize_text_field( wp_unslash( $_POST['permabase'] ) ) : '';
+		$destlink  = isset( $_POST['destlink'] ) ? sanitize_text_field( wp_unslash( $_POST['destlink'] ) ) : '';
 		
 		// Temporarily update settings for rule generation
 		$fmc_settings = get_option( 'fmc_settings' );

@@ -226,7 +226,13 @@ class fmcWidget extends WP_Widget {
 		$size = array_key_exists('size', $args) ? $args['size'] : null;
 		$class = array_key_exists('class', $args) ? $args['class'] : 'widefat';
 
-		$data_alpha =   array_key_exists('data-alpha', $args) ? "data-alpha='".$args['data-alpha']."'" : '';
+		$data_alpha = '';
+		if ( array_key_exists( 'data-alpha-enabled', $args ) ) {
+			$data_alpha = " data-alpha-enabled='" . esc_attr( $args['data-alpha-enabled'] ) . "'";
+		} elseif ( array_key_exists( 'data-alpha', $args ) ) {
+			// Back-compat for pre–wp-color-picker-alpha 3.x attribute name.
+			$data_alpha = " data-alpha-enabled='" . esc_attr( $args['data-alpha'] ) . "'";
+		}
 		$default = array_key_exists('default', $args) ? $args['default'] : null;
 		$value = $this->get_field_value($for) != false ? $this->get_field_value($for) : $default;
 
@@ -239,7 +245,12 @@ class fmcWidget extends WP_Widget {
 		$size = array_key_exists('size', $args) ? $args['size'] : null;
 		$class = array_key_exists('class', $args) ? $args['class'] : 'widefat';
 
-		$data_alpha =   array_key_exists('data-alpha', $args) ? "data-alpha='".$args['data-alpha']."'" : '';
+		$data_alpha = '';
+		if ( array_key_exists( 'data-alpha-enabled', $args ) ) {
+			$data_alpha = " data-alpha-enabled='" . esc_attr( $args['data-alpha-enabled'] ) . "'";
+		} elseif ( array_key_exists( 'data-alpha', $args ) ) {
+			$data_alpha = " data-alpha-enabled='" . esc_attr( $args['data-alpha'] ) . "'";
+		}
 		$default = array_key_exists('default', $args) ? $args['default'] : null;
 		$value = $this->get_field_value($for) != false ? $this->get_field_value($for) : $default;
 		$fonts = array_key_exists('fonts', $args) ? $args['fonts'] : fmcWidget::available_fonts();

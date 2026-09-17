@@ -579,17 +579,6 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 		return $request;
 	}
 
-  function ReAuthenticate() {
-	$spark_oauth = $this->parse_spark_oauth_raw();
-    if ( isset( $spark_oauth[ 'refresh_token' ] ) && !empty( $spark_oauth[ 'refresh_token' ] ) ) {
-      return $this->Grant(unserialize( $spark_oauth[ 'refresh_token' ] ), 'refresh_token');
-    }
-    return false;
-  }
-
-
-
-
 	function AddListingsToCart( $id, $listings ){
 		$data = array( 'ListingIds' => $listings );
 		return $this->get_all_results( $this->get_from_api( 'POST', 'listingcarts/' . $id, 0, array(), $this->make_sendable_body( $data ) ) );
@@ -600,18 +589,6 @@ class flexmlsConnectPortalUser extends flexmlsAPI_OAuth {
 		return $this->get_all_results( $this->get_from_api( 'DELETE', 'listingcarts/' . $id . '/listings/' . $listing ) );
 		//return $this->return_all_results( $this->MakeAPICall("DELETE", "listingcarts/".$id."/listings/".$listing) );
 	}
-
-  /*
-  function sign_request($request) {
-    //$last_token = isset($_SESSION['last_token']) ? unserialize($_SESSION['last_token']) : '';
-    $this->SetHeader('Authorization', 'OAuth '. $last_token);
-    // reload headers into request
-    $request['headers'] = $this->headers;
-    $request['query_string'] = http_build_query($request['params']);
-    $request['cacheable_query_string'] = $request['query_string'];
-    return $request;
-  }
-  */
 
 }
 

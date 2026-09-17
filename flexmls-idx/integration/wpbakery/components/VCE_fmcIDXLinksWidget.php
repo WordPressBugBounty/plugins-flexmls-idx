@@ -48,7 +48,13 @@ class VCE_fmcIDXLinksWidget extends VCE_component {
 
     protected function api_links_array($links){
         $array = array();
+        if (!is_array($links)) {
+            return $array;
+        }
         foreach ($links as $link) {
+            if (!is_array($link) || !isset($link['LinkId'], $link['Name'])) {
+                continue;
+            }
             $array[$link['LinkId']] = $link['Name'];
         }
         return $array;

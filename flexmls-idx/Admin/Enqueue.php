@@ -39,10 +39,12 @@ class Enqueue {
 			'post.php',
 			'post-new.php',
 			'toplevel_page_fmc_admin_intro',
-			'widgets.php'
+			'widgets.php',
+			'customize.php',
+			'site-editor.php',
 		);
-		if( !in_array( $hook, $hooked_pages ) ){
-			//return;
+		if( !in_array( $hook, $hooked_pages, true ) ){
+			return;
 		}
 		wp_enqueue_script( 'jquery-ui-core' );
 		wp_enqueue_script( 'jquery-ui-sortable' );
@@ -59,11 +61,8 @@ class Enqueue {
 
 		$version = ( defined( 'FMC_DEV' ) && FMC_DEV ) ? false : FMC_PLUGIN_VERSION;
 
-		/* Fix error wp-color-picker for WP 5.5
-		https://github.com/kallookoo/wp-color-picker-alpha/issues/35#issuecomment-670711991
-		*/
-
-		$flexmls_admin_deps = array( 'jquery', 'wp-color-picker' );
+		// wp-color-picker-alpha 3.x relies on core wp-color-picker + wp.i18n (not wpColorPickerL10n).
+		$flexmls_admin_deps = array( 'jquery', 'wp-color-picker', 'wp-i18n' );
 		if ( $options['select2_turn_off'] !== 'admin' && $options['select2_turn_off'] !== 'all' ) {
 			$flexmls_admin_deps[] = 'select2-4.0.5';
 		}
@@ -72,16 +71,6 @@ class Enqueue {
 		$admin_js_version = ( defined( 'FMC_DEV' ) && FMC_DEV ) ? false : ( file_exists( $admin_js_path ) ? filemtime( $admin_js_path ) : $version );
 		wp_register_script( 'flexmls_admin_script', plugins_url( 'assets/js/admin.js', dirname( __FILE__ ) ),
 			$flexmls_admin_deps, $admin_js_version );
-
-		$color_picker_strings = array(
-			'clear'            => __( 'Clear', 'flexmls-idx' ),
-			'clearAriaLabel'   => __( 'Clear color', 'flexmls-idx' ),
-			'defaultString'    => __( 'Default', 'flexmls-idx' ),
-			'defaultAriaLabel' => __( 'Select default color', 'flexmls-idx' ),
-			'pick'             => __( 'Select Color', 'flexmls-idx' ),
-			'defaultLabel'     => __( 'Color value', 'flexmls-idx' ),
-		);
-		wp_localize_script( 'flexmls_admin_script', 'wpColorPickerL10n', $color_picker_strings );
 
 		wp_enqueue_script('flexmls_admin_script');
 
@@ -132,22 +121,6 @@ class Enqueue {
 		) );
 
 		add_thickbox();
-	}
-
-	/* Print the wpColorPickerL10n variable in the footer, to be sure it isn't overwritten by WordPress */
-	static function admin_print_footer_scripts() {
-		?>
-		<script type="text/javascript">
-			var wpColorPickerL10n = {
-				"clear": <?php echo json_encode( __( 'Clear', 'flexmls-idx' ) ); ?>,
-				"clearAriaLabel": <?php echo json_encode( __( 'Clear color', 'flexmls-idx' ) ); ?>,
-				"defaultString": <?php echo json_encode( __( 'Default', 'flexmls-idx' ) ); ?>,
-				"defaultAriaLabel": <?php echo json_encode( __( 'Select default color', 'flexmls-idx' ) ); ?>,
-				"pick": <?php echo json_encode( __( 'Select Color', 'flexmls-idx' ) ); ?>,
-				"defaultLabel": <?php echo json_encode( __( 'Color value', 'flexmls-idx' ) ); ?>
-			};
-		</script>
-		<?php
 	}
 
 	static function wp_enqueue_scripts(){

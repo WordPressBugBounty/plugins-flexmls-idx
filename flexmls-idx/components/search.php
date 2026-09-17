@@ -1079,7 +1079,7 @@ class fmcSearch_v1 extends fmcWidget {
       $this->instance[$for] = $value;
     }
 
-    $this->text_field_tag($for, array('class' => 'wp-color-picker', 'data-alpha'=>'true','size' => '6', 'default' => $default));
+    $this->text_field_tag($for, array('class' => 'wp-color-picker', 'data-alpha-enabled' => 'true', 'size' => '6', 'default' => $default));
   }
 
   protected function sortable_list($collection) {

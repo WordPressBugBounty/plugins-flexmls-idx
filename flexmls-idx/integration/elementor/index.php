@@ -25,22 +25,10 @@ add_action('elementor/widgets/register', function($widgets_manager){
   $version = ( defined( 'FMC_DEV' ) && FMC_DEV ) ? false : FMC_PLUGIN_VERSION;
 			
   if(is_admin()){
-    wp_enqueue_script( 'flexmls_admin_script_', plugins_url( '../assets/js/admin.js', dirname( __FILE__ ) ), 
-			array( 'jquery', 'wp-color-picker' ), $version );
+    wp_enqueue_script( 'flexmls_admin_script_', plugins_url( '../assets/js/admin.js', dirname( __FILE__ ) ),
+			array( 'jquery', 'wp-color-picker', 'wp-i18n' ), $version );
 
-		$color_picker_strings = array(
-			'clear'            => __( 'Clear', 'fmcdomain' ),
-			'clearAriaLabel'   => __( 'Clear color', 'fmcdomain' ),
-			'defaultString'    => __( 'Default', 'fmcdomain' ),
-			'defaultAriaLabel' => __( 'Select default color', 'fmcdomain' ),
-			'pick'             => __( 'Select Color', 'fmcdomain' ),
-			'defaultLabel'     => __( 'Color value', 'fmcdomain' ),
-		);
-		wp_localize_script( 'flexmls_admin_script_', 'wpColorPickerL10n', $color_picker_strings );	
-
-    wp_enqueue_script('flexmls_admin_script_');
-    
-    wp_enqueue_script( 'fmcElementor', plugins_url( 'scripts/elementor-init.js', __FILE__ ), array( 'jquery', 'wp-color-picker' ), $version );
+    wp_enqueue_script( 'fmcElementor', plugins_url( 'scripts/elementor-init.js', __FILE__ ), array( 'jquery', 'wp-color-picker', 'wp-i18n' ), $version );
     wp_enqueue_style( 'fmc_connect1', plugins_url( '../assets/css/style_admin.css', dirname( __FILE__ ) ), array(), $version );
   }
   

@@ -75,7 +75,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 			$fmc_special_page_caught['type'] = "search-results";
 			$fmc_special_page_caught['page-title'] = "Property Search";
 			$fmc_special_page_caught['post-title'] = "Property Search";
-			$fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_tag_url('search') .'?'. $_SERVER['QUERY_STRING'];
+			$fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_tag_url( 'search' );
 			return;
 		}
 
@@ -129,7 +129,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 		$fmc_special_page_caught['type'] = "search-results";
 		$fmc_special_page_caught['page-title'] = "Property Search";
 		$fmc_special_page_caught['post-title'] = "Property Search";
-		$fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_tag_url('search') .'?'. $_SERVER['QUERY_STRING'];
+		$fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_tag_url( 'search' );
 
 	}
 
@@ -592,6 +592,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 					'agentEmail': '<?php echo $this->contact_form_agent_email($sf); ?>',
 					'officeEmail': '<?php echo $this->contact_form_office_email($sf); ?>',
 					'listingId': '<?php echo addslashes($sf['ListingId']); ?>',
+					'listingKey': '<?php echo addslashes( $sf['ListingKey'] ?? '' ); ?>',
 					'phoneRequired': <?php echo $phone_req ? 'true' : 'false'; ?>,
 					'addressRequired': <?php echo $address_req ? 'true' : 'false'; ?>
 					<?php if( isset($options['contact_disclaimer']) ) : ?>

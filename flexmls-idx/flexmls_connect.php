@@ -5,7 +5,7 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 4.0.1
+Version: 4.1
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
 Tested up to: 7.1
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '4.0.1';
+const FMC_PLUGIN_VERSION = '4.1';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -69,7 +69,6 @@ class FlexMLS_IDX {
 		require_once( 'components/LocationGenerator.php' );
 
 		add_action( 'admin_enqueue_scripts', array( '\FlexMLS\Admin\Enqueue', 'admin_enqueue_scripts' ) );
-		add_action( 'admin_print_footer_scripts', array( '\FlexMLS\Admin\Enqueue', 'admin_print_footer_scripts' ) );
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 		add_action( 'admin_menu', array( $this, 'admin_menu_fix_submenu_labels' ), 99 );
 		add_action( 'admin_init', array( $this, 'admin_init_redirect_clear_cache' ) );
@@ -129,7 +128,12 @@ class FlexMLS_IDX {
 		}
 		$options = get_option( 'fmc_settings', array() );
 		$has_key = ! empty( $options['api_key'] ) && ! empty( $options['api_secret'] );
-		$submenu['fmc_admin_intro'][0][0] = $has_key ? 'Credentials' : 'Activate';
+		if ( current_user_can( \FlexMLS\Admin\Settings::SETTINGS_CAPABILITY ) ) {
+			$submenu['fmc_admin_intro'][0][0] = $has_key ? 'Credentials' : 'Activate';
+		} else {
+			// Authors/editors use this page for widget setup instructions, not credentials.
+			$submenu['fmc_admin_intro'][0][0] = 'Get Started';
+		}
 	}
 
 	function admin_init_redirect_clear_cache(){
@@ -190,7 +194,7 @@ class FlexMLS_IDX {
 			$cls = esc_attr( \FlexMLS\Admin\ApiMessages::admin_alert_class( 'warning', $for_about_wrap ) );
 			printf(
 				'<div class="%3$s">
-						<p>You must enter your Flexmls&reg; API Credentials. <a href="%1$s">Click here</a> to enter your API credentials, or <a href="%2$s">contact Flexmls&reg; support</a>.</p>
+						<p>You must enter your Flexmls&reg; plugin credentials. <a href="%1$s">Click here</a> to enter your key and secret, or <a href="%2$s">contact Flexmls&reg; support</a>.</p>
 					</div>',
 				admin_url( 'admin.php?page=fmc_admin_intro' ),
 				admin_url( 'admin.php?page=fmc_admin_intro&tab=support' ),

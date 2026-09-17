@@ -10,6 +10,9 @@ class VCE_fmcPhotos extends VCE_component {
 
     protected function makeOptGroup($property_type, $property_sub_type){
       $arr = [];
+      if (!is_array($property_type)) {
+          return $arr;
+      }
       foreach ($property_type as $property_code => $v) {
           $arr[$property_code] = array();
           $arr[$property_code][''] = 'All Sub Types';

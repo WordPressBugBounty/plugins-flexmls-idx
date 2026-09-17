@@ -50,14 +50,18 @@ class OAuth extends Core {
 			}
 			$code = sanitize_text_field( $code );
 			$state = urldecode( $state );
-			if( false === filter_var( $state, FILTER_VALIDATE_URL ) ){
-				$state = '';
+			$fallback = home_url( '/' );
+			// Reject off-site URLs; FILTER_VALIDATE_URL alone allows any absolute host.
+			$state = wp_validate_redirect( $state, $fallback );
+			if ( empty( $state ) ) {
+				$state = $fallback;
 			}
 			if( !empty( $code ) && !empty( $state ) ){
 				$this->oauth_login_code = $code;
 				$this->oauth_login_state = $state;
 				if( $this->generate_oauth_token() ){
-					exit( '<meta http-equiv="refresh" content="0; url=' . $state . '">' );
+					wp_safe_redirect( $state );
+					exit;
 				}
 			}
 		}

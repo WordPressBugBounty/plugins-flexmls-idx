@@ -64,8 +64,13 @@ class flexmlsConnectPageOAuthLogin {
           }
 
         }
-        //redirect to last page user was on
-        wp_redirect($state);
+        // Same-site return only — reject off-site open redirects via OAuth state.
+        $fallback = home_url( '/' );
+        $state    = wp_validate_redirect( $state, $fallback );
+        if ( empty( $state ) ) {
+          $state = $fallback;
+        }
+        wp_safe_redirect( $state );
         exit;
       }
     }
