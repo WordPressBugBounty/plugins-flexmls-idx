@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 4.1
+Stable tag: 4.1.1
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,20 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+
+= 4.1.1 =
+Performance:
+* Optimized API and database routing to improve loading speeds on non-IDX pages.
+* Upgraded our caching architecture to significantly reduce site-wide server load and deliver listing data more efficiently.
+* Streamlined API session management for faster connectivity and reduced server overhead.
+
+Reliability & Compatibility:
+* Improved fallback messaging and plugin resilience during third-party IDX service interruptions.
+* Enhanced Elementor integration to ensure seamless dynamic widget rendering and smarter cache handling.
+* Optimized stylesheet delivery to guarantee immediate cache invalidation and smooth visual transitions following plugin updates.
+
+Security & Stability:
+* Implemented proactive security hardening for search filters and market statistics routing.
 
 = 4.1 =
 Security & Stability:

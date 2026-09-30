@@ -137,12 +137,48 @@ class ApiMessages {
 	}
 
 	/**
+	 * Lazy Spark account health check (GetMyAccount + ConnectionPause + entitlement).
+	 *
+	 * Formerly ran on every WordPress bootstrap. Runs at most once per request, on admin,
+	 * cron, or the first IDX API use so pages without Flexmls content skip Spark entirely.
+	 *
+	 * @return void
+	 */
+	public static function ensure_spark_account_bootstrap() {
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+
+		global $fmc_api;
+		$options = get_option( 'fmc_settings' );
+		if ( empty( $options['api_key'] ) || empty( $options['api_secret'] ) ) {
+			return;
+		}
+		if ( ! isset( $fmc_api ) || ! is_object( $fmc_api ) || ! method_exists( $fmc_api, 'GetMyAccount' ) ) {
+			return;
+		}
+
+		$active_account = $fmc_api->GetMyAccount();
+		\FlexMLS\Admin\ConnectionPause::ensure_pause_from_bootstrap_1015(
+			isset( $fmc_api->last_error_code ) ? (int) $fmc_api->last_error_code : 0,
+			isset( $fmc_api->last_error_mess ) ? (string) $fmc_api->last_error_mess : ''
+		);
+
+		if ( ! empty( $active_account ) ) {
+			self::sync_wordpress_idx_entitlement_on_api( $fmc_api );
+		}
+	}
+
+	/**
 	 * Block IDX plugin API calls when the key lacks WordPressIdx, except endpoints needed for session health and re-checking system info.
 	 *
 	 * @param string $service Spark service path (e.g. system, my/account, listings).
 	 * @param string $method  HTTP method.
 	 */
 	public static function is_spark_api_blocked_missing_wordpress_idx_subscription( $service, $method ) {
+		self::ensure_spark_account_bootstrap();
 		global $fmc_api;
 		if ( ! isset( $fmc_api ) || ! is_object( $fmc_api ) || true !== $fmc_api->wordpress_idx_entitlement_blocked ) {
 			return false;

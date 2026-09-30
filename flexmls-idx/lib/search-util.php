@@ -466,7 +466,7 @@ class flexmlsSearchUtil {
 							action: 'flexmls_connect_save_search',
 							nonce: ( typeof fmcAjax !== 'undefined' && fmcAjax.nonce ) ? fmcAjax.nonce : '',
 							name: $( '.flexmls_connect_search_name' ).val(),
-							filter: <?php echo json_encode( $filter_param ); ?>
+							filter: <?php echo wp_json_encode( $filter_param, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ); ?>
 						},
 						success: function ( data, status ) {
 							if ( data && data['result'] ) {
@@ -516,7 +516,7 @@ class flexmlsSearchUtil {
 		<script type="text/javascript">
 			jQuery( function ( $ ) {
 				var lazyLoad = <?php echo $lazy_load ? 'true' : 'false'; ?>,
-				    lazyConfig = <?php echo $lazy_load ? wp_json_encode( $lazy_load_config ) : 'null'; ?>;
+				    lazyConfig = <?php echo $lazy_load ? wp_json_encode( $lazy_load_config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ) : 'null'; ?>;
 
 				$( document ).on( 'click', '.close-map-button', function ( e ) {
 					e.preventDefault();

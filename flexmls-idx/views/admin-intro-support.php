@@ -67,12 +67,6 @@ foreach( $all_plugins as $plugin_file => $plugin_data ) {
 	}
 }
 
-$known_plugin_conflicts = array(
-			'screencastcom-video-embedder/screencast.php', // Screencast Video Embedder, JS syntax errors in 0.4.4 breaks all pages
-		);
-
-$known_plugin_conflicts_tag = ' &ndash; <span class="flexmls-known-plugin-conflict-tag">Known issues</span>';
-
 // Plugins that minify CSS/JS — show a notice that our plugin's assets should be excluded from their minification.
 $minification_plugins = array(
 	'autoptimize/autoptimize.php'       => 'Autoptimize',
@@ -294,13 +288,12 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 						<li>
 							<?php
 								printf(
-									'<a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a>%s',
+									'<a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a>',
 									esc_url( $active_plugin[ 'PluginURI' ] ),
 									esc_html( $active_plugin[ 'Name' ] ),
 									esc_html( $active_plugin[ 'Version' ] ),
 									esc_url( $active_plugin[ 'AuthorURI' ] ),
-									esc_html( $active_plugin[ 'Author' ] ),
-									in_array( $plugin_file, $known_plugin_conflicts ) ? $known_plugin_conflicts_tag : ''
+									esc_html( $active_plugin[ 'Author' ] )
 								);
 							?>
 							<?php if ( isset( $minification_plugins[ $plugin_file ] ) ) : ?>
@@ -319,13 +312,12 @@ if ( $latest !== null && version_compare( FMC_PLUGIN_VERSION, $latest, '<' ) ) {
 					<?php foreach( $deactivated_plugins as $plugin_file => $deactivated_plugin ): ?>
 						<?php
 							printf(
-								'<li><a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a>%s</li>',
+								'<li><a href="%s" target="_blank">%s</a> (Version %s) by <a href="%s" target="_blank">%s</a></li>',
 								esc_url( $deactivated_plugin[ 'PluginURI' ] ),
 								esc_html( $deactivated_plugin[ 'Name' ] ),
 								esc_html( $deactivated_plugin[ 'Version' ] ),
 								esc_url( $deactivated_plugin[ 'AuthorURI' ] ),
-								esc_html( $deactivated_plugin[ 'Author' ] ),
-								in_array( $plugin_file, $known_plugin_conflicts ) ? $known_plugin_conflicts_tag : ''
+								esc_html( $deactivated_plugin[ 'Author' ] )
 							);
 						?>
 					<?php endforeach; ?>

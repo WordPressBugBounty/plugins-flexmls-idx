@@ -11,7 +11,7 @@
         }
   
         protected function setControlls() {
-            extract($this->module_info['vars']);
+            extract($this->integration_control_vars());
 
             $this->add_control(
                 'listing',

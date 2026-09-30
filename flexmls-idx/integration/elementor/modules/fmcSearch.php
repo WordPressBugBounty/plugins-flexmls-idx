@@ -80,7 +80,7 @@
         }
 
         protected function setControlls() {
-            extract($this->module_info['vars']);
+            extract($this->integration_control_vars());
 
             $on_off_options = [
                 'label_on' => __( 'yes', 'plugin-name' ),

@@ -5,7 +5,7 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 4.1
+Version: 4.1.1
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
 Tested up to: 7.1
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '4.1';
+const FMC_PLUGIN_VERSION = '4.1.1';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
@@ -79,6 +79,7 @@ class FlexMLS_IDX {
 		add_action( 'init', array( $this, 'rewrite_rules' ) );
 		add_action( 'parse_query', array( $this, 'parse_query' ) );
 		add_action( 'plugins_loaded', array( '\FlexMLS\Admin\Settings', 'update_settings' ), 9 );
+		add_action( 'plugins_loaded', array( '\FlexMLS\Admin\Update', 'maybe_migrate_tracked_transients_autoload' ), 5 );
 		add_action( 'plugins_loaded', array( $this, 'session_start' ) );
 		add_filter( 'redirect_canonical', array( $this, 'prevent_idx_redirects' ), 10, 2 );
 		add_action( 'send_headers', array( $this, 'send_idx_page_header' ) );
@@ -213,8 +214,9 @@ class FlexMLS_IDX {
 			}
 		}
 
-		// GetMyAccount() at plugin load sets last_error on $fmc_api; generate_auth_token() uses a separate Core instance
-		// and may still return a cached session token — so 1010/1015 from my/account (etc.) never reached the notice path.
+		// GetMyAccount can fail with 1010/1015 while a cached session token still looks valid.
+		// Run the deferred account check here (admin) so notices see my/account errors.
+		\FlexMLS\Admin\ApiMessages::ensure_spark_account_bootstrap();
 		global $fmc_api;
 		$fmc_err_code = ( isset( $fmc_api ) && isset( $fmc_api->last_error_code ) ) ? (int) $fmc_api->last_error_code : 0;
 		$fmc_err_mess = ( isset( $fmc_api ) && isset( $fmc_api->last_error_mess ) ) ? (string) $fmc_api->last_error_mess : '';
@@ -430,17 +432,18 @@ class FlexMLS_IDX {
 			session_start();
 		}
 		*/
-		$SparkAPI = new \SparkAPI\Core();
 		$fmc_plugin_version = get_option( 'fmc_plugin_version' );
 		if( false === $fmc_plugin_version || version_compare( $fmc_plugin_version, FMC_PLUGIN_VERSION, '<' ) ){
 			\FlexMLS\Admin\Update::set_minimum_options();
-			$did_clear_cache = $SparkAPI->clear_cache( true );
+			$SparkAPI = new \SparkAPI\Core();
+			$SparkAPI->clear_cache( true );
 			update_option( 'fmc_plugin_version', FMC_PLUGIN_VERSION, 'no' );
 		}
 		if( !wp_next_scheduled( 'flexmls_hourly_cache_cleanup' ) ){
 			wp_schedule_event( time(), 'hourly', 'flexmls_hourly_cache_cleanup');
 		}
-		$auth_token = $SparkAPI->generate_auth_token();
+		// Auth tokens are generated on first Spark API use (admin, cron, widget/shortcode),
+		// not on every plugins_loaded.
 
 		global $listings_per_page;
 		if( isset( $_GET[ 'Limit' ] ) ){
@@ -477,27 +480,22 @@ class FlexMLS_IDX {
 
 	function widgets_init(){
 		global $fmc_widgets;
-		$SparkAPI = new \SparkAPI\Core();
-		$auth_token = $SparkAPI->generate_auth_token();
 
-		if( $auth_token ){
-			register_widget( '\\FlexMLS\\Widgets\\LeadGeneration' );
+		// Register when credentials are saved — do not hit Spark here. A missing/expired
+		// auth token must not unregister widgets on customer sites; API errors surface at render.
+		if( ! flexmlsConnect::has_api_saved() ){
+			return;
 		}
+
+		register_widget( '\\FlexMLS\\Widgets\\LeadGeneration' );
 
 		// This will come out soon once all of the widgets have been
 		// rebuilt as native WordPress widgets and called using
 		// register_widget above.
-		if( $auth_token && $fmc_widgets ){
+		if( $fmc_widgets ){
 			foreach( $fmc_widgets as $class => $wdg ){
 				if( file_exists( FMC_PLUGIN_DIR . 'components/' . $wdg[ 'component' ] ) ){
 					require_once( FMC_PLUGIN_DIR . 'components/' . $wdg[ 'component' ] );
-					// All widgets require a "key" or auth token so this can be removed
-					/*
-					$meets_key_reqs = false;
-					if ($wdg['requires_key'] == false || ($wdg['requires_key'] == true && flexmlsConnect::has_api_saved())) {
-						$meets_key_reqs = true;
-					}
-					*/
 					if( class_exists( $class, false ) && true == $wdg[ 'widget' ] ){
 						register_widget( $class );
 					}
@@ -688,59 +686,51 @@ $fmc_instance_cache = array();
 
 
 /*
-* register the init functions with the appropriate WP hooks
+* Page-builder integrations: gate on saved credentials only (no Spark call at file load).
+* Account / entitlement / ConnectionPause run via ApiMessages::ensure_spark_account_bootstrap()
+* on admin, cron, or first IDX API use.
 */
-//add_action('widgets_init', array('flexmlsConnect', 'widget_init') );
-
-$active_account_check = $fmc_api->GetMyAccount();
-
 if ( ! empty( $api_key ) && ! empty( $api_secret ) ) {
-	\FlexMLS\Admin\ConnectionPause::ensure_pause_from_bootstrap_1015(
-		isset( $fmc_api->last_error_code ) ? (int) $fmc_api->last_error_code : 0,
-		isset( $fmc_api->last_error_mess ) ? (string) $fmc_api->last_error_mess : ''
-	);
-}
 
-if ( ! empty( $api_key ) && ! empty( $api_secret ) && ! empty( $active_account_check ) ) {
-	\FlexMLS\Admin\ApiMessages::sync_wordpress_idx_entitlement_on_api( $fmc_api );
-}
-
-if(!empty($api_key) && !empty($api_secret) && !empty($active_account_check) ){
-
-	$options_int = get_option('fmc_settings');
-	$options_integration = [
-		'divi' => false,
+	$options_int = get_option( 'fmc_settings' );
+	if ( ! is_array( $options_int ) ) {
+		$options_int = array();
+	}
+	$options_integration = array(
+		'divi'      => false,
 		'elementor' => false,
-		'wpbakery' => false
-	];
+		'wpbakery'  => false,
+	);
 
 	require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
 	//------------------------------------
 	//Elementor
-	if (is_plugin_active('elementor/elementor.php')) {
+	if ( is_plugin_active( 'elementor/elementor.php' ) ) {
 		$options_integration['elementor'] = true;
 		add_action( 'elementor/init', function() {
 			require_once plugin_dir_path( __FILE__ ) . 'integration/elementor/index.php';
 
-			\Elementor\Plugin::$instance->elements_manager->add_category('flexmls',
-			[
+			\Elementor\Plugin::$instance->elements_manager->add_category( 'flexmls',
+			array(
 				'title' => 'Flexmls&reg;',
-				'icon' => 'fa fa-plug',
-			]);
+				'icon'  => 'fa fa-plug',
+			) );
 
-		});
+		} );
 	}
-	//WPBackery
-	if (is_plugin_active('js_composer/js_composer.php')) {
+	//WPBakery
+	if ( is_plugin_active( 'js_composer/js_composer.php' ) ) {
 		$options_integration['wpbakery'] = true;
 		require_once plugin_dir_path( __FILE__ ) . 'integration/wpbakery/index.php';
 	}
 
 	//-------------------
 
-	$options_int['integration'] = $options_integration;
-	update_option('fmc_settings', $options_int);
+	if ( ! isset( $options_int['integration'] ) || $options_int['integration'] !== $options_integration ) {
+		$options_int['integration'] = $options_integration;
+		update_option( 'fmc_settings', $options_int );
+	}
 }
 
 $fmc_admin = new flexmlsConnectSettings;

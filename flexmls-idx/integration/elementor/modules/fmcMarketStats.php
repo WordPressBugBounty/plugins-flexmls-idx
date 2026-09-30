@@ -5,10 +5,72 @@
         
         protected function integrationWithElementor(){
             $this->settings_fmc = ['title', 'width_', 'height_', 'chart_type', 'type', 'display', 'property_type', 'location'];
-            $types = $this->module_info['vars']['type_options'];
-            foreach ($types as $val => $label) {
+            // Static chart types — do not require Spark at widget register (WP-1392).
+            foreach ( array_keys( $this->market_stat_type_options() ) as $val ) {
                 $this->settings_fmc[] = 'display_'.$val;
             }
+        }
+
+        /**
+         * Chart type keys used in Elementor settings. Matches fmcMarketStats::get_type_options().
+         *
+         * @return array<string, string>
+         */
+        protected function market_stat_type_options() {
+            return array(
+                'absorption' => 'Absorption Rate',
+                'inventory'  => 'Inventory',
+                'price'      => 'Prices',
+                'ratio'      => 'Sale to Original List Price Ratio',
+                'dom'        => 'Sold DOM',
+                'volume'     => 'Volume',
+            );
+        }
+
+        /**
+         * Display metrics per type. Matches fmcMarketStats::$stat_types (no Spark).
+         *
+         * @return array<string, array<int, array<string, mixed>>>
+         */
+        protected function market_stat_display_types() {
+            return array(
+                'absorption' => array(
+                    array( 'label' => 'Absorption Rate (in Months)', 'value' => 'AbsorptionRate', 'selected' => true ),
+                ),
+                'inventory'  => array(
+                    array( 'label' => 'Number of Active Listings', 'value' => 'ActiveListings', 'selected' => true ),
+                    array( 'label' => 'Number of New Listings', 'value' => 'NewListings', 'selected' => true ),
+                    array( 'label' => 'Number of Pended Listings', 'value' => 'PendedListings' ),
+                    array( 'label' => 'Number of Sold Listings', 'value' => 'SoldListings' ),
+                ),
+                'price'      => array(
+                    array( 'label' => 'Active Avg List Price (in Dollars)', 'value' => 'ActiveAverageListPrice', 'selected' => true ),
+                    array( 'label' => 'New Avg List Price (in Dollars)', 'value' => 'NewAverageListPrice', 'selected' => true ),
+                    array( 'label' => 'Pended Avg List Price (in Dollars)', 'value' => 'PendedAverageListPrice' ),
+                    array( 'label' => 'Sold Avg List Price (in Dollars)', 'value' => 'SoldAverageListPrice' ),
+                    array( 'label' => 'Sold Avg Sale Price (in Dollars)', 'value' => 'SoldAverageSoldPrice' ),
+                    array( 'label' => 'Active Median List Price (in Dollars)', 'value' => 'ActiveMedianListPrice', 'selected' => true ),
+                    array( 'label' => 'New Median List Price (in Dollars)', 'value' => 'NewMedianListPrice', 'selected' => true ),
+                    array( 'label' => 'Pended Median List Price (in Dollars)', 'value' => 'PendedMedianListPrice' ),
+                    array( 'label' => 'Sold Median List Price (in Dollars)', 'value' => 'SoldMedianListPrice' ),
+                    array( 'label' => 'Sold Median Sale Price (in Dollars)', 'value' => 'SoldMedianSoldPrice' ),
+                ),
+                'ratio'      => array(
+                    array( 'label' => 'Sale to Original List Price (Percentage)', 'value' => 'SaleToOriginalListPriceRatio', 'selected' => true ),
+                    array( 'label' => 'Sale to List Price (Percentage)', 'value' => 'SaleToListPriceRatio' ),
+                ),
+                'dom'        => array(
+                    array( 'label' => 'Average CDOM (in Days)', 'value' => 'AverageCdom', 'selected' => true ),
+                    array( 'label' => 'Average ADOM (in Days)', 'value' => 'AverageDom' ),
+                ),
+                'volume'     => array(
+                    array( 'label' => 'Active List Volume (in Dollars)', 'value' => 'ActiveListVolume', 'selected' => true ),
+                    array( 'label' => 'New List Volume (in Dollars)', 'value' => 'NewListVolume', 'selected' => true ),
+                    array( 'label' => 'Pended List Volume (in Dollars)', 'value' => 'PendedListVolume' ),
+                    array( 'label' => 'Sold List Volume (in Dollars)', 'value' => 'SoldListVolume' ),
+                    array( 'label' => 'Sold Sale Volume (in Dollars)', 'value' => 'SoldSaleVolume' ),
+                ),
+            );
         }
 
         protected $stat_types;
@@ -17,27 +79,39 @@
         protected $display_options;
         
         protected function render_hook($settings){
-            $props = $settings;
-            $types = $this->module_info['vars']['type_options'];
+            $props = is_array( $settings ) ? $settings : array();
+            $types = $this->market_stat_type_options();
+            $type  = ( isset( $props['type'] ) && isset( $types[ $props['type'] ] ) ) ? $props['type'] : 'absorption';
+            $props['type'] = $type;
 
-            foreach ($types as $val => $label) {
-                if($props['type'] == $val){
-                    $display = $val;
-                } else {
-                    unset($props['display_'.$val]);
+            foreach ( $types as $val => $label ) {
+                if ( $val !== $type ) {
+                    unset( $props[ 'display_' . $val ] );
                 }
             }
-    
-            $props['display'] = implode(',', $props['display_'.$display]);
-            $props['width'] = $props['width_']['size'];
-            $props['height'] = $props['height_']['size'];
-            unset($props['display_'.$display]);
-            unset($props['width_']);
-            unset($props['height_']);
 
-            $return = $props + ['integration' => 'elementor'];
+            $display_values = isset( $props[ 'display_' . $type ] ) ? $props[ 'display_' . $type ] : array();
+            if ( is_string( $display_values ) ) {
+                $display_values = ( '' === $display_values ) ? array() : explode( ',', $display_values );
+            }
+            if ( ! is_array( $display_values ) ) {
+                $display_values = array();
+            }
+            $display_values = array_values( array_filter( $display_values, 'strlen' ) );
+            if ( empty( $display_values ) ) {
+                foreach ( $this->market_stat_display_types()[ $type ] as $row ) {
+                    if ( ! empty( $row['selected'] ) ) {
+                        $display_values[] = $row['value'];
+                    }
+                }
+            }
 
-            return $return;
+            $props['display'] = implode( ',', $display_values );
+            $props['width']   = isset( $props['width_']['size'] ) ? $props['width_']['size'] : '';
+            $props['height']  = isset( $props['height_']['size'] ) ? $props['height_']['size'] : '';
+            unset( $props[ 'display_' . $type ], $props['width_'], $props['height_'] );
+
+            return $props + array( 'integration' => 'elementor' );
         }
 
 
@@ -55,11 +129,29 @@
 
            $market_stat_version = $this->get_market_stat_version();
 
-            extract($this->module_info['vars']);
+            extract($this->integration_control_vars());
 
-            $this->chart_type = $chart_type;
-            $this->stat_types = $stat_types;
-            $this->type_options = $type_options;
+            if ( ! isset( $width ) || '' === $width ) {
+                $width = 480;
+            }
+            if ( ! isset( $height ) || '' === $height ) {
+                $height = 200;
+            }
+
+            $this->chart_type   = ! empty( $chart_type ) && is_array( $chart_type )
+                ? $chart_type
+                : array(
+                    'LineChart'   => 'Line',
+                    'ColumnChart' => 'Column',
+                    'BarChart'    => 'Bar',
+                    'AreaChart'   => 'Area',
+                );
+            $this->stat_types   = ! empty( $stat_types ) && is_array( $stat_types )
+                ? $stat_types
+                : $this->market_stat_display_types();
+            $this->type_options = ! empty( $type_options ) && is_array( $type_options )
+                ? $type_options
+                : $this->market_stat_type_options();
             $this->display_options = array();
 
             if ( ! is_array( $property_type_options ) ) {
@@ -121,7 +213,7 @@
                     [
                         'label' => __('Chart Type', 'flexmls-idx'),
                         'type' => \Elementor\Controls_Manager::SELECT,
-                        'options' => $chart_type,
+                        'options' => $this->chart_type,
                         'description' => 'Which type of chart to display',
                         'default' => 'LineChart',
                     ]
@@ -133,7 +225,7 @@
                 [
                     'label' => __( 'Type', 'flexmls-idx' ),
                     'type' => \Elementor\Controls_Manager::SELECT,
-                    'options' => $type_options,
+                    'options' => $this->type_options,
                     //added - changed the word chart to data
                     'description' => 'Which type of data to display',
                     'default' => 'absorption',
@@ -164,14 +256,14 @@
         }  
 
         private function set_stat_types($param){
-            $types = $this->type_options;
-            $stat = $this->stat_types;
-    
+            $types = is_array( $this->type_options ) ? $this->type_options : array();
+            $stat  = is_array( $this->stat_types ) ? $this->stat_types : array();
+
             $return = array();
             $i = 0;
-    
+
             foreach ($types as $val => $label) {
-                $types_array = $this->modify_types($stat[$val]);
+                $types_array = $this->modify_types( isset( $stat[ $val ] ) && is_array( $stat[ $val ] ) ? $stat[ $val ] : array() );
                 $this->display_options[$val] = $types_array['options'];
                 $this->add_control(
                     $param.'_'.$val,

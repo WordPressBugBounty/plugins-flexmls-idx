@@ -178,6 +178,8 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 
 		$options = get_option( 'fmc_settings' );
 
+		\FlexMLS\Admin\ApiMessages::ensure_spark_account_bootstrap();
+
 		$search_unavailable_inner = null;
 		if ( isset( $fmc_api->wordpress_idx_entitlement_blocked ) && true === $fmc_api->wordpress_idx_entitlement_blocked ) {
 			$search_unavailable_inner = esc_html( \FlexMLS\Admin\ApiMessages::widget_wordpress_idx_subscription_blocked_public_message() );

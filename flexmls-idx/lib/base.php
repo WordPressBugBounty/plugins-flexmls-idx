@@ -22,27 +22,21 @@ class flexmlsConnect {
 
 
 	static function widget_init(){
-		// Load all of the widgets we need for the plugin.
+		// Legacy path (widgets_init on FlexMLS_IDX is the active registrar).
+		// Do not generate an auth token here — register when credentials are saved.
 		global $fmc_widgets;
-		$SparkAPI = new \SparkAPI\Core();
-		$auth_token = $SparkAPI->generate_auth_token();
-		if( $auth_token && $fmc_widgets ){
-			foreach( $fmc_widgets as $class => $wdg ){
-				if( file_exists( FMC_PLUGIN_DIR . 'components/' . $wdg[ 'component' ] ) ){
-					require_once( FMC_PLUGIN_DIR . 'components/' . $wdg[ 'component' ] );
-					// All widgets require a "key" or auth token so this will be removed
-					/*
-					$meets_key_reqs = false;
-					if ($wdg['requires_key'] == false || ($wdg['requires_key'] == true && flexmlsConnect::has_api_saved())) {
-						$meets_key_reqs = true;
-					}
-					*/
-					if( class_exists( $class, false ) && true == $wdg[ 'widget' ] ){
-						register_widget( $class );
-					}
-					if( false == $wdg[ 'widget' ] ){
-						new $class();
-					}
+		if( ! self::has_api_saved() || ! $fmc_widgets ){
+			add_action('wp_ajax_fmcShortcodeContainer', array('flexmlsConnect', 'shortcode_container') );
+			return;
+		}
+		foreach( $fmc_widgets as $class => $wdg ){
+			if( file_exists( FMC_PLUGIN_DIR . 'components/' . $wdg[ 'component' ] ) ){
+				require_once( FMC_PLUGIN_DIR . 'components/' . $wdg[ 'component' ] );
+				if( class_exists( $class, false ) && true == $wdg[ 'widget' ] ){
+					register_widget( $class );
+				}
+				if( false == $wdg[ 'widget' ] ){
+					new $class();
 				}
 			}
 		}
@@ -190,6 +184,7 @@ class flexmlsConnect {
 
   static function widget_not_available(&$api, $detailed = false, $args = false, $settings = false) {
     $return = "";
+    \FlexMLS\Admin\ApiMessages::ensure_spark_account_bootstrap();
 
     if (is_array($args)) {
       $return .= isset($args['before_widget']) ? $args['before_widget'] : '';
@@ -210,18 +205,22 @@ class flexmlsConnect {
     }
 
     $last_error_code = isset($api->last_error_code) ? $api->last_error_code : null;
+    $last_error_mess = isset($api->last_error_mess) ? (string) $api->last_error_mess : '';
     if ($last_error_code == 1500) {
       $message = "This widget requires a subscription to Flexmls&reg; IDX in order to work.  <a href=''>Buy Now</a>.";
     }
     elseif ( 1010 === (int) $last_error_code || 1015 === (int) $last_error_code ) {
-      $api_msg = isset( $api->last_error_mess ) ? $api->last_error_mess : '';
+      $api_msg = $last_error_mess;
       $message = \FlexMLS\Admin\ApiMessages::widget_unavailable_message( (int) $last_error_code, $api_msg );
     }
-    elseif ($detailed == true) {
-      $message = "There was an issue communicating with the Flexmls&reg; IDX API services required to generate this widget.  Please refresh the page or try again later.  Error code: ".$last_error_code;
-    }
     else {
-      $message = "This widget is temporarily unavailable.  Please refresh the page or try again later.  Error code: ".$last_error_code;
+      // Public copy stays generic. Technical detail goes in data-flexmls-error for console via main.js.
+      $code_label = ( null !== $last_error_code && '' !== (string) $last_error_code ) ? (string) $last_error_code : 'unknown';
+      $detail     = 'Error code: ' . $code_label;
+      if ( '' !== $last_error_mess ) {
+        $detail .= ' (' . $last_error_mess . ')';
+      }
+      $message = '<div class="flexmls-widget-unavailable" data-flexmls-error="' . esc_attr( $detail ) . '">This widget is temporarily unavailable. Please refresh the page or try again later.</div>';
     }
 
     $return .= $message;

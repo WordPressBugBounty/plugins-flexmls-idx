@@ -5,9 +5,53 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 class Update {
 
+	/** One-time migration flag: fmc_tracked_transients must not autoload. */
+	const TRACKED_TRANSIENTS_AUTOLOAD_MIGRATION = 'fmc_tracked_transients_noautoload_v1';
+
 	public static function hourly_cache_cleanup(){
 		$SparkAPI = new \SparkAPI\Core();
+		// Non-force: expires query junk only; a still-valid AuthToken is kept (WP-1389).
 		$SparkAPI->clear_cache();
+		// After cache wipe, refresh account health / entitlement / ConnectionPause.
+		\FlexMLS\Admin\ApiMessages::ensure_spark_account_bootstrap();
+	}
+
+	/**
+	 * Stop autoloading fmc_tracked_transients on existing installs (WP-1381).
+	 *
+	 * New writes already pass autoload=false. This flips the DB flag for sites that
+	 * already created the option with default autoload=yes, and drops the option on
+	 * non-object-cache hosts where SQL pattern deletes make the tracker unnecessary.
+	 *
+	 * @return void
+	 */
+	public static function maybe_migrate_tracked_transients_autoload() {
+		if ( get_option( self::TRACKED_TRANSIENTS_AUTOLOAD_MIGRATION ) ) {
+			return;
+		}
+
+		$option_name = \SparkAPI\Core::TRACKED_TRANSIENTS_OPTION;
+
+		if ( ! wp_using_ext_object_cache() ) {
+			delete_option( $option_name );
+		} elseif ( false !== get_option( $option_name, false ) ) {
+			if ( function_exists( 'wp_set_option_autoload' ) ) {
+				wp_set_option_autoload( $option_name, false );
+			} else {
+				global $wpdb;
+				$wpdb->update(
+					$wpdb->options,
+					array( 'autoload' => 'no' ),
+					array( 'option_name' => $option_name ),
+					array( '%s' ),
+					array( '%s' )
+				);
+				wp_cache_delete( 'alloptions', 'options' );
+				wp_cache_delete( $option_name, 'options' );
+			}
+		}
+
+		update_option( self::TRACKED_TRANSIENTS_AUTOLOAD_MIGRATION, 1, false );
 	}
 
 	public static function set_minimum_options( $is_new_install = false ){
@@ -62,5 +106,7 @@ class Update {
 
 		// Legacy caching option. Will be removed in future versions
 		update_option( 'fmc_cache_version', 1 );
+
+		self::maybe_migrate_tracked_transients_autoload();
 	}
 }

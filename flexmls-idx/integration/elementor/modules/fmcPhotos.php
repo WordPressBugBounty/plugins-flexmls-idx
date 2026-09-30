@@ -33,9 +33,16 @@
         }
   
         protected function setControlls() {
-            extract($this->module_info['vars']);
+            extract($this->integration_control_vars());
 
             $this->additional_fields = $additional_fields;
+            // Front-end CSS generation runs setControlls() without Spark; slider max is 1–8 (WP-1392).
+            if ( empty( $horizontal ) || ! is_array( $horizontal ) ) {
+                $horizontal = range( 1, 8 );
+            }
+            if ( empty( $vertical ) || ! is_array( $vertical ) ) {
+                $vertical = range( 1, 8 );
+            }
 
             $idx_links_use = array_merge(['default' => '(Use Saved Default)'], $this->modify_array($idx_links, 'LinkId', 'Name'));
      
@@ -238,6 +245,9 @@
         
         private function set_dimentions($arr){
             $return = array();
+            if ( ! is_array( $arr ) ) {
+                return $return;
+            }
             foreach ($arr as $key => $value) {
                 $return[(string) $key] = (string) $value;
             }

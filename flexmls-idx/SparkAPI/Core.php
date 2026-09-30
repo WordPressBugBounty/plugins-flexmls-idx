@@ -90,6 +90,27 @@ class Core {
 	private const QUERY_POLL_MAX_WAIT = 20;
 
 	/**
+	 * Total seconds allowed for a Spark HTTP request body (WordPress default is 5).
+	 * Listing searches with filters/expand often need longer than 5s on cold cache.
+	 */
+	private const HTTP_TIMEOUT = 15;
+
+	/** Seconds allowed to establish the TCP/TLS connection to Spark. */
+	private const HTTP_CONNECT_TIMEOUT = 5;
+
+	/** Sentinel widget/API error code when a Spark HTTP call times out. */
+	const ERROR_HTTP_TIMEOUT = 'http_timeout';
+
+	/** Sentinel widget/API error code for other Spark HTTP transport failures. */
+	const ERROR_HTTP_TRANSPORT = 'http_error';
+
+	/**
+	 * Option that lists Spark/query transient keys for bulk deletes under external object cache.
+	 * Must never autoload — can be ~80KB and was previously loaded on every request.
+	 */
+	const TRACKED_TRANSIENTS_OPTION = 'fmc_tracked_transients';
+
+	/**
 	 * Try to acquire a transient-based lock (single-flight across requests).
 	 *
 	 * @param string $lock_key    Transient key for the lock.
@@ -136,6 +157,55 @@ class Core {
 			usleep( $interval_ms * 1000 );
 		}
 		return false;
+	}
+
+	/**
+	 * Classify a WordPress HTTP WP_Error into a stable sentinel code + message.
+	 *
+	 * @param \WP_Error $error Transport error from wp_remote_*.
+	 * @return array{code: string, message: string}
+	 */
+	private function classify_http_wp_error( $error ) {
+		$message = $error instanceof \WP_Error ? $error->get_error_message() : '';
+		$is_timeout = ( false !== stripos( $message, 'timed out' ) || false !== stripos( $message, 'timeout' ) );
+		return array(
+			'code'    => $is_timeout ? self::ERROR_HTTP_TIMEOUT : self::ERROR_HTTP_TRANSPORT,
+			'message' => $message,
+		);
+	}
+
+	/**
+	 * Apply a transport WP_Error onto last_error_* for widget/admin messaging.
+	 *
+	 * @param \WP_Error $error Transport error from wp_remote_*.
+	 * @return array{code: string, message: string}
+	 */
+	private function apply_http_wp_error( $error ) {
+		$classified            = $this->classify_http_wp_error( $error );
+		$this->last_error_code = $classified['code'];
+		$this->last_error_mess = $classified['message'];
+		return $classified;
+	}
+
+	/**
+	 * Run a Spark HTTP call with explicit total + connect timeouts.
+	 *
+	 * @param callable $callback Receives no args; should call wp_remote_*.
+	 * @return mixed Return value of $callback.
+	 */
+	private function with_spark_http_timeouts( $callback ) {
+		$connect_timeout = self::HTTP_CONNECT_TIMEOUT;
+		$curl_handler    = function ( $handle ) use ( $connect_timeout ) {
+			if ( function_exists( 'curl_setopt' ) && ( is_resource( $handle ) || $handle instanceof \CurlHandle ) ) {
+				curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, $connect_timeout );
+			}
+		};
+		add_action( 'http_api_curl', $curl_handler, 10, 1 );
+		try {
+			return $callback();
+		} finally {
+			remove_action( 'http_api_curl', $curl_handler, 10 );
+		}
 	}
 
 	/**
@@ -225,11 +295,33 @@ class Core {
 		// This helps prevent the tracking array from growing indefinitely
 		$this->cleanup_tracking_array();
 
-		delete_transient( 'flexmls_auth_token' );
-		if ( ! \FlexMLS\Admin\ConnectionPause::should_skip_clear_cache_token_refresh() ) {
-			$this->generate_auth_token( 'auto' );
+		// Manual/forced clear may drop the session. Hourly cleanup must not
+		// delete a still-valid AuthToken (avoids a site-wide /session stampede).
+		if ( $force ) {
+			delete_transient( 'flexmls_auth_token' );
+			if ( ! \FlexMLS\Admin\ConnectionPause::should_skip_clear_cache_token_refresh() ) {
+				$this->generate_auth_token( 'auto' );
+			}
+		} else {
+			$existing = get_transient( 'flexmls_auth_token' );
+			if ( ! $this->cached_auth_token_is_usable( $existing ) ) {
+				delete_transient( 'flexmls_auth_token' );
+				if ( ! \FlexMLS\Admin\ConnectionPause::should_skip_clear_cache_token_refresh() ) {
+					$this->generate_auth_token( 'auto' );
+				}
+			}
 		}
 		return true;
+	}
+
+	/**
+	 * Persist the tracked-transients map without autoloading it.
+	 *
+	 * @param array $tracked_transients Map of transient name => pattern.
+	 * @return bool
+	 */
+	private function update_tracked_transients_option( $tracked_transients ) {
+		return update_option( self::TRACKED_TRANSIENTS_OPTION, $tracked_transients, false );
 	}
 
 	/**
@@ -242,7 +334,7 @@ class Core {
 	 * @return int Number of transients deleted.
 	 */
 	private function delete_transients_by_pattern( $pattern ) {
-		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		$tracked_transients = get_option( self::TRACKED_TRANSIENTS_OPTION, array() );
 		$deleted_count     = 0;
 
 		if ( ! is_array( $tracked_transients ) ) {
@@ -260,7 +352,7 @@ class Core {
 
 		// Update the tracking option
 		if ( $deleted_count > 0 ) {
-			update_option( 'fmc_tracked_transients', $tracked_transients );
+			$this->update_tracked_transients_option( $tracked_transients );
 		}
 
 		// Fallback: If we're not using object cache, we can still query the database
@@ -285,14 +377,14 @@ class Core {
 	 * @return int Number of expired transients cleaned up.
 	 */
 	private function cleanup_expired_transients( $pattern ) {
-		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		$tracked_transients = get_option( self::TRACKED_TRANSIENTS_OPTION, array() );
 		$cleaned_count      = 0;
 
 		if ( ! is_array( $tracked_transients ) ) {
-			return 0;
+			$tracked_transients = array();
 		}
 
-		// Check each tracked transient and remove if expired
+		// Check each tracked transient and remove if expired (object-cache installs rely on the tracker)
 		foreach ( $tracked_transients as $transient_name => $transient_pattern ) {
 			if ( strpos( $transient_name, $pattern ) === 0 ) {
 				// Try to get the transient - if it returns false, it's expired or doesn't exist
@@ -307,7 +399,7 @@ class Core {
 
 		// Update the tracking option if we cleaned anything
 		if ( $cleaned_count > 0 ) {
-			update_option( 'fmc_tracked_transients', $tracked_transients );
+			$this->update_tracked_transients_option( $tracked_transients );
 		}
 
 		// Fallback for non-object-cache environments: clean up expired transients from database
@@ -327,15 +419,19 @@ class Core {
 	/**
 	 * Track a transient name for later bulk operations.
 	 *
-	 * This helps us manage transients when using object caching systems
-	 * where we can't query the database directly.
+	 * Only used when an external object cache is active (no SQL LIKE over options).
+	 * Without object cache, pattern deletes use direct SQL and skip this option entirely.
 	 *
 	 * @param string $transient_name The full transient name (without 'transient_' prefix).
 	 * @param string $pattern The pattern this transient belongs to (for grouping).
 	 * @return void
 	 */
 	public function track_transient( $transient_name, $pattern = 'flexmls_query_' ) {
-		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		if ( ! wp_using_ext_object_cache() ) {
+			return;
+		}
+
+		$tracked_transients = get_option( self::TRACKED_TRANSIENTS_OPTION, array() );
 
 		if ( ! is_array( $tracked_transients ) ) {
 			$tracked_transients = array();
@@ -351,7 +447,7 @@ class Core {
 			$tracked_transients = array_slice( $tracked_transients, -1000, null, true );
 		}
 
-		update_option( 'fmc_tracked_transients', $tracked_transients );
+		$this->update_tracked_transients_option( $tracked_transients );
 	}
 
 	/**
@@ -363,7 +459,11 @@ class Core {
 	 * @return int Number of orphaned entries removed.
 	 */
 	private function cleanup_tracking_array() {
-		$tracked_transients = get_option( 'fmc_tracked_transients', array() );
+		if ( ! wp_using_ext_object_cache() ) {
+			return 0;
+		}
+
+		$tracked_transients = get_option( self::TRACKED_TRANSIENTS_OPTION, array() );
 		$cleaned_count      = 0;
 
 		if ( ! is_array( $tracked_transients ) || empty( $tracked_transients ) ) {
@@ -387,10 +487,32 @@ class Core {
 
 		// Update the tracking option if we cleaned anything
 		if ( $cleaned_count > 0 ) {
-			update_option( 'fmc_tracked_transients', $tracked_transients );
+			$this->update_tracked_transients_option( $tracked_transients );
 		}
 
 		return $cleaned_count;
+	}
+
+	/**
+	 * Drop auth-failure / connection-pause state only when it exists.
+	 *
+	 * The cached-token path used to call delete_transient/delete_option on every
+	 * generate_auth_token() hit (dozens of times per IDX page). Skip no-op deletes.
+	 * Runs the presence check at most once per request.
+	 *
+	 * @return void
+	 */
+	private function clear_auth_recovery_state_if_present() {
+		static $checked = false;
+		if ( $checked ) {
+			return;
+		}
+		$checked = true;
+
+		if ( false !== get_transient( 'flexmls_auth_failures_timestamps' ) ) {
+			delete_transient( 'flexmls_auth_failures_timestamps' );
+		}
+		\FlexMLS\Admin\ConnectionPause::clear_state();
 	}
 
 	/**
@@ -404,8 +526,7 @@ class Core {
 		$auth_token = get_transient( 'flexmls_auth_token' );
 		if ( $auth_token ) {
 			if ( $this->cached_auth_token_is_usable( $auth_token ) ) {
-				delete_transient( 'flexmls_auth_failures_timestamps' );
-				\FlexMLS\Admin\ConnectionPause::clear_state();
+				$this->clear_auth_recovery_state_if_present();
 				return $auth_token;
 			}
 			// Corrupt or expired cached session — force a new /session.
@@ -443,12 +564,21 @@ class Core {
 		try {
 			$params   = $this->generate_security_params( $options );
 			$url      = sprintf( 'https://%s/%s/session?%s', $this->api_base, $this->api_version, build_query( $params ) );
-			$response = wp_remote_post( $url, array( 'headers' => $this->api_headers ) );
+			$response = $this->with_spark_http_timeouts(
+				function () use ( $url ) {
+					return wp_remote_post(
+						$url,
+						array(
+							'headers' => $this->api_headers,
+							'timeout' => self::HTTP_TIMEOUT,
+						)
+					);
+				}
+			);
 
 			if ( is_wp_error( $response ) ) {
-				$this->last_error_code = null;
-				$this->last_error_mess  = $response->get_error_message();
-				\FlexMLS\Admin\ConnectionPause::after_session_failure( 0, null, $this->last_error_mess, $failures_timestamps, null );
+				$classified = $this->apply_http_wp_error( $response );
+				\FlexMLS\Admin\ConnectionPause::after_session_failure( 0, null, $classified['message'], $failures_timestamps, null );
 				return false;
 			}
 
@@ -457,7 +587,7 @@ class Core {
 
 			if ( $this->is_valid_response( $decoded_response ) ) {
 				$auth_token = $decoded_response;
-				set_transient( 'flexmls_auth_token', $auth_token, 15 * MINUTE_IN_SECONDS );
+				set_transient( 'flexmls_auth_token', $auth_token, $this->auth_token_cache_ttl( $auth_token ) );
 				delete_transient( 'flexmls_auth_failures_timestamps' );
 				\FlexMLS\Admin\ConnectionPause::clear_state();
 				$this->release_lock( $lock_key );
@@ -583,6 +713,35 @@ class Core {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * How long to keep flexmls_auth_token in the object cache.
+	 *
+	 * Spark sessions can last up to 24h but idle-out around 60m. Cache until
+	 * Spark Expires (minus a small safety margin), capped under the idle window
+	 * so we refresh before Spark silently drops the session.
+	 *
+	 * @param array $auth_token Session payload from POST /session.
+	 * @return int TTL in seconds.
+	 */
+	private function auth_token_cache_ttl( $auth_token ) {
+		$max_ttl     = 50 * MINUTE_IN_SECONDS;
+		$safety_secs = MINUTE_IN_SECONDS;
+		$expires     = 0;
+		if ( is_array( $auth_token ) && isset( $auth_token['D']['Results'][0]['Expires'] ) ) {
+			$parsed = strtotime( (string) $auth_token['D']['Results'][0]['Expires'] );
+			if ( false !== $parsed ) {
+				$expires = $parsed;
+			}
+		}
+		if ( $expires > 0 ) {
+			$until = $expires - time() - $safety_secs;
+			if ( $until > 0 ) {
+				return max( MINUTE_IN_SECONDS, min( $max_ttl, $until ) );
+			}
+		}
+		return $max_ttl;
 	}
 
 	/**
@@ -820,6 +979,9 @@ class Core {
 	 * $core->make_api_call( 'GET', 'service', 3600, array( 'param1' => 'value1', 'param2' => 'value2' ), null, false );
 	 */
 	public function make_api_call( $method, $service, $cache_time = 0, $params = array(), $post_data = null, $a_retry = false ) {
+		// Account / entitlement / 1015 pause before using a cached session token.
+		\FlexMLS\Admin\ApiMessages::ensure_spark_account_bootstrap();
+
 		// Try generating auth token only once.
 		$auth_token_generated = $this->generate_auth_token();
 
@@ -948,14 +1110,27 @@ class Core {
 			'method'  => $request['method'],
 			'headers' => $this->api_headers,
 			'body'    => $post_data,
+			'timeout' => self::HTTP_TIMEOUT,
 		);
 
-		$response = wp_remote_request( $url, $args );
+		$response = $this->with_spark_http_timeouts(
+			function () use ( $url, $args ) {
+				return wp_remote_request( $url, $args );
+			}
+		);
 
-		// Handle request errors.
+		// Handle request errors (timeouts, DNS, TLS, etc.).
 		if ( is_wp_error( $response ) ) {
+			$classified = $this->apply_http_wp_error( $response );
 			add_action( 'admin_notices', array( $this, 'admin_notices_api_connection_error' ) );
-			return array( 'http_code' => wp_remote_retrieve_response_code( $response ) );
+			return array(
+				'D' => array(
+					'Success' => false,
+					'Code'    => $classified['code'],
+					'Message' => $classified['message'],
+				),
+				'http_code' => 0,
+			);
 		}
 
 		$json = json_decode( wp_remote_retrieve_body( $response ), true );

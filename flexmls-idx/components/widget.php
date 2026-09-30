@@ -130,7 +130,13 @@ class fmcWidget extends WP_Widget {
 							$v = trim( $v, " ,\t\n\r\0\x0B" );
 					}
 
-					if (!empty($v)) {
+					// Multi-select fields (e.g. market stats display) arrive as arrays from
+					// Gutenberg block attrs / http_build_query. Shortcodes expect CSV strings.
+					if ( is_array( $v ) ) {
+							$v = implode( ',', array_map( 'strval', $v ) );
+					}
+
+					if (!empty($v) && is_string( $v )) {
 							$v = htmlentities(stripslashes($v), ENT_QUOTES);
 							$shortcode .= " {$k}=\"{$v}\"";
 					}

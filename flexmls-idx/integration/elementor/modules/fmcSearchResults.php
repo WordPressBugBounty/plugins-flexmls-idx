@@ -24,7 +24,7 @@ class EL_fmcSearchResults extends EL_FMC_shortcode{
     }
 
     protected function setControlls() {
-        extract($this->module_info['vars']);
+        extract($this->integration_control_vars());
 
         $this->add_control(
             'title',

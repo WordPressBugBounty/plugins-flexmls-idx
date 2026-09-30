@@ -24,6 +24,13 @@
     public function get_title() {
         return $this->title;
     }
+
+    /**
+     * Flexmls widgets fetch live Spark data. Do not let Element Cache store a failed render (WP-1393).
+     */
+    protected function is_dynamic_content(): bool {
+        return true;
+    }
   
     public function __construct( $data = [], $args = null,  $cats = []) {
       $this->categories = $cats;
@@ -57,10 +64,18 @@
     }
     
     public function get_keywords() {
-        return [ 'flexmls', 'fms', 'widget' ];
+          return [ 'flexmls', 'fms', 'widget' ];
+    }
+
+    /**
+     * Flexmls widgets fetch live Spark data. Do not let Element Cache store a failed render (WP-1393).
+     */
+    protected function is_dynamic_content(): bool {
+        return true;
     }
     
     protected function register_controls() {
+		$this->ensure_integration_vars();
 
 		$this->start_controls_section(
 			'content_section',
@@ -75,6 +90,136 @@
 		$this->end_controls_section();
 
     }
+
+	/**
+	 * Load Spark-backed control options only in the Elementor editor / admin-ajax.
+	 * Front-end widget register and page views skip this (WP-1392).
+	 */
+	protected function should_fetch_spark_for_controls() {
+		if ( wp_doing_cron() ) {
+			return false;
+		}
+		if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+			return true;
+		}
+		if ( is_admin() ) {
+			return true;
+		}
+		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->editor )
+			&& is_object( \Elementor\Plugin::$instance->editor )
+			&& method_exists( \Elementor\Plugin::$instance->editor, 'is_edit_mode' )
+			&& \Elementor\Plugin::$instance->editor->is_edit_mode() ) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Populate $this->module_info['vars'] from the component when the editor needs dropdowns.
+	 */
+	protected function ensure_integration_vars() {
+		if ( ! empty( $this->module_info['vars'] ) && is_array( $this->module_info['vars'] ) ) {
+			return;
+		}
+
+		$this->module_info['vars'] = array();
+
+		if ( ! $this->should_fetch_spark_for_controls() ) {
+			return;
+		}
+
+		$id_base = isset( $this->module_info['id_base'] ) ? $this->module_info['id_base'] : '';
+		if ( '' === $id_base ) {
+			return;
+		}
+
+		if ( ! class_exists( $id_base, false ) ) {
+			return;
+		}
+
+		$component = isset( $this->module_info['component'] ) ? $this->module_info['component'] : null;
+		if ( ! is_object( $component ) ) {
+			$component                     = new $id_base();
+			$this->module_info['component'] = $component;
+		}
+
+		if ( ! method_exists( $component, 'integration_view_vars' ) ) {
+			return;
+		}
+
+		$vars = $component->integration_view_vars();
+		$this->module_info['vars'] = is_array( $vars ) ? $vars : array();
+	}
+
+	/**
+	 * Safe vars for setControlls() when Spark was skipped or the API missed.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function integration_control_vars() {
+		$vars = ( isset( $this->module_info['vars'] ) && is_array( $this->module_info['vars'] ) )
+			? $this->module_info['vars']
+			: array();
+
+		$array_keys = array(
+			'property_type',
+			'property_type_options',
+			'property_types',
+			'property_sub_type',
+			'api_links',
+			'idx_links',
+			'destination',
+			'destination_options',
+			'default_view',
+			'default_view_options',
+			'type_options',
+			'stat_types',
+			'chart_type',
+			'display',
+			'display_options',
+			'display_day_options',
+			'source',
+			'source_options',
+			'status',
+			'sort',
+			'sort_options',
+			'available_fields',
+			'additional_fields',
+			'agent',
+			'api_property_type_options',
+			'horizontal',
+			'vertical',
+			'image_size',
+			'auto_rotate',
+			'days',
+			'send_to',
+			'theme_options',
+			'orientation_options',
+			'border_style_options',
+			'submit_button_options',
+			'listings_per_page_options',
+		);
+		foreach ( $array_keys as $key ) {
+			if ( ! isset( $vars[ $key ] ) || ! is_array( $vars[ $key ] ) ) {
+				$vars[ $key ] = array();
+			}
+		}
+
+		$string_keys = array(
+			'title',
+			'location_slug',
+			'portal_slug',
+			'special_neighborhood_title_ability',
+			'title_description',
+		);
+		foreach ( $string_keys as $key ) {
+			if ( ! isset( $vars[ $key ] ) ) {
+				$vars[ $key ] = '';
+			}
+		}
+
+		return $vars;
+	}
     
     protected function render_hook($settings){
         return $settings;
@@ -127,19 +272,26 @@
 
     protected function inits(){
         $className = (string) str_replace('EL_', '', get_class($this));
-        $vars = array();
 
         global $fmc_widgets_integration;
         if ( empty( $fmc_widgets_integration[ $className ] ) ) {
-            $this->module_info = array( 'vars' => array() );
+            $this->module_info = array(
+                'title'       => $className,
+                'id_base'     => $className,
+                'slug'        => 'fmc-widget-' . strtolower( $className ),
+                'description' => '',
+                'shortcode'   => '',
+                'component'   => null,
+                'vars'        => array(),
+            );
             return;
         }
 
         $info = $fmc_widgets_integration[ $className ];
 
-        // Component classes are normally loaded in widgets_init only when API auth
-        // succeeds. Elementor may register widgets later (or while auth is paused),
-        // so load the component file here if the class is not already available.
+        // Load the component file so the class exists later. Do not instantiate or
+        // call integration_view_vars() here — that hits Spark on every Elementor
+        // widget register, including front-end page views (WP-1392).
         if ( ! class_exists( $className, false ) && ! empty( $info['component'] ) ) {
             $component_file = FMC_PLUGIN_DIR . 'components/' . $info['component'];
             if ( file_exists( $component_file ) ) {
@@ -147,22 +299,14 @@
             }
         }
 
-        if ( ! class_exists( $className, false ) ) {
-            $this->module_info = array( 'vars' => array() );
-            return;
-        }
-
-        $component = new $className();
-        $vars = $component->integration_view_vars();
-
         $this->module_info = array(
-            "title" => $info['title'],
-            'id_base' => $className,
-            'slug' => 'fmc-widget-'.strtolower($className),
-            "description" => $info['description'],
-            "shortcode" => $info['shortcode'],
-            'component' => &$component,
-            'vars' => $vars,
+            'title'       => $info['title'],
+            'id_base'     => $className,
+            'slug'        => 'fmc-widget-' . strtolower( $className ),
+            'description' => $info['description'],
+            'shortcode'   => $info['shortcode'],
+            'component'   => null,
+            'vars'        => array(),
         );
     } 
 
@@ -180,13 +324,8 @@
 
     public function __construct( $data = [], $args = null,  $cats = [] ) {
         $this->inits();
-
-        if (empty($this->module_info['vars'])) return;  
-        
         $this->integrationWithElementor();
-
         $this->categories = $cats;
-    
         parent::__construct( $data, $args );
     }  
 

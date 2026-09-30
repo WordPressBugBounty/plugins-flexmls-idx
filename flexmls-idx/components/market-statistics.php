@@ -236,8 +236,8 @@
                     ];
                 }
 
-                // Encode data to JSON for safe JavaScript consumption
-                $json_chart_data = json_encode($chart_data);
+                // Encode data to JSON for safe JavaScript consumption (HEX flags avoid </script> breakout)
+                $json_chart_data = wp_json_encode( $chart_data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT );
 
                 $market_random_number = wp_rand( 1, 1000 );
 

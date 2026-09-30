@@ -22,6 +22,40 @@ class ConnectionPause {
 	/** Rolling window for counting session failures (seconds). */
 	public const FAILURE_WINDOW = 900;
 
+	/** Transport/timeout failures need more strikes before a short pause. */
+	public const TRANSPORT_FAILURES_BEFORE_PAUSE = 5;
+
+	/** Cool-down after clustered transport failures (seconds). */
+	public const TRANSPORT_PAUSE_SECONDS = 120;
+
+	/**
+	 * Whether a session failure is a transport/timeout (no Spark D.Code).
+	 *
+	 * @param int    $http_status      HTTP status or 0.
+	 * @param string $wp_error_message WP_Error message, if any.
+	 * @return bool
+	 */
+	public static function is_transport_failure( $http_status, $wp_error_message ) {
+		if ( is_string( $wp_error_message ) && '' !== $wp_error_message ) {
+			return true;
+		}
+		return 0 === (int) $http_status;
+	}
+
+	/**
+	 * Sentinel code for widgets/admin when Spark did not return D.Code.
+	 *
+	 * @param string $wp_error_message WP_Error message.
+	 * @return string
+	 */
+	public static function transport_failure_class( $wp_error_message ) {
+		$msg = (string) $wp_error_message;
+		if ( false !== stripos( $msg, 'timed out' ) || false !== stripos( $msg, 'timeout' ) ) {
+			return 'http_timeout';
+		}
+		return 'http_error';
+	}
+
 	/**
 	 * @return array<string, mixed>
 	 */
@@ -31,6 +65,9 @@ class ConnectionPause {
 	}
 
 	public static function clear_state() {
+		if ( empty( self::get_state() ) ) {
+			return;
+		}
 		delete_option( self::OPTION_KEY );
 	}
 
@@ -71,8 +108,10 @@ class ConnectionPause {
 	 */
 	public static function sync_last_error_to_core( $core ) {
 		$st = self::get_state();
-		if ( array_key_exists( 'api_code', $st ) && null !== $st['api_code'] && '' !== $st['api_code'] ) {
-			$core->last_error_code = (int) $st['api_code'];
+		if ( ! empty( $st['failure_class'] ) && is_string( $st['failure_class'] ) ) {
+			$core->last_error_code = $st['failure_class'];
+		} elseif ( array_key_exists( 'api_code', $st ) && null !== $st['api_code'] && '' !== $st['api_code'] ) {
+			$core->last_error_code = is_numeric( $st['api_code'] ) ? (int) $st['api_code'] : $st['api_code'];
 		}
 		if ( ! empty( $st['api_message'] ) ) {
 			$core->last_error_mess = $st['api_message'];
@@ -130,6 +169,35 @@ class ConnectionPause {
 			if ( is_string( $hdr ) && is_numeric( trim( $hdr ) ) ) {
 				$retry_after_sec = min( (int) trim( $hdr ), DAY_IN_SECONDS );
 			}
+		}
+
+		$is_transport = ( null === $api_code ) && self::is_transport_failure( (int) $http_status, (string) $wp_error_message );
+
+		// Timeouts / DNS / TLS: do not use the 5/15/60 minute Spark-error ladder.
+		if ( $is_transport ) {
+			if ( count( $recent ) < self::TRANSPORT_FAILURES_BEFORE_PAUSE ) {
+				return;
+			}
+			$failure_class = self::transport_failure_class( (string) $wp_error_message );
+			$state         = array(
+				'next_auto_attempt_at' => time() + self::TRANSPORT_PAUSE_SECONDS,
+				'http_status'          => (int) $http_status,
+				'api_code'             => null,
+				'failure_class'        => $failure_class,
+				'api_message'          => $api_msg,
+				'wp_error'             => $wp_error_message,
+				'updated_at'           => time(),
+			);
+			update_option( self::OPTION_KEY, $state );
+			error_log(
+				sprintf(
+					'[Flexmls IDX] Connection paused (transport %s): HTTP=%s %s',
+					$failure_class,
+					(string) $http_status,
+					$wp_error_message ? $wp_error_message : ''
+				)
+			);
+			return;
 		}
 
 		if ( count( $recent ) < self::FAILURES_BEFORE_PAUSE ) {
