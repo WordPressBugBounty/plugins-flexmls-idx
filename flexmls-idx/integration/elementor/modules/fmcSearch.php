@@ -1,6 +1,9 @@
 <?php
     class EL_fmcSearch extends EL_FMC_shortcode{
 
+        /** Placeholder label 4.1.1 stored as the link default when Spark returned no links. */
+        const LEGACY_NO_LINKS_LABEL = 'No Links in Flexmls® account';
+
         protected function integrationWithElementor(){
             $this->settings_fmc = [
                 'title',
@@ -65,6 +68,8 @@
                 $props['property_type_ui'] = 'checkboxes';
             }
 
+            $props['link'] = $this->resolve_link_setting( isset( $props['link'] ) ? $props['link'] : '' );
+
             $props['width'] = $props['width_']['size'];
             $props['background_color'] = $props['background_color_'];
             unset($props['width_']);
@@ -77,6 +82,28 @@
 
             $return = $props + ['integration' => 'elementor'];
             return $return;
+        }
+
+        /**
+         * Elementor omits settings equal to the control default when saving, and front-end
+         * renders skip Spark (WP-1392), so a page saved with the first IDX link has no link
+         * value here. Fall back to the first IDX link, the default the editor offered.
+         */
+        protected function resolve_link_setting( $link ) {
+            $link = trim( (string) $link );
+            if ( '' !== $link && 'default' !== $link && self::LEGACY_NO_LINKS_LABEL !== $link ) {
+                return $link;
+            }
+
+            global $fmc_api;
+            if ( $fmc_api ) {
+                $links = $fmc_api->GetIDXLinks( array( '_pagination' => 1, '_page' => 1 ) );
+                if ( is_array( $links ) && isset( $links[0]['LinkId'] ) && '' !== (string) $links[0]['LinkId'] ) {
+                    return (string) $links[0]['LinkId'];
+                }
+            }
+
+            return 'default';
         }
 
         protected function setControlls() {
@@ -102,8 +129,8 @@
                     $idx_links_use = $this->modify_array($idx_links, 'LinkId', 'Name');
                     $idx_links_default = $idx_links[0]['LinkId'];
             } else {
-                    $idx_links_use = ['default' => 'No Links in Flexmls® account'];
-                    $idx_links_default = $idx_links_use['default'];
+                    $idx_links_use = ['default' => self::LEGACY_NO_LINKS_LABEL];
+                    $idx_links_default = 'default';
             }
 
             $this->add_control(
@@ -113,6 +140,7 @@
                     'type'            => \Elementor\Controls_Manager::SELECT2,
                     'options'         => $idx_links_use,
                     'default'          => $idx_links_default,
+                    'save_default'     => true,
                     'description'     => __( 'Link used when search is executed', 'plugin-name' ),
                 )
             );

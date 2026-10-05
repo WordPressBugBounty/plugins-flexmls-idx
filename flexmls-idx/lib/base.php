@@ -1524,6 +1524,10 @@ class flexmlsConnect {
     }
     // Non-numeric (or short) ids are treated as tiny/base-36 codes. Do not fall back to GetIDXLink( $link_id )
     // — the API returns 400 for tiny strings on idxlinks/{id}, and only adds noise after FromTinyId fails.
+    // translate_tiny_code() returns this sentinel for non-base-36 input; Spark always rejects it (1053).
+    if ( '20000000' === self::translate_tiny_code( $link_id ) ) {
+      return null;
+    }
     $row = $fmc_api->GetIDXLinkFromTinyId( $link_id );
     return ( is_array( $row ) && ! empty( $row['LinkId'] ) ) ? $row : null;
   }

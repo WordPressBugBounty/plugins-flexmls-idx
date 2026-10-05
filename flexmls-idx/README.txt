@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 4.1.1
+Stable tag: 4.1.2
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,10 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+
+= 4.1.2 =
+Efficiency Update:
+* Fixed the Elementor IDX Search widget showing "This widget is temporarily unavailable" on published pages when the first IDX link was selected. Affected pages work again without needing to be re-edited.
 
 = 4.1.1 =
 Performance:
