@@ -5,7 +5,7 @@ Plugin Name: Flexmls® IDX
 Plugin URI: https://fbsidx.com/help
 Description: Provides Flexmls&reg; Customers with Flexmls&reg; IDX features on their WordPress websites. <strong>Tips:</strong> <a href="admin.php?page=fmc_admin_settings">Activate your Flexmls&reg; IDX plugin</a> on the settings page; <a href="widgets.php">add widgets to your sidebar</a> using the Widgets Admin under Appearance; and include widgets on your posts or pages using the Flexmls&reg; IDX Widget Short-Code Generator on the Visual page editor.
 Author: FBS
-Version: 4.1.2
+Version: 4.2
 Author URI:  https://www.flexmls.com
 Requires at least: 5.0
 Tested up to: 7.1
@@ -16,11 +16,15 @@ defined( 'ABSPATH' ) or die( 'This plugin requires WordPress' );
 
 const FMC_API_BASE = 'sparkapi.com';
 const FMC_API_VERSION = 'v1';
-const FMC_PLUGIN_VERSION = '4.1.2';
+const FMC_PLUGIN_VERSION = '4.2';
 
 define( 'FMC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
-global $auth_token_failures, $spark_oauth_global;
+// WP-CLI and plugin activation include this file inside a function, so variables
+// that other code reads with `global` have to be declared global here.
+global $auth_token_failures, $spark_oauth_global, $fmc_version, $fmc_plugin_dir, $fmc_plugin_url,
+	$fmc_widgets, $fmc_widgets_integration, $fmc_special_page_caught, $fmc_api, $fmc_api_portal,
+	$fmc_search_results_loaded;
 $auth_token_failures = 0;
 
 $fmc_version = FMC_PLUGIN_VERSION;
@@ -61,6 +65,7 @@ class FlexMLS_IDX {
 		require_once( 'pages/core.php' );
 		require_once( 'pages/full-page.php' );
 		require_once( 'pages/listing-details.php' );
+		require_once( 'lib/listing-structured-data.php' );
 		require_once( 'pages/search-results.php' );
 		require_once( 'pages/fmc-agents.php' );
 		require_once( 'pages/next-listing.php' );
@@ -88,7 +93,6 @@ class FlexMLS_IDX {
 		add_action( 'wp_ajax_fmcShortcodeContainer', array( '\FlexMLS\Admin\TinyMCE', 'tinymce_shortcodes' ) );
 		add_action('wp_ajax_fmcLocationGenerator', array('\FlexMLS\Admin\LocationGenerator', 'tinymce_form') );
 		add_action( 'wp_ajax_tinymce_shortcodes_generate', array( '\FlexMLS\Admin\TinyMCE', 'tinymce_shortcodes_generate' ) );
-        add_action( 'wp_ajax_nopriv_tinymce_shortcodes_generate', array( '\FlexMLS\Admin\TinyMCE', 'tinymce_shortcodes_generate' ) );
 		add_action( 'wp_ajax_fmcleadgen_shortcode', array( '\FlexMLS\Shortcodes\LeadGeneration', 'tinymce_form' ) );
 		add_action( 'wp_ajax_fmcleadgen_submit', array( '\FlexMLS\Shortcodes\LeadGeneration', 'submit_lead' ) );
 		add_action( 'wp_ajax_nopriv_fmcleadgen_submit', array( '\FlexMLS\Shortcodes\LeadGeneration', 'submit_lead' ) );
@@ -105,9 +109,9 @@ class FlexMLS_IDX {
 		\FlexMLS\Admin\LegacyVersionNudge::register();
 		\FlexMLS\Admin\OfficeAgentsSelectAjax::register();
 
-		add_shortcode( 'idx_frame', array( 'flexmlsConnect', 'shortcode' ) );
-		add_shortcode( 'lead_generation', array( '\FlexMLS\Shortcodes\LeadGeneration', 'shortcode' ) );
-		add_shortcode( 'neighborhood_page', array( 'FlexMLS\Shortcodes\NeighborhoodPage', 'shortcode' ) );
+		flexmls_add_shortcode( 'idx_frame', array( 'flexmlsConnect', 'shortcode' ) );
+		flexmls_add_shortcode( 'lead_generation', array( '\FlexMLS\Shortcodes\LeadGeneration', 'shortcode' ) );
+		flexmls_add_shortcode( 'neighborhood_page', array( 'FlexMLS\Shortcodes\NeighborhoodPage', 'shortcode' ) );
 	}
 
 	function admin_menu(){
@@ -414,15 +418,35 @@ class FlexMLS_IDX {
 		add_rewrite_rule( 'oauth/spark-logout/?', 'index.php?plugin=flexmls-idx&oauth_tag=oauth-logout', 'top' );
 		add_rewrite_tag( '%oauth_tag%', '([^&]+)' );
 
+		$idx_rule_regex = null;
+		$idx_rule_query = null;
 		if ( is_array( $fmc_settings ) && isset( $fmc_settings['permabase'] ) && isset( $fmc_settings['destlink'] ) ) {
-			add_rewrite_rule( $fmc_settings['permabase'] . '/([^/]+)?' , 'index.php?plugin=flexmls-idx&fmc_tag=$matches[1]&page_id=' . $fmc_settings['destlink'], 'top' );
+			$idx_rule_regex = $fmc_settings['permabase'] . '/([^/]+)?';
+			$idx_rule_query = 'index.php?plugin=flexmls-idx&fmc_tag=$matches[1]&page_id=' . $fmc_settings['destlink'];
+			add_rewrite_rule( $idx_rule_regex, $idx_rule_query, 'top' );
 			add_rewrite_rule( 'portal/([^/]+)?', 'index.php?plugin=flexmls-idx&fmc_vow_tag=$matches[1]&page_id=' . $fmc_settings['destlink'], 'top' );
 		}
 		add_rewrite_tag( '%fmc_tag%', '([^&]+)' );
 		add_rewrite_tag( '%fmc_vow_tag%', '([^&]+)' );
-		
-		// Use nginx-compatible rewrite rule handling
-		\FlexMLS\Admin\NginxCompatibility::handle_rewrite_rules();
+
+		if ( null !== $idx_rule_regex ) {
+			$this->maybe_repair_rewrite_rules( $idx_rule_regex, $idx_rule_query );
+		}
+	}
+
+	/**
+	 * Flush rewrite rules only when the stored rules are missing or have a stale IDX rule
+	 * (e.g. after a plugin update or a settings change made outside the settings page).
+	 * Flushing on every request rebuilds the rules option on each page load.
+	 */
+	private function maybe_repair_rewrite_rules( $idx_rule_regex, $idx_rule_query ) {
+		if ( \FlexMLS\Admin\NginxCompatibility::is_nginx() || '' === get_option( 'permalink_structure' ) ) {
+			return;
+		}
+		$stored_rules = get_option( 'rewrite_rules' );
+		if ( ! is_array( $stored_rules ) || ! isset( $stored_rules[ $idx_rule_regex ] ) || $stored_rules[ $idx_rule_regex ] !== $idx_rule_query ) {
+			flush_rewrite_rules( false );
+		}
 	}
 
 	function session_start(){

@@ -55,8 +55,8 @@ class fmcSearch extends fmcSearch_v1 {
 		$location_fields = array();
 
 		foreach ($all_location_fields as $location_field) {
-			if(array_key_exists($location_field, $_GET)){
-				$location_fields[$location_field] = $_GET[$location_field];
+			if(array_key_exists($location_field, $_GET) && is_string($_GET[$location_field])){
+				$location_fields[$location_field] = sanitize_text_field(wp_unslash($_GET[$location_field]));
 			}
 		}
 
@@ -305,7 +305,7 @@ class fmcSearch extends fmcSearch_v1 {
 		}
 
 		global $fmc_api;
-		$standard_status = new fmcStandardStatus( $fmc_api->GetStandardField("StandardStatus") );
+		$standard_status = new fmcStandardStatus( is_object( $fmc_api ) ? $fmc_api->GetStandardField("StandardStatus") : false );
 		$allow_sold_searching = $standard_status->allow_sold_searching();
 
 		$fmc_settings = get_option( 'fmc_settings' );
@@ -525,7 +525,7 @@ class fmcSearch extends fmcSearch_v1 {
 	protected function get_view_property_types() {
 		global $fmc_api;
 		$output = array();
-		$types = $fmc_api->GetPropertyTypes();
+		$types = is_object( $fmc_api ) ? $fmc_api->GetPropertyTypes() : false;
 		if ( is_array($types) ) {
 			foreach ($types as $id => $name) {
 				$output []= [
@@ -579,7 +579,7 @@ class fmcSearch extends fmcSearch_v1 {
 		}
 
 		global $fmc_api;
-		$standard_status = new fmcStandardStatus($fmc_api->GetStandardField("StandardStatus"));
+		$standard_status = new fmcStandardStatus( is_object( $fmc_api ) ? $fmc_api->GetStandardField("StandardStatus") : false );
 
 		$vars = array();
 		$vars["settings_fields"] = $this->settings_fields_v2();

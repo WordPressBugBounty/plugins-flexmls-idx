@@ -3,19 +3,8 @@
 /**
  * Verify nonce for public IDX AJAX requests. Call at the start of wp_ajax_nopriv_ handlers
  * that are triggered from the front end. Dies with 403 or JSON error if the nonce is missing or invalid.
- * Allows internal server-side block render (FlexMlsCallback) via one-time token so Gutenberg blocks work on the front end.
  */
 function flexmls_verify_ajax_nonce() {
-	// Internal server-side render: FlexMlsCallback sends a one-time token (cURL request has no cookies).
-	$internal_token = isset( $_POST['fmc_render_token'] ) ? sanitize_text_field( wp_unslash( $_POST['fmc_render_token'] ) ) : '';
-	if ( $internal_token && strlen( $internal_token ) === 32 && ctype_xdigit( $internal_token ) ) {
-		$transient_key = 'fmc_render_' . $internal_token;
-		if ( get_transient( $transient_key ) ) {
-			delete_transient( $transient_key );
-			return;
-		}
-	}
-
 	if ( ! check_ajax_referer( 'fmc_ajax', 'nonce', false ) ) {
 		if ( wp_doing_ajax() && ( isset( $_REQUEST['nonce'] ) || isset( $_POST['nonce'] ) ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid security token. Please refresh the page.', 'flexmls-idx' ) ) );
@@ -23,6 +12,73 @@ function flexmls_verify_ajax_nonce() {
 		status_header( 403 );
 		wp_die( esc_html__( 'Invalid security token. Please refresh the page.', 'flexmls-idx' ), '', array( 'response' => 403 ) );
 	}
+}
+
+/**
+ * add_shortcode() for plugin shortcodes, with the output rendered through flexmls_render_safely().
+ */
+function flexmls_add_shortcode( $tag, $callback ) {
+	add_shortcode( $tag, function ( $atts, $content = null, $shortcode_tag = '' ) use ( $tag, $callback ) {
+		return flexmls_render_safely( "[{$tag}] shortcode", function () use ( $callback, $atts, $content, $shortcode_tag ) {
+			return call_user_func( $callback, $atts, $content, $shortcode_tag );
+		} );
+	} );
+}
+
+/**
+ * Returns what $render returns. If it throws, the error is logged and the widget-unavailable
+ * message is returned in place of the output, so a failed API call can't take down the page.
+ *
+ * @param string   $context Names what was being rendered, for the error log and browser console.
+ * @param callable $render
+ * @param string   $before  Markup to wrap the message in, e.g. the sidebar's before_widget.
+ * @param string   $after
+ * @return mixed
+ */
+function flexmls_render_safely( $context, $render, $before = '', $after = '' ) {
+	$ob_level = ob_get_level();
+	try {
+		return call_user_func( $render );
+	} catch ( \Throwable $e ) {
+		$detail = flexmls_recover_from_error( $context, $e, $ob_level );
+		// Same markup as flexmlsConnect::widget_not_available(); main.js logs data-flexmls-error to the console.
+		return $before . '<div class="flexmls-widget-unavailable" data-flexmls-error="' . esc_attr( $detail ) . '">This widget is temporarily unavailable. Please refresh the page or try again later.</div>' . $after;
+	}
+}
+
+/**
+ * Discards output left in buffers opened after $ob_level (view templates buffer their output),
+ * writes the error to the PHP error log, and returns a description of it for the browser console.
+ * Only administrators get the error message and file in that description.
+ *
+ * @param string     $context
+ * @param \Throwable $e
+ * @param int        $ob_level ob_get_level() from before the code that threw.
+ * @return string
+ */
+function flexmls_recover_from_error( $context, $e, $ob_level ) {
+	while ( ob_get_level() > $ob_level ) {
+		if ( ! ob_end_clean() ) {
+			break;
+		}
+	}
+
+	$error = sprintf( '%s: %s in %s:%d', get_class( $e ), $e->getMessage(), $e->getFile(), $e->getLine() );
+	error_log( "Flexmls IDX: {$context} failed. {$error}" );
+
+	if ( function_exists( 'wp_get_current_user' ) && current_user_can( 'manage_options' ) ) {
+		return "{$context} failed. {$error}";
+	}
+	return "{$context} failed. The PHP error log has the details.";
+}
+
+/**
+ * Shown in place of a widget or shortcode settings form that failed to build.
+ *
+ * @param string $detail From flexmls_recover_from_error().
+ */
+function flexmls_settings_form_error_html( $detail ) {
+	return '<p><b>Flexmls&reg; IDX couldn\'t load these settings.</b> ' . esc_html( $detail ) . '</p>';
 }
 
 function flexmls_autoloader( $className, $dir = '' ){

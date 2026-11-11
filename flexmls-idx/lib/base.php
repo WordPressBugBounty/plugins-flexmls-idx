@@ -947,11 +947,52 @@ class flexmlsConnect {
     if ( ! is_array( $data ) || ! isset( $data['StandardFields']['ListingId'] ) ) {
       return '';
     }
-    $address = flexmlsConnect::format_listing_street_address($data);
-    $return = ( ! empty( $address ) && isset( $address[0], $address[1] ) ) ? $address[0] . ', ' . $address[1] . ' (MLS# ' . $data['StandardFields']['ListingId'] . ')' : '';
-    $return = flexmlsConnect::clean_spaces_and_trim($return);
+    list( $street, $locality ) = flexmlsConnect::format_listing_street_address($data);
+    $mls_number = 'MLS# ' . $data['StandardFields']['ListingId'];
 
-    return $return;
+    if ( '' !== $street ) {
+      $place = ( '' !== $locality ) ? $street . ', ' . $locality : $street;
+    } else {
+      // Address suppressed by the listing agent/seller: describe the property instead.
+      $type = flexmlsConnect::listing_property_type_label( $data );
+      if ( '' !== $locality ) {
+        $place = ( '' !== $type ) ? $type . ' in ' . $locality : $locality;
+      } else {
+        $place = $type;
+      }
+    }
+
+    $return = ( '' !== $place ) ? $place . ' (' . $mls_number . ')' : $mls_number;
+    return flexmlsConnect::clean_spaces_and_trim($return);
+  }
+
+  /**
+   * Readable property type for a listing (e.g. "Residential Lease"), honoring the labels set on
+   * the Behavior tab. Returns '' rather than the raw type code when no label is known.
+   */
+  static function listing_property_type_label( $data ) {
+    $sf = ( is_array( $data ) && isset( $data['StandardFields'] ) && is_array( $data['StandardFields'] ) ) ? $data['StandardFields'] : array();
+    $code = isset( $sf['PropertyType'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['PropertyType'] ) ? (string) $sf['PropertyType'] : '';
+
+    if ( '' !== $code ) {
+      $options = get_option( 'fmc_settings' );
+      if ( is_array( $options ) && ! empty( $options[ 'property_type_label_' . $code ] ) ) {
+        return (string) $options[ 'property_type_label_' . $code ];
+      }
+      global $fmc_api;
+      if ( is_object( $fmc_api ) ) {
+        $types = $fmc_api->GetPropertyTypes();
+        if ( is_array( $types ) && ! empty( $types[ $code ] ) && is_string( $types[ $code ] ) ) {
+          return $types[ $code ];
+        }
+      }
+    }
+
+    if ( isset( $sf['PropertyTypeLabel'] ) && flexmlsConnect::is_not_blank_or_restricted( $sf['PropertyTypeLabel'] ) ) {
+      return (string) $sf['PropertyTypeLabel'];
+    }
+
+    return '';
   }
 
   static function format_date ($format,$date){

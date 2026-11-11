@@ -16,7 +16,7 @@ class fmcLeadGen extends fmcWidget {
     WP_Widget::__construct( $class , $widget_info['title'], $widget_ops);
 
     // have WP replace instances of [first_argument] with the return from the second_argument function
-    add_shortcode( 'lead_generation', array(&$this, 'shortcode'));
+    flexmls_add_shortcode( 'lead_generation', array(&$this, 'shortcode'));
 
     // register where the AJAX calls should be routed when they come in
     add_action('wp_ajax_fmcLeadGen_submit', array(&$this, 'submit_lead') );
@@ -24,7 +24,6 @@ class fmcLeadGen extends fmcWidget {
 
     add_action("wp_ajax_{$class}_shortcode", array(&$this, 'shortcode_form') );
     add_action("wp_ajax_{$class}_shortcode_gen", array(&$this, 'shortcode_generate') );
-    add_action('wp_ajax_nopriv_'.get_class($this).'_shortcode_gen', array(&$this, 'shortcode_generate') );
 
   }
 

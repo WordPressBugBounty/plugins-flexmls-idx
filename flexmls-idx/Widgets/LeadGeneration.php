@@ -16,7 +16,9 @@ class LeadGeneration extends \WP_Widget {
 		echo $args[ 'before_widget' ];
 		$args[ 'is_widget' ] = 1;
 		$args = array_merge( $args, $instance );
-		echo \FlexMLS\Shortcodes\LeadGeneration::shortcode( $args );
+		echo flexmls_render_safely( 'Contact Me Form widget', function () use ( $args ) {
+			return \FlexMLS\Shortcodes\LeadGeneration::shortcode( $args );
+		} );
 		echo $args[ 'after_widget' ];
 	}
 

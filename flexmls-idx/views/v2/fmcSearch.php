@@ -24,7 +24,7 @@
   ">
 
   <?php if ($destination == "remote") { ?>
-    <form action='<?php echo $_SERVER['REQUEST_URI'] ?>' method='post' <?php echo $this_target ?> role="search" aria-label="Property search form">
+    <form method='post' <?php echo $this_target ?> role="search" aria-label="Property search form">
   <?php } else { ?>
     <form action="<?php echo flexmlsConnect::make_nice_tag_url('search'); ?>" method='get'
       <?php echo $this_target; ?> role="search" aria-label="Property search form">
@@ -60,10 +60,10 @@
         <select class="flexmlsLocationSearch" id="location-search-v2-<?php echo $rand; ?>" data-portal-slug="<?= $portal_slug ?>" multiple="true" aria-describedby="location-help-v2-<?php echo $rand; ?>" data-select2-accessible="true">
           <?php
             foreach ($location_fields as $field => $value) {
-              $option_value = $field . '_' . stripslashes($value);
+              $option_value = $field . '_' . $value;
               $displayName = $value . " ($field)";
 
-              echo '<option value="' . $option_value . '" selected="selected">' . stripslashes($displayName) . '</option>';
+              echo '<option value="' . esc_attr($option_value) . '" selected="selected">' . esc_html($displayName) . '</option>';
             }
           ?>
         </select>

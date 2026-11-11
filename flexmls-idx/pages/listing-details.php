@@ -24,7 +24,24 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     add_filter( 'aioseo_canonical_url', array( $this, 'aioseo_canonical' ), 0 );
     add_filter( 'the_seo_framework_meta_canonical', array( $this, 'seo_framework_canonical' ), 0 );
     add_filter( 'seopress_canonical', array( $this, 'seopress_canonical' ), 0 );
-    
+    add_filter( 'seopress_titles_canonical', '__return_empty_string', 99 );
+    add_filter( 'the_seo_framework_meta_render_data', array( $this, 'remove_seo_framework_canonical' ), 10 );
+
+    // Titles and meta descriptions: SEO plugins replace the core document title and print
+    // their own description, so hand them the listing values instead of printing a second tag.
+    add_filter( 'rank_math/frontend/title', array( $this, 'seo_plugin_full_title' ), 99 );
+    add_filter( 'aioseo_title', array( $this, 'seo_plugin_full_title' ), 99 );
+    add_filter( 'seopress_titles_title', array( $this, 'seo_plugin_full_title' ), 99 );
+    add_filter( 'the_seo_framework_title_from_generation', array( $this, 'seo_plugin_title_without_site_name' ), 99 );
+    add_filter( 'the_seo_framework_title_from_custom_field', array( $this, 'seo_plugin_title_without_site_name' ), 99 );
+
+    add_filter( 'wpseo_metadesc', array( $this, 'seo_plugin_description' ), 99 );
+    add_filter( 'rank_math/frontend/description', array( $this, 'seo_plugin_description' ), 99 );
+    add_filter( 'aioseo_description', array( $this, 'seo_plugin_description' ), 99 );
+    add_filter( 'seopress_titles_desc', array( $this, 'seo_plugin_description' ), 99 );
+    add_filter( 'the_seo_framework_generated_description', array( $this, 'seo_plugin_description' ), 99 );
+    add_filter( 'the_seo_framework_custom_field_description', array( $this, 'seo_plugin_description' ), 99 );
+
     add_action('wp_head', array($this, 'wp_meta_description_tag'), 0 );
     add_action('wp_head', array($this, 'open_graph_tags'), 0 );
     
@@ -43,10 +60,17 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     
     // The SEO Framework - Disable OpenGraph tags
     add_filter( 'the_seo_framework_og_output', array( $this, 'disable_seo_framework_opengraph' ), 10 );
+    // The SEO Framework 5.x no longer uses the_seo_framework_og_output; drop its social tag pools instead.
+    add_filter( 'the_seo_framework_meta_generator_pools', array( $this, 'remove_seo_framework_social_pools' ), 10 );
     
     // Jetpack - Disable OpenGraph tags
     add_filter( 'jetpack_enable_open_graph', array( $this, 'disable_jetpack_opengraph' ), 10 );
 
+    add_action( 'wp_head', array( $this, 'structured_data_tag' ), 1 );
+  }
+
+  function structured_data_tag() {
+    flexmlsListingStructuredData::output( $this->listing_data );
   }
 
   function wp_head(){
@@ -92,9 +116,11 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     $this->listing_data = $listing;
 
     if ($listing != null) {
+      $this->maybe_redirect_to_canonical_listing_url( $tag, $listing );
       $fmc_special_page_caught['page-title'] = flexmlsConnect::make_nice_address_title($listing);
       $fmc_special_page_caught['post-title'] = flexmlsConnect::make_nice_address_title($listing);
       $fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_address_url($listing);
+      $this->send_last_modified_header( $listing );
     }
     else {
       $page = flexmlsConnect::get_no_listings_page_number();
@@ -102,8 +128,62 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       $fmc_special_page_caught['page-title'] = "Listing Not Available";
       $fmc_special_page_caught['post-title'] = $page_data->post_title;
 
+      $this->send_unavailable_listing_status( $result );
     }
 
+  }
+
+  /**
+   * 301 to the canonical address URL when the requested slug doesn't match it
+   * (any "*-mls_{id}" slug otherwise serves the listing).
+   */
+  private function maybe_redirect_to_canonical_listing_url( $tag, $listing ) {
+    if ( ! flexmlsConnect::generate_nice_urls() || is_admin() || wp_doing_ajax() ) {
+      return;
+    }
+    if ( ! apply_filters( 'flexmls_redirect_listing_to_canonical_url', true, $listing ) ) {
+      return;
+    }
+    $canonical_url = flexmlsConnect::make_nice_address_url( $listing, array(), $this->type );
+    if ( '' === $canonical_url ) {
+      return;
+    }
+    $canonical_slug = basename( untrailingslashit( (string) wp_parse_url( $canonical_url, PHP_URL_PATH ) ) );
+    if ( '' === $canonical_slug || $canonical_slug === untrailingslashit( (string) $tag ) ) {
+      return;
+    }
+    $query = isset( $_SERVER['QUERY_STRING'] ) ? (string) wp_unslash( $_SERVER['QUERY_STRING'] ) : '';
+    $redirect_url = ( '' !== $query ) ? $canonical_url . '?' . $query : $canonical_url;
+    wp_safe_redirect( $redirect_url, 301, 'Flexmls IDX' );
+    exit;
+  }
+
+  private function send_last_modified_header( $listing ) {
+    if ( headers_sent() || empty( $listing['StandardFields']['ModificationTimestamp'] ) ) {
+      return;
+    }
+    $modified = strtotime( $listing['StandardFields']['ModificationTimestamp'] );
+    if ( false === $modified ) {
+      return;
+    }
+    header( 'Last-Modified: ' . gmdate( 'D, d M Y H:i:s', $modified ) . ' GMT' );
+  }
+
+  /**
+   * 410 when the API confirms the listing doesn't exist; 503 when the API call itself failed,
+   * so an outage isn't read by search engines as the listing being removed.
+   */
+  private function send_unavailable_listing_status( $api_result ) {
+    if ( headers_sent() || 'fmc_vow_tag' === $this->type ) {
+      return;
+    }
+    if ( false === $api_result || ! is_array( $api_result ) ) {
+      status_header( 503 );
+      header( 'Retry-After: 3600' );
+    } else {
+      status_header( (int) apply_filters( 'flexmls_unavailable_listing_status', 410 ) );
+    }
+    nocache_headers();
   }
 
 
@@ -950,24 +1030,143 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   }
 
   function wp_meta_description_tag() {
-    $description = get_bloginfo('description');
-    if ( is_array( $this->listing_data ) && isset( $this->listing_data['StandardFields']['PublicRemarks'] ) && flexmlsConnect::is_not_blank_or_restricted( $this->listing_data['StandardFields']['PublicRemarks'] ) ) {
-      $description = $this->listing_data['StandardFields']['PublicRemarks'];
+    if ( $this->seo_plugin_outputs_description() ) {
+      return;
     }
-    echo "<meta name='description' content='" . esc_attr( substr( $description, 0, 160 ) ) . "'>";
+    $description = $this->listing_description( 160 );
+    if ( '' === $description ) {
+      $description = get_bloginfo( 'description' );
+    }
+    echo "<meta name='description' content='" . esc_attr( $description ) . "'>" . PHP_EOL;
+  }
+
+  /**
+   * Whether an active SEO plugin prints its own meta description (fed by seo_plugin_description()).
+   */
+  private function seo_plugin_outputs_description() {
+    $active = defined( 'WPSEO_VERSION' )
+      || class_exists( 'RankMath' )
+      || defined( 'AIOSEO_VERSION' )
+      || defined( 'SEOPRESS_VERSION' )
+      || defined( 'THE_SEO_FRAMEWORK_VERSION' );
+    return (bool) apply_filters( 'flexmls_seo_plugin_outputs_description', $active );
+  }
+
+  function seo_plugin_description( $description ) {
+    if ( ! is_array( $this->listing_data ) ) {
+      return $description;
+    }
+    $listing_description = $this->listing_description( 160 );
+    return ( '' !== $listing_description ) ? $listing_description : $description;
+  }
+
+  /**
+   * Listing title without the site name, e.g. "123 Main St, City, ST 12345 (MLS# 123)".
+   */
+  private function listing_seo_title() {
+    return (string) apply_filters( 'flexmls_listing_seo_title', flexmlsConnect::make_nice_address_title( $this->listing_data ), $this->listing_data );
+  }
+
+  function seo_plugin_full_title( $title ) {
+    if ( ! is_array( $this->listing_data ) ) {
+      return $title;
+    }
+    $parts = apply_filters( 'document_title_parts', array(
+      'title' => $this->listing_seo_title(),
+      'site'  => get_bloginfo( 'name' ),
+    ) );
+    $sep = apply_filters( 'document_title_separator', '-' );
+    return capital_P_dangit( implode( " $sep ", array_filter( $parts ) ) );
+  }
+
+  function seo_plugin_title_without_site_name( $title ) {
+    return is_array( $this->listing_data ) ? $this->listing_seo_title() : $title;
+  }
+
+  /**
+   * Listing description for meta/OpenGraph tags: public remarks when available, otherwise a
+   * generated summary. Truncated at a word boundary to $max_length characters.
+   */
+  private function listing_description( $max_length ) {
+    if ( ! is_array( $this->listing_data ) ) {
+      return '';
+    }
+    $sf = isset( $this->listing_data['StandardFields'] ) && is_array( $this->listing_data['StandardFields'] ) ? $this->listing_data['StandardFields'] : array();
+
+    $remarks = isset( $sf['PublicRemarks'] ) ? $sf['PublicRemarks'] : '';
+    $description = flexmlsConnect::is_not_blank_or_restricted( $remarks ) ? $remarks : $this->generated_listing_summary( $sf );
+    $description = apply_filters( 'flexmls_listing_meta_description', $description, $this->listing_data, $max_length );
+
+    return $this->truncate_at_word( $description, $max_length );
+  }
+
+  /**
+   * e.g. "Residential Lease: 3 bed, 2 bath, 1,850 sq ft at 123 Main St, City, ST 12345. Listed at $2,100. MLS# 123."
+   */
+  private function generated_listing_summary( $sf ) {
+    $features = array();
+    if ( flexmlsConnect::is_not_blank_or_restricted( $sf['BedsTotal'] ?? '' ) ) {
+      $features[] = $sf['BedsTotal'] . ' bed';
+    }
+    if ( flexmlsConnect::is_not_blank_or_restricted( $sf['BathsTotal'] ?? '' ) ) {
+      $features[] = ( 0 + $sf['BathsTotal'] ) . ' bath';
+    }
+    $sqft = flexmlsConnect::is_not_blank_or_restricted( $sf['BuildingAreaTotal'] ?? '' ) ? $sf['BuildingAreaTotal'] : ( $sf['LivingArea'] ?? '' );
+    if ( flexmlsConnect::is_not_blank_or_restricted( $sqft ) && is_numeric( $sqft ) ) {
+      $features[] = number_format( (float) $sqft ) . ' sq ft';
+    } elseif ( flexmlsConnect::is_not_blank_or_restricted( $sf['LotSizeAcres'] ?? '' ) && is_numeric( $sf['LotSizeAcres'] ) ) {
+      $features[] = ( 0 + $sf['LotSizeAcres'] ) . ' acre';
+    }
+
+    // Avoid "for sale"/"for rent": the property type label (e.g. "Residential Lease") says which it is.
+    $type = flexmlsConnect::listing_property_type_label( $this->listing_data );
+    if ( '' !== $type ) {
+      $summary = $features ? $type . ': ' . implode( ', ', $features ) : $type;
+    } else {
+      $summary = $features ? implode( ', ', $features ) . ' property' : 'Property';
+    }
+
+    list( $street, $locality ) = flexmlsConnect::format_listing_street_address( $this->listing_data );
+    if ( '' !== $street ) {
+      $summary .= ' at ' . $street . ( '' !== $locality ? ', ' . $locality : '' );
+    } elseif ( '' !== $locality ) {
+      $summary .= ' in ' . $locality;
+    }
+    $summary .= '.';
+
+    $price = flexmlsConnect::format_listing_standard_price_display( $sf );
+    if ( '' !== $price ) {
+      $summary .= ( ( $sf['StandardStatus'] ?? '' ) === 'Closed' ? ' Last listed at ' : ' Listed at ' ) . $price . '.';
+    }
+    if ( ! empty( $sf['ListingId'] ) ) {
+      $summary .= ' MLS# ' . $sf['ListingId'] . '.';
+    }
+    return $summary;
+  }
+
+  private function truncate_at_word( $text, $max_length ) {
+    $text = trim( preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( (string) $text ), ENT_QUOTES, 'UTF-8' ) ) );
+    if ( mb_strlen( $text ) <= $max_length ) {
+      return $text;
+    }
+    $cut = mb_substr( $text, 0, $max_length - 1 );
+    $last_space = mb_strrpos( $cut, ' ' );
+    if ( false !== $last_space && $last_space > $max_length / 2 ) {
+      $cut = mb_substr( $cut, 0, $last_space );
+    }
+    return rtrim( $cut, " \t,;:.-" ) . '…';
   }
 
   function wp_robots_noindex_listing($robots) {
-    if ( ! isset( $this->listing_data ) || ! is_array( $this->listing_data ) ) {
+    $link_criteria_mls_status = ( is_array( $this->listing_data ) && isset( $this->listing_data['StandardFields']['StandardStatus'] ) ) ? $this->listing_data['StandardFields']['StandardStatus'] : '';
+    $is_unavailable = ! isset( $this->listing_data ) || ! is_array( $this->listing_data );
+    $is_closed = ( $link_criteria_mls_status == 'Closed' && get_option( 'blog_public' ) != 0 );
+    if ( $is_unavailable || $is_closed ) {
       $robots['noindex'] = true;
-      $robots['nofollow'] = true;
-      return $robots;
-    }
-    $link_criteria_mls_status = isset( $this->listing_data['StandardFields']['StandardStatus'] ) ? $this->listing_data['StandardFields']['StandardStatus'] : '';
-    if ( $link_criteria_mls_status == 'Closed' && get_option( 'blog_public' ) != 0 ) {
-      $robots['noindex'] = true;
-      $robots['nofollow'] = true;
-      return $robots;
+      if ( get_option( 'blog_public' ) != 0 ) {
+        $robots['follow'] = true;
+        unset( $robots['nofollow'] );
+      }
     }
     return $robots;
   }
@@ -1223,16 +1422,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   }
 
   function wpseo_title( $title ){
-    $address = flexmlsConnect::format_listing_street_address( $this->listing_data );
-    $title = array(
-      'title' => $address[ 2 ],
-      'site' => get_bloginfo( 'name' )
-    );
-    $sep = apply_filters( 'document_title_separator', '-' );
-    $title = apply_filters( 'document_title_parts', $title );
-    $title = implode( " $sep ", array_filter( $title ) );
-    $title = capital_P_dangit( $title );
-    return $title;
+    return $this->seo_plugin_full_title( $title );
   }
 
   function wpseo_canonical() {
@@ -1261,6 +1451,9 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   }
 
   function open_graph_tags() {
+    if ( ! is_array( $this->listing_data ) ) {
+      return;
+    }
     $site_name = get_bloginfo('name');
     $title = flexmlsConnect::make_nice_address_title($this->listing_data);
     $sf = ( is_array($this->listing_data) && isset($this->listing_data['StandardFields']) && is_array($this->listing_data['StandardFields']) )
@@ -1282,7 +1475,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       }
     }
     
-    $description = ( isset($sf['PublicRemarks']) ) ? substr($sf['PublicRemarks'], 0, 200) : '';
+    $description = $this->listing_description( 200 );
     $url = flexmlsConnect::make_nice_address_url($this->listing_data);
     
     // Get locale (default to en_US, but can be filtered)
@@ -1324,9 +1517,6 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       if ( !empty($thumbnail_alt) ) {
         echo "<meta property='og:image:alt' content='" . $thumbnail_alt . "' />" . PHP_EOL;
       }
-      // Recommended image dimensions for optimal display (1200x630 is ideal, but we'll use 1280 which is close)
-      echo "<meta property='og:image:width' content='1280' />" . PHP_EOL;
-      echo "<meta property='og:image:height' content='720' />" . PHP_EOL;
     }
     
     // Price information (very useful for real estate listings)
@@ -1535,7 +1725,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
    * Start output buffering to remove SEOPress social tags from final HTML
    */
   function start_seopress_output_buffer() {
-    if ( ! $this->is_listing_detail_page() ) {
+    if ( ! defined( 'SEOPRESS_VERSION' ) || ! $this->is_listing_detail_page() ) {
       return;
     }
     
@@ -1543,22 +1733,30 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   }
 
   /**
-   * Remove SEOPress Twitter Card tags from output buffer
+   * Remove SEOPress Twitter Card tags from output buffer, leaving the plugin's own
+   * OpenGraph/Twitter block (see open_graph_tags()) untouched.
    */
   function remove_seopress_tags_from_output( $buffer ) {
-    // Remove SEOPress Twitter Card meta tags that might have slipped through
     $patterns = array(
       '/<meta\s+name=["\']twitter:card["\'][^>]*\/?>/i',
       '/<meta\s+name=["\']twitter:site["\'][^>]*\/?>/i',
       '/<meta\s+name=["\']twitter:creator["\'][^>]*\/?>/i',
       '/<meta\s+name=["\']twitter:title["\'][^>]*\/?>/i',
     );
-    
-    foreach ( $patterns as $pattern ) {
-      $buffer = preg_replace( $pattern, '', $buffer );
+
+    $own_block = '/(<!-- Flexmls® IDX WordPress Plugin - OpenGraph Tags for Listing Detail pages -->.*?<!-- \/ Flexmls® IDX WordPress Plugin -->)/s';
+    $segments = preg_split( $own_block, $buffer, -1, PREG_SPLIT_DELIM_CAPTURE );
+    if ( ! is_array( $segments ) ) {
+      return $buffer;
     }
-    
-    return $buffer;
+    foreach ( $segments as $index => $segment ) {
+      // Odd indexes are the captured plugin blocks.
+      if ( 0 === $index % 2 ) {
+        $segments[ $index ] = preg_replace( $patterns, '', $segment );
+      }
+    }
+
+    return implode( '', $segments );
   }
 
   /**
@@ -1573,6 +1771,20 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
    */
   function disable_seo_framework_opengraph( $output ) {
     return $this->is_listing_detail_page() ? '' : $output;
+  }
+
+  function remove_seo_framework_social_pools( $pools ) {
+    if ( ! $this->is_listing_detail_page() || ! is_array( $pools ) ) {
+      return $pools;
+    }
+    return array_values( array_diff( $pools, array( 'Open_Graph', 'Facebook', 'Twitter' ) ) );
+  }
+
+  function remove_seo_framework_canonical( $render_data ) {
+    if ( is_array( $render_data ) && isset( $render_data['canonical'] ) ) {
+      unset( $render_data['canonical'] );
+    }
+    return $render_data;
   }
 
   /**

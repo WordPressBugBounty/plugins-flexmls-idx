@@ -35,11 +35,13 @@ class FMCD_module extends ET_Builder_Module {
 
         $component = $this->component;
 
-        if($this->use_static === true){
-            return $component::shortcode($props);//print_r($props);//;
-        } else {
-            return $component->shortcode($props);//print_r($props);//;
-        }
+        return flexmls_render_safely( get_class( $this ) . ' Divi module', function () use ( $component, $props ) {
+            if($this->use_static === true){
+                return $component::shortcode($props);//print_r($props);//;
+            } else {
+                return $component->shortcode($props);//print_r($props);//;
+            }
+        } );
 
     }
 

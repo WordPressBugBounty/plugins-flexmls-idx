@@ -9,9 +9,11 @@ if ( ! is_array( $fmc_settings ) ) {
 
 $fmc_settings[ 'listlink' ] = isset( $fmc_settings[ 'listlink' ] ) ? $fmc_settings[ 'listlink' ] : '';
 $fmc_settings[ 'listpref' ] = isset( $fmc_settings[ 'listpref' ] ) ? $fmc_settings[ 'listpref' ] : 'listpref';
+$fmc_settings[ 'listing_detail_structured_data' ] = ! empty( $fmc_settings[ 'listing_detail_structured_data' ] ) ? 1 : 0;
 $fmc_settings[ 'listing_detail_expand_sections' ] = isset( $fmc_settings[ 'listing_detail_expand_sections' ] ) ? (int) $fmc_settings[ 'listing_detail_expand_sections' ] : 0;
 $fmc_settings[ 'listing_detail_show_more_info' ] = isset( $fmc_settings[ 'listing_detail_show_more_info' ] ) ? (int) $fmc_settings[ 'listing_detail_show_more_info' ] : 1;
 $fmc_settings[ 'listing_detail_contact_on_closed' ] = isset( $fmc_settings[ 'listing_detail_contact_on_closed' ] ) ? (int) $fmc_settings[ 'listing_detail_contact_on_closed' ] : 1;
+$fmc_settings[ 'listing_detail_address_h1' ] = isset( $fmc_settings[ 'listing_detail_address_h1' ] ) ? (int) $fmc_settings[ 'listing_detail_address_h1' ] : 0;
 $fmc_settings[ 'v2_listing_photo_click_action' ] = ( isset( $fmc_settings[ 'v2_listing_photo_click_action' ] ) && in_array( $fmc_settings[ 'v2_listing_photo_click_action' ], array( 'detail', 'modal' ), true ) ) ? $fmc_settings[ 'v2_listing_photo_click_action' ] : 'modal';
 $fmc_settings[ 'v2_listing_photo_modal_provider' ] = ( isset( $fmc_settings[ 'v2_listing_photo_modal_provider' ] ) && in_array( $fmc_settings[ 'v2_listing_photo_modal_provider' ], array( 'auto', 'cbox', 'third_party', 'none' ), true ) ) ? $fmc_settings[ 'v2_listing_photo_modal_provider' ] : 'auto';
 $show_v2_photo_modal_provider = ( 'modal' === $fmc_settings['v2_listing_photo_click_action'] );
@@ -51,6 +53,18 @@ $all_public_pages = is_array( $all_public_pages ) ? $all_public_pages : array();
 			</tr>
 			<tr>
 				<th scope="row">
+					<label for="listing_detail_structured_data">Structured data for search engines</label>
+				</th>
+				<td>
+					<input type="hidden" name="fmc_settings[listing_detail_structured_data]" value="0" />
+					<p>
+						<label for="listing_detail_structured_data"><input type="checkbox" name="fmc_settings[listing_detail_structured_data]" id="listing_detail_structured_data" value="1" <?php checked( $fmc_settings[ 'listing_detail_structured_data' ], 1 ); ?> /> Add schema.org structured data (JSON-LD) to listing detail pages</label>
+					</p>
+					<p class="description">Describes each listing (address, price, status, beds, baths, size, photos) in a format search engines read directly.</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
 					<label for="listing_detail_expand_sections_y">Expand all listing detail page sections by default</label>
 				</th>
 				<td>
@@ -82,6 +96,18 @@ $all_public_pages = is_array( $all_public_pages ) ? $all_public_pages : array();
 						<label for="listing_detail_contact_on_closed_y"><input type="radio" name="fmc_settings[listing_detail_contact_on_closed]" id="listing_detail_contact_on_closed_y" value="1" <?php checked( $fmc_settings[ 'listing_detail_contact_on_closed' ], 1 ); ?>> Yes, show the Contact button on sold &amp; closed listings</label><br />
 						<label for="listing_detail_contact_on_closed_n"><input type="radio" name="fmc_settings[listing_detail_contact_on_closed]" id="listing_detail_contact_on_closed_n" value="0" <?php checked( $fmc_settings[ 'listing_detail_contact_on_closed' ], 0 ); ?>> No, hide it on sold &amp; closed listings</label>
 					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="listing_detail_address_h1">Version 2 Listing Detail Address Heading</label>
+				</th>
+				<td>
+					<input type="hidden" name="fmc_settings[listing_detail_address_h1]" value="0" />
+					<p>
+						<label for="listing_detail_address_h1"><input type="checkbox" name="fmc_settings[listing_detail_address_h1]" id="listing_detail_address_h1" value="1" <?php checked( $fmc_settings[ 'listing_detail_address_h1' ], 1 ); ?> /> Show the listing address as the page&#8217;s main heading (<code>&lt;h1&gt;</code>)</label>
+					</p>
+					<p class="description">Turn this on if your theme hides page titles on the listing detail page, so the page still has an <code>&lt;h1&gt;</code> heading for search engines. Leave it off if your theme already shows the page title, to avoid two <code>&lt;h1&gt;</code> headings.</p>
 				</td>
 			</tr>
 			<tr id="fmc-setting-v2-listing-detail-photo-action">

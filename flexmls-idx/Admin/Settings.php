@@ -497,6 +497,7 @@ class Settings {
 					case 'allow_sold_searching':
 					case 'search_listing_card_native_lazy_load':
 					case 'search_results_display_open_house_datetime':
+					case 'search_noindex_filtered':
 						$fmc_settings[ $key ] = ( 1 == $val ? 1 : 0 );
 						break;
 					case 'v2_listing_photo_click_action':
@@ -522,9 +523,11 @@ class Settings {
 			$posted_settings = isset( $_POST[ 'fmc_settings' ] ) && is_array( $_POST[ 'fmc_settings' ] ) ? $_POST[ 'fmc_settings' ] : array();
 			foreach( $posted_settings as $key => $val ){
 				switch( $key ){
+					case 'listing_detail_structured_data':
 					case 'listing_detail_expand_sections':
 					case 'listing_detail_show_more_info':
 					case 'listing_detail_contact_on_closed':
+					case 'listing_detail_address_h1':
 						$fmc_settings[ $key ] = ( 1 == $val ? 1 : 0 );
 						break;
 					case 'v2_listing_photo_click_action':

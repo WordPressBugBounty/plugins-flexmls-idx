@@ -40,64 +40,40 @@ function flex_mls_gtb_cgb_editor_assets() {
         true // Enqueue the script in the footer.
     );
 
-    $htmlListingDetails = $htmlPhotos = $htmlMarketStats = $htmlSearch = $htmlLocationLinks =
-        $htmlIDXLinksWidget = $htmlLeadgen = $htmlSearchResults = $htmlAccount = $htmlAgents =
-            "<b>Flex connection error! Have you entered Flexmls® plugin credentials?</b>";
     $instance = array("_instance_type" => "shortcode", "_is_gutenberg_new" => true);
+    $form_classes = array(
+        'htmlListingDetails' => 'fmcListingDetails',
+        'htmlPhotos'         => 'fmcPhotos',
+        'htmlMarketStats'    => 'fmcMarketStats',
+        'htmlSearch'         => 'fmcSearch',
+        'htmlLocationLinks'  => 'fmcLocationLinks',
+        'htmlIDXLinksWidget' => 'fmcIDXLinksWidget',
+        'htmlSearchResults'  => 'fmcSearchResults',
+        'htmlLeadgen'        => 'FlexMLS\Widgets\LeadGeneration',
+        'htmlAccount'        => 'fmcAccount',
+        'htmlAgents'         => 'fmcAgents',
+    );
+    $forms = array();
 
-    if(class_exists("fmcListingDetails")) {
-        $listingDetails = new fmcListingDetails();
-        $htmlListingDetails = $listingDetails->settings_form($instance);
+    foreach ( $form_classes as $key => $class ) {
+        $forms[ $key ] = "<b>Flex connection error! Have you entered Flexmls® plugin credentials?</b>";
+        if ( ! class_exists( $class ) ) {
+            continue;
+        }
+
+        // Call settings_form() here, not from a callback: fmcWidget::is_called_for_widget() looks for this function in the call stack.
+        $ob_level = ob_get_level();
+        try {
+            $widget = new $class();
+            $forms[ $key ] = ( $widget instanceof fmcWidget ) ? $widget->settings_form( $instance ) : $widget->get_form( $instance );
+        } catch ( \Throwable $e ) {
+            $detail = flexmls_recover_from_error( "{$class} block settings", $e, $ob_level );
+            $forms[ $key ] = flexmls_settings_form_error_html( $detail );
+            wp_add_inline_script( 'fmc_gtb_global', 'console.warn( "Flexmls IDX:", ' . wp_json_encode( $detail ) . ' );' );
+        }
     }
 
-    if(class_exists("fmcPhotos")) {
-        $photos = new fmcPhotos();
-        $htmlPhotos = $photos->settings_form($instance);
-    }
-
-    if(class_exists("fmcMarketStats")) {
-        $marketStats = new fmcMarketStats();
-        $htmlMarketStats = $marketStats->settings_form($instance);
-    }
-
-    if(class_exists("fmcSearch")) {
-        $search = new fmcSearch();
-        $htmlSearch = $search->settings_form($instance);
-    }
-
-    if(class_exists("fmcLocationLinks")) {
-        $locationLinks = new fmcLocationLinks();
-        $htmlLocationLinks = $locationLinks->settings_form($instance);
-    }
-
-    if(class_exists("fmcIDXLinksWidget")) {
-        $idxLinksWidget = new fmcIDXLinksWidget();
-        $htmlIDXLinksWidget = $idxLinksWidget->settings_form($instance);
-    }
-
-    if(class_exists("fmcSearchResults")) {
-        $searchResults = new fmcSearchResults();
-        $htmlSearchResults = $searchResults->settings_form($instance);
-    }
-
-    if(class_exists("FlexMLS\Widgets\LeadGeneration")) {
-        $leadgen = new \FlexMLS\Widgets\LeadGeneration();
-        $htmlLeadgen = $leadgen->get_form($instance);
-    }
-
-
-    if(class_exists("fmcAccount")) {
-        $account = new fmcAccount();
-        $htmlAccount = $account->settings_form($instance);
-    }
-
-    if(class_exists("fmcAgents")) {
-        $agents = new fmcAgents();
-        $htmlAgents = $agents->settings_form($instance);
-    }
-
-
-    $arr = array(
+    $arr = array_merge( array(
         'ajaxurl' => admin_url( 'admin-ajax.php' ),
         'pluginurl' => plugins_url( '', dirname( __FILE__ ) ),
         'nonce' => wp_create_nonce( 'fmc_ajax' ),
@@ -113,17 +89,7 @@ function flex_mls_gtb_cgb_editor_assets() {
             'action'  => 'flexmls_office_agents_select2',
             'enabled' => flexmlsConnect::office_agents_select2_enabled() ? 1 : 0,
         ),
-        'htmlListingDetails' => $htmlListingDetails,
-        'htmlPhotos' => $htmlPhotos,
-        'htmlMarketStats' => $htmlMarketStats,
-        'htmlSearch' => $htmlSearch,
-        'htmlLocationLinks' => $htmlLocationLinks,
-        'htmlIDXLinksWidget' => $htmlIDXLinksWidget,
-        'htmlLeadgen' => $htmlLeadgen,
-        'htmlSearchResults' => $htmlSearchResults,
-        'htmlAccount' => $htmlAccount,
-        'htmlAgents'  => $htmlAgents
-    );
+    ), $forms );
 
     wp_localize_script( 'flex_mls_gtb-cgb-block-js', 'flexGtbData',  $arr);
 
@@ -186,50 +152,70 @@ function init_flexmls_gutenberg()
 }
 function FlexMlsCallback($attributes )
 {
-    ob_start();
-    if(isset($attributes['sendData'])) {
-        $url = admin_url('admin-ajax.php');
-        // Internal cURL has no cookies; use one-time token so shortcode_generate nonce check passes.
-        $attributes['sendData']['fmc_render_token'] = bin2hex( random_bytes( 16 ) );
-        set_transient( 'fmc_render_' . $attributes['sendData']['fmc_render_token'], 1, 60 );
-
-        $ch = curl_init();
-
-        $post_data = http_build_query($attributes['sendData']);
-
-        curl_setopt($ch, CURLOPT_URL,$url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER,true);
-        curl_setopt($ch, CURLOPT_ENCODING,"");
-        curl_setopt($ch, CURLOPT_MAXREDIRS,10);
-        curl_setopt($ch, CURLOPT_TIMEOUT,30);
-        curl_setopt($ch, CURLOPT_HTTP_VERSION,CURL_HTTP_VERSION_1_1);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST,"POST");
-        curl_setopt($ch, CURLOPT_HTTPHEADER,array(
-            "cache-control: no-cache",
-            "content-type: application/x-www-form-urlencoded"
-        ));
-
-        if( defined( 'FMC_DEV' ) && FMC_DEV ) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        }
-
-        curl_setopt($ch, CURLOPT_POSTFIELDS,$post_data);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $server_output = curl_exec($ch);
-        $err = curl_error($ch);
-        // CurlHandle is closed automatically when destroyed (curl_close deprecated in PHP 8.5).
-        $output = flexmlsJSON::json_decode($server_output);
-        if (is_array($output) && isset($output['body'])) {
-            echo $output['body'];
-        } else {
-            echo "<div>Error loading content</div>";
-        }
-
-    }
-    else {
-        echo "<div>Flexmls Plugin</div>";
+    if ( ! isset( $attributes['sendData'] ) ) {
+        return "<div>Flexmls Plugin</div>";
     }
 
-    return ob_get_clean();
+    $shortcode = flexmls_block_shortcode_string( $attributes['sendData'] );
+    if ( '' === $shortcode ) {
+        return "<div>Error loading content</div>";
+    }
+
+    // These filters run do_shortcode() after do_blocks(); block templates and
+    // template parts run it before, so the shortcode has to be expanded here.
+    if ( doing_filter( 'the_content' ) || doing_filter( 'widget_block_content' ) ) {
+        return $shortcode;
+    }
+
+    return do_shortcode( $shortcode );
+}
+
+/**
+ * @param array $send_data The block's saved sendData attribute.
+ * @return string Empty when the settings don't match an available widget.
+ */
+function flexmls_block_shortcode_string( $send_data )
+{
+    if ( ! is_array( $send_data ) || ! isset( $send_data['action'] ) || ! is_string( $send_data['action'] ) ) {
+        return '';
+    }
+
+    $send_data = flexmls_block_form_values( $send_data );
+    $action = $send_data['action'];
+
+    if ( 'tinymce_shortcodes_generate' === $action ) {
+        return \FlexMLS\Admin\TinyMCE::build_shortcode_string( wp_slash( $send_data ) );
+    }
+
+    global $fmc_widgets;
+    $suffix = '_shortcode_gen';
+    if ( substr( $action, -strlen( $suffix ) ) !== $suffix ) {
+        return '';
+    }
+
+    $widget_class = substr( $action, 0, -strlen( $suffix ) );
+    if ( empty( $fmc_widgets[ $widget_class ]['shortcode'] ) || ! shortcode_exists( $fmc_widgets[ $widget_class ]['shortcode'] ) ) {
+        return '';
+    }
+
+    return fmcWidget::build_shortcode_string( $widget_class, $send_data );
+}
+
+/**
+ * Converts JSON attribute values to the strings a form submission would carry
+ * (true/false become '1'/'0', null is dropped), which the shortcode builders expect.
+ */
+function flexmls_block_form_values( $values )
+{
+    $form_values = array();
+    foreach ( $values as $key => $value ) {
+        if ( is_array( $value ) ) {
+            $form_values[ $key ] = flexmls_block_form_values( $value );
+        } elseif ( is_bool( $value ) ) {
+            $form_values[ $key ] = $value ? '1' : '0';
+        } elseif ( is_scalar( $value ) ) {
+            $form_values[ $key ] = (string) $value;
+        }
+    }
+    return $form_values;
 }

@@ -151,7 +151,14 @@ class flexmlsConnectPage {
     if ( is_string( $url ) && strpos( $url, 'v2=' ) !== false ) {
       $url = remove_query_arg( 'v2', $url );
     }
-    echo "<link rel='canonical' href='" . esc_url( trailingslashit( $url ) ) . "' />\n";
+    $url = (string) $url;
+    $query_start = strpos( $url, '?' );
+    if ( false === $query_start ) {
+      $url = trailingslashit( $url );
+    } else {
+      $url = trailingslashit( substr( $url, 0, $query_start ) ) . substr( $url, $query_start );
+    }
+    echo "<link rel='canonical' href='" . esc_url( $url ) . "' />\n";
   }
 
 }

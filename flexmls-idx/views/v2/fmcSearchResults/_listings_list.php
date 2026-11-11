@@ -3,8 +3,6 @@
 	<?php if ( ! empty( $this->search_data ) ) : ?>
 		<?php
 			$mls_fields_to_suppress = [];
-			global $wp;
-			$current_url = home_url( add_query_arg( $_GET, $wp->request ) );
 
 			$fmc_settings_listing_lazy = get_option( 'fmc_settings' );
 			$fmc_v2_listing_native_lazy_on = ! is_array( $fmc_settings_listing_lazy )
@@ -21,8 +19,6 @@
 				$second_line_address = htmlspecialchars($listing_address[1]);
 				$one_line_address = htmlspecialchars($listing_address[2]);
 				$one_line_without_zip_address = flexmlsSearchUtil::one_line_without_zip_address( $record );
-				$link_to_details_criteria = $this->search_criteria;
-
 
 				$sf = isset( $record['StandardFields'] ) && is_array( $record['StandardFields'] ) ? $record['StandardFields'] : array();
 
@@ -30,11 +26,9 @@
 					$mls_fields_to_suppress = flexmlsSearchUtil::mls_fields_to_suppress( $sf );
 				}
 
-				$link_to_details_criteria['m'] = $sf['MlsId'] ?? '';
-
-				$link_to_details = flexmlsConnect::make_nice_address_url($record, $link_to_details_criteria);
-
-				$link_to_details = add_query_arg( 'search_referral_url', urlencode( $current_url ), $link_to_details );
+				// Only the MLS id is kept on the link (it disambiguates listing ids across MLSs);
+				// the search itself is remembered client-side for "Back to search".
+				$link_to_details = flexmlsConnect::make_nice_address_url( $record, ! empty( $sf['MlsId'] ) ? array( 'm' => $sf['MlsId'] ) : array() );
 
 		?>
 			<?php $main_photo = fmcSearchResults::main_photo_from_collection( $sf['Photos'] ?? array() ); ?>
@@ -187,5 +181,8 @@
 			</div>
 
 		<?php endforeach; ?>
+		<script>
+			try { window.sessionStorage.setItem( 'flexmls_search_referral_url', window.location.href ); } catch ( e ) {}
+		</script>
 	<?php endif; ?>
 </div>

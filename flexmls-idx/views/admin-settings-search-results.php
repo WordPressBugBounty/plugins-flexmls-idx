@@ -11,6 +11,7 @@ $fmc_settings[ 'multiple_summaries' ] = ( isset( $fmc_settings[ 'multiple_summar
 $fmc_settings[ 'allow_sold_searching' ] = ( isset( $fmc_settings[ 'allow_sold_searching' ] ) && 1 == $fmc_settings[ 'allow_sold_searching' ] ) ? 1 : 0;
 $fmc_settings[ 'search_listing_card_native_lazy_load' ] = isset( $fmc_settings['search_listing_card_native_lazy_load'] ) ? (int) $fmc_settings['search_listing_card_native_lazy_load'] : 1;
 $fmc_settings[ 'search_results_display_open_house_datetime' ] = ( isset( $fmc_settings[ 'search_results_display_open_house_datetime' ] ) && 1 == $fmc_settings[ 'search_results_display_open_house_datetime' ] ) ? 1 : 0;
+$fmc_settings[ 'search_noindex_filtered' ] = ( isset( $fmc_settings[ 'search_noindex_filtered' ] ) && 1 == $fmc_settings[ 'search_noindex_filtered' ] ) ? 1 : 0;
 
 ?>
 <form action="<?php echo admin_url( 'admin.php?page=fmc_admin_settings&tab=search-results' ); ?>" method="post">
@@ -38,6 +39,21 @@ $fmc_settings[ 'search_results_display_open_house_datetime' ] = ( isset( $fmc_se
 						<label for="allow_sold_searching_y"><input type="radio" name="fmc_settings[allow_sold_searching]" id="allow_sold_searching_y" value="1" <?php checked( $fmc_settings[ 'allow_sold_searching' ], 1 ); ?>> Yes, allow visitors to search for sold &amp; pending listings</label><br />
 						<label for="allow_sold_searching_n"><input type="radio" name="fmc_settings[allow_sold_searching]" id="allow_sold_searching_n" value="0" <?php checked( $fmc_settings[ 'allow_sold_searching' ], 0 ); ?>> No, do not allow searches for sold &amp; pending listings</label>
 					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">
+					<label for="search-noindex-filtered">Filtered searches in search engines</label>
+				</th>
+				<td>
+					<input type="hidden" name="fmc_settings[search_noindex_filtered]" value="0" />
+					<p>
+						<label>
+							<input type="checkbox" name="fmc_settings[search_noindex_filtered]" id="search-noindex-filtered" value="1" <?php checked( $fmc_settings[ 'search_noindex_filtered' ], 1 ); ?> />
+							Ask search engines not to index filtered search result pages (recommended).
+						</label>
+					</p>
+					<p class="description">Filtered searches (for example <code>/<?php echo esc_html( isset( $fmc_settings['permabase'] ) ? $fmc_settings['permabase'] : 'idx' ); ?>/search/?City=&hellip;</code>) create a nearly endless number of similar pages. When on, these pages use <code>noindex, follow</code> so search engines focus on your listing pages; the unfiltered search page stays indexable. If your site gets search traffic from filtered search URLs (check Google Search Console), those pages will drop out of search results over a few weeks. For local searches, create pages for the cities or neighborhoods you serve and add an IDX Listing Summary to each one.</p>
 				</td>
 			</tr>
 		</tbody>

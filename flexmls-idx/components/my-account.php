@@ -19,11 +19,10 @@ class fmcAccount extends fmcWidget {
 
     $widget_ops = array( 'description' => $widget_info['description'] );
     WP_Widget::__construct( get_class($this) , $widget_info['title'], $widget_ops);
-    add_shortcode($widget_info['shortcode'], array(&$this, 'shortcode'));
+    flexmls_add_shortcode($widget_info['shortcode'], array(&$this, 'shortcode'));
     // have WP replace instances of [first_argument] with the return from the second_argument function
     add_action('wp_ajax_'.get_class($this).'_shortcode', array(&$this, 'shortcode_form') );
     add_action('wp_ajax_'.get_class($this).'_shortcode_gen', array(&$this, 'shortcode_generate') );
-    add_action('wp_ajax_nopriv_'.get_class($this).'_shortcode_gen', array(&$this, 'shortcode_generate') );
     add_action('wp_ajax_'.get_class($this).'_remove_cart', array(&$this, 'ajax_remove_listing_from_cart') );
     add_action('wp_ajax_nopriv_'.get_class($this).'_remove_cart', array(&$this, 'ajax_remove_listing_from_cart') );
 
@@ -57,8 +56,6 @@ class fmcAccount extends fmcWidget {
       'listing_id' => flexmlsConnect::wp_input_get_post('flexmls_listing_id')
       );
     $current_page = flexmlsConnect::wp_input_get_post('flexmls_page_override');
-    $SparkAPI = new \SparkAPI\Core();
-	$SparkAPI->clear_cache( true );
     $bool ? exit("SUCCESS") : exit($fmc_api_portal->get_portal_page(false, $add_cart_params, $current_page));
   }
 
@@ -83,8 +80,6 @@ class fmcAccount extends fmcWidget {
       'listing_id' => flexmlsConnect::wp_input_get_post('flexmls_listing_id')
       );
     $current_page = flexmlsConnect::wp_input_get_post('flexmls_page_override');
-    $SparkAPI = new \SparkAPI\Core();
-	$SparkAPI->clear_cache( true );
     $bool ? exit("SUCCESS") : exit($fmc_api_portal->get_portal_page(false, $add_cart_params, $current_page));
   }
 

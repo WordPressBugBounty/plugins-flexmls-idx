@@ -27,26 +27,69 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 		add_filter( 'aioseo_canonical_url', array( $this, 'aioseo_canonical' ), 0 );
 		add_filter( 'the_seo_framework_meta_canonical', array( $this, 'seo_framework_canonical' ), 0 );
 		add_filter( 'seopress_canonical', array( $this, 'seopress_canonical' ), 0 );
+		add_filter( 'seopress_titles_canonical', '__return_empty_string', 99 );
 
+		add_filter( 'wp_robots', array( $this, 'wp_robots_noindex_filtered_search' ), 0 );
+
+	}
+
+	/**
+	 * Search criteria keys that don't change which listings are shown (paging, sort, display)
+	 * plus common tracking parameters.
+	 */
+	private static function non_filter_criteria_keys() {
+		return apply_filters( 'flexmls_search_non_filter_criteria_keys', array( 'pg', 'Limit', 'OrderBy', 'view', 'v2', 'search_referral_url', 'gclid', 'fbclid', 'msclkid' ) );
+	}
+
+	/**
+	 * Whether the request narrows the search (city, price, beds, saved search, ...). Filtered
+	 * searches are near-infinite URL combinations, so they're noindexed.
+	 */
+	private function is_filtered_search() {
+		$criteria = is_array( $this->search_criteria ) ? $this->search_criteria : array();
+		foreach ( self::non_filter_criteria_keys() as $key ) {
+			unset( $criteria[ $key ] );
+		}
+		foreach ( array_keys( $criteria ) as $key ) {
+			if ( 0 === strpos( (string) $key, 'utm_' ) || '' === $criteria[ $key ] || array() === $criteria[ $key ] ) {
+				unset( $criteria[ $key ] );
+			}
+		}
+		return (bool) apply_filters( 'flexmls_is_filtered_search', ! empty( $criteria ), $this->search_criteria );
+	}
+
+	private static function noindex_filtered_searches_enabled() {
+		$options = get_option( 'fmc_settings' );
+		return is_array( $options ) && ! empty( $options['search_noindex_filtered'] );
+	}
+
+	function wp_robots_noindex_filtered_search( $robots ) {
+		if ( ! self::noindex_filtered_searches_enabled() || ! $this->is_filtered_search() ) {
+			return $robots;
+		}
+		$robots['noindex'] = true;
+		if ( get_option( 'blog_public' ) != 0 ) {
+			$robots['follow'] = true;
+			unset( $robots['nofollow'] );
+		}
+		return $robots;
+	}
+
+	/**
+	 * Canonical for the search page: the unfiltered search (keeping the page number), or the
+	 * requested URL itself for filtered searches, which are noindexed.
+	 */
+	private function canonical_search_url() {
+		if ( $this->is_filtered_search() ) {
+			$request_path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+			return home_url( $request_path );
+		}
+		$page_args = ( (int) $this->current_page > 1 ) ? array( 'pg' => (int) $this->current_page ) : array();
+		return flexmlsConnect::make_nice_tag_url( 'search', $page_args, $this->type ? $this->type : 'fmc_tag' );
 	}
 
 	function wp_head(){
 
-		// WP-716: Add prerender next and previous tags for better performance
-		if( 1 < $this->total_pages ){
-				$previous_page = max( 1, $this->current_page - 1 );
-				$next_page = min( $this->total_pages, $this->current_page + 1 );
-
-				if( $previous_page != $this->current_page ){
-						echo '<link rel="prerender" href="' . $this->make_pagination_link($previous_page) . '">';
-				}
-
-				if( $this->current_page != $this->total_pages ){
-						echo '<link rel="prerender" href="' . $this->make_pagination_link($next_page) . '">';
-				}
-		}
-		
-		
     		if ( $this->uses_v2_template() ) {
       			$this->render_template_styles();
     		   }
@@ -129,7 +172,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 		$fmc_special_page_caught['type'] = "search-results";
 		$fmc_special_page_caught['page-title'] = "Property Search";
 		$fmc_special_page_caught['post-title'] = "Property Search";
-		$fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_tag_url( 'search' );
+		$fmc_special_page_caught['page-url'] = $this->canonical_search_url();
 
 	}
 

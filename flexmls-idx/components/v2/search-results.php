@@ -97,15 +97,11 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 			 * Grab the proper data for the Google Map and render it.
 			 */
 				$markers      = array();
-				$result_count = 0;
-				global $wp;
-				$current_url = home_url( add_query_arg( $_GET, $wp->request ) );
 				if($search_results){ 
 					$this->search_data = $search_results;
 				}
 				if (is_array($this->search_data)) {
 					foreach ( $this->search_data as $record ) {
-					$result_count ++;
 					if ( ! isset( $record['StandardFields'] ) || ! is_array( $record['StandardFields'] ) ) {
 						continue;
 					}
@@ -118,24 +114,9 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 					$listing_address          = flexmlsConnect::format_listing_street_address( $record );
 					$first_line_address       = htmlspecialchars( $listing_address[0] );
 					$second_line_address      = htmlspecialchars( $listing_address[1] );
-					$link_to_details_criteria = $this->search_criteria;
-
 					$list_price = flexmlsConnect::format_listing_standard_price_display( $fields );
 
-					$this_result_overall_index = ( $this->page_size * ( $this->current_page - 1 ) ) + $result_count;
-
-					// figure out if there's a previous listing
-					$link_to_details_criteria['p'] = ( $this_result_overall_index != 1 ) ? 'y' : 'n';
-
-					// figure out if there's a next listing possible
-					$link_to_details_criteria['n'] = ( $this_result_overall_index < $this->total_rows ) ? 'y' : 'n';
-
-					if ( ! empty( $fields['MlsId'] ) ) {
-						$link_to_details_criteria['m'] = $fields['MlsId'];
-					}
-
-					$link_to_details = flexmlsConnect::make_nice_address_url( $record, $link_to_details_criteria );
-					$link_to_details = add_query_arg( 'search_referral_url', urlencode( $current_url ), $link_to_details );
+					$link_to_details = flexmlsConnect::make_nice_address_url( $record, ! empty( $fields['MlsId'] ) ? array( 'm' => $fields['MlsId'] ) : array() );
 
 					// Image
 					$image_thumb = '';

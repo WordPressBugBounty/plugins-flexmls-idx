@@ -11,12 +11,11 @@ class fmcIDXLinksWidget extends fmcWidget {
     WP_Widget::__construct( get_class($this) , $widget_info['title'], $widget_ops);
 
     // have WP replace instances of [first_argument] with the return from the second_argument function
-    add_shortcode($widget_info['shortcode'], array(&$this, 'shortcode'));
+    flexmls_add_shortcode($widget_info['shortcode'], array(&$this, 'shortcode'));
 
     // register where the AJAX calls should be routed when they come in
     add_action('wp_ajax_'.get_class($this).'_shortcode', array(&$this, 'shortcode_form') );
     add_action('wp_ajax_'.get_class($this).'_shortcode_gen', array(&$this, 'shortcode_generate') );
-    add_action('wp_ajax_nopriv_'.get_class($this).'_shortcode_gen', array(&$this, 'shortcode_generate') );
 
   }
 

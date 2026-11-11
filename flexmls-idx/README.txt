@@ -4,7 +4,7 @@ Contributors: flexmls
 Requires at least: 5.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 4.1.2
+Stable tag: 4.2
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -84,6 +84,27 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 
 == Changelog ==
+
+= 4.2 =
+Security & Stability:
+* Fixed a cross-site scripting (XSS) issue in the IDX Search widget. Thanks to Varvel for reporting it through Patchstack.
+* Fixed a malformed search link causing an error on pages with the IDX Search widget.
+* Removed old plugin files that were no longer used.
+* When a Flexmls widget hits an error, it now shows "This widget is temporarily unavailable" instead of stopping the rest of the page from loading. The error is written to the PHP error log.
+* Flexmls blocks no longer make a second request back to your own site to render, which fixes "Error loading content" on sites where a firewall or password protection blocks those requests.
+
+SEO:
+* Listing detail pages now send their title and description to Yoast, Rank Math, All in One SEO, SEOPress and The SEO Framework, with no duplicate meta, social or canonical tags.
+* Listing descriptions are trimmed cleanly, and when a listing has no remarks a summary is built from its details. Titles and descriptions read correctly for rentals and for listings whose address is hidden.
+* Optional schema.org structured data (JSON-LD) for listing detail pages, off by default.
+* Optional setting to show the listing address as the page's main heading (h1).
+* Search engines are now told to skip indexing filtered search result pages while still following their links (on by default for new sites). Search result links use clean listing URLs, and the outdated prerender tags were removed.
+* Closed and unavailable listings are marked noindex, follow. Listings that no longer exist return a 410 status, outdated listing URLs redirect to the current address, and listing pages send a Last-Modified header. If listing data can't be loaded, the page returns a temporary 503 status so search engines try again later.
+
+Performance:
+* The first listing photo loads right away instead of lazy-loading, so listing pages appear faster.
+* The plugin no longer rebuilds WordPress permalinks on every page load.
+* Marking a listing as a Favorite or No Interest no longer clears the site's IDX cache.
 
 = 4.1.2 =
 Efficiency Update:

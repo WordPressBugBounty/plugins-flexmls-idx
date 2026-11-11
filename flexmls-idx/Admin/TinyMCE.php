@@ -44,12 +44,24 @@ class TinyMCE {
 
 	public static function tinymce_shortcodes_generate(){
 		flexmls_verify_ajax_nonce();
-		$shortcode_to_use = sanitize_text_field( $_POST[ 'shortcode_to_use' ] );
+
+		$response = array(
+			'body' => self::build_shortcode_string( $_POST )
+		);
+		exit( json_encode( $response ) );
+	}
+
+	/**
+	 * @param array $request Slashed form data, like $_POST. The slashes stay in the
+	 *                       shortcode; shortcode attribute parsing removes them.
+	 */
+	public static function build_shortcode_string( $request ){
+		$shortcode_to_use = sanitize_text_field( isset( $request[ 'shortcode_to_use' ] ) ? $request[ 'shortcode_to_use' ] : '' );
 
 		$params = array();
 
-		if( isset( $_POST[ 'shortcode_fields_to_catch' ] ) ){
-			foreach( $_POST[ 'shortcode_fields_to_catch' ] as $key => $val ){
+		if( isset( $request[ 'shortcode_fields_to_catch' ] ) ){
+			foreach( $request[ 'shortcode_fields_to_catch' ] as $key => $val ){
 				$val = wp_kses( $val, array() );
 				if( !empty( $val ) ){
 					$params[] = $key . '="' . wp_kses( $val, array() ) . '"';
@@ -57,11 +69,6 @@ class TinyMCE {
 			}
 		}
 
-		$shortcode = '[' . $shortcode_to_use . ' ' . implode( ' ', $params ) . ']';
-
-		$response = array(
-			'body' => $shortcode
-		);
-		exit( json_encode( $response ) );
+		return '[' . $shortcode_to_use . ' ' . implode( ' ', $params ) . ']';
 	}
 }

@@ -30,6 +30,26 @@
 			$back_to_search_link = wp_validate_redirect( $search_referral_url, $default_search_url );
 			?>
 			<a class="back-to-search-link flexmls-primary-color-font" href="<?php echo esc_url( $back_to_search_link ); ?>">&larr; Back to search</a>
+		<?php else : ?>
+			<a class="back-to-search-link flexmls-primary-color-font" href="#" style="display:none;" data-flexmls-search-return>&larr; Back to search</a>
+			<script>
+				( function() {
+					try {
+						var link = document.querySelector( '[data-flexmls-search-return]' );
+						var stored = window.sessionStorage.getItem( 'flexmls_search_referral_url' );
+						if ( ! link || ! stored ) {
+							return;
+						}
+						var url = new URL( stored, window.location.href );
+						if ( url.origin !== window.location.origin ) {
+							return;
+						}
+						link.href = url.href;
+						link.style.display = '';
+						link.parentNode.classList.add( 'has-return-button' );
+					} catch ( e ) {}
+				} )();
+			</script>
 		<?php endif; ?>
 		<?php if ( $fmc_show_listing_lead_actions ) : ?>
 		<button class="flexmls-btn flexmls-btn-primary flexmls-primary-color-background" onclick="flexmls_connect.contactForm({
@@ -53,7 +73,15 @@
 	<div class="top-info-wrapper listing-section">
 		<div class="title-and-details-wrapper">
 			<div class="title-and-status-wrapper">
-				<h2 class="property-title flexmls-title-largest flexmls-primary-color-font flexmls-heading-font"><?php echo esc_html( $one_line_address ); ?></h2>
+				<?php
+				$fmc_settings_address_heading = get_option( 'fmc_settings' );
+				$address_heading_tag = ( is_array( $fmc_settings_address_heading ) && ! empty( $fmc_settings_address_heading['listing_detail_address_h1'] ) ) ? 'h1' : 'h2';
+				$address_heading_tag = apply_filters( 'flexmls_listing_detail_address_heading_tag', $address_heading_tag, $record );
+				if ( ! in_array( $address_heading_tag, array( 'h1', 'h2', 'h3', 'div' ), true ) ) {
+					$address_heading_tag = 'h2';
+				}
+				?>
+				<<?php echo $address_heading_tag; ?> class="property-title flexmls-title-largest flexmls-primary-color-font flexmls-heading-font"><?php echo esc_html( $one_line_address ); ?></<?php echo $address_heading_tag; ?>>
 
 				<?php if ( ! empty( $sf['OnMarketDate'] ?? '' ) ) : ?>
 					<?php if ( strtotime( $sf['OnMarketDate'] ) > strtotime( '-7 days' ) ) : ?>
@@ -128,7 +156,11 @@
 						$img_alt_attr = "Photo for listing #" . $sf['ListingId'];
 					}
 					?>
-					<img class="owl-lazy" data-src="<?php echo esc_url( $p['UriLarge'] ); ?>" data-photo-index="<?php echo esc_attr( $index ); ?>" alt="<?php echo esc_attr( $img_alt_attr ); ?>" />
+					<?php if ( 0 === $index ) : ?>
+						<img src="<?php echo esc_url( $p['UriLarge'] ); ?>" fetchpriority="high" decoding="async" data-photo-index="<?php echo esc_attr( $index ); ?>" alt="<?php echo esc_attr( $img_alt_attr ); ?>" />
+					<?php else : ?>
+						<img class="owl-lazy" data-src="<?php echo esc_url( $p['UriLarge'] ); ?>" data-photo-index="<?php echo esc_attr( $index ); ?>" alt="<?php echo esc_attr( $img_alt_attr ); ?>" />
+					<?php endif; ?>
 				<?php endforeach; ?>
 				</div>
 			</div>

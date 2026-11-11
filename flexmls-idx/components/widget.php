@@ -25,7 +25,13 @@ class fmcWidget extends WP_Widget {
 
 		$widget_info = $fmc_widgets[ get_class($this) ];
 
-		$settings_content = $this->settings_form( array('_instance_type' => 'shortcode') );
+		// Call settings_form() here, not from a callback: is_called_for_widget() looks for this method in the call stack.
+		$ob_level = ob_get_level();
+		try {
+			$settings_content = $this->settings_form( array('_instance_type' => 'shortcode') );
+		} catch ( \Throwable $e ) {
+			$settings_content = flexmls_settings_form_error_html( flexmls_recover_from_error( get_class( $this ) . ' shortcode settings', $e, $ob_level ) );
+		}
 
 		$response = array(
 				'title' => $widget_info['title'] .' widget',
@@ -75,7 +81,12 @@ class fmcWidget extends WP_Widget {
 	// form for generating a widget. used in appearence > widgets. not used for shortcode forms
 	function form($instance) {
 		echo "<div class='flexmls-widget-settings'>";
-		echo $this->settings_form($instance);
+		$ob_level = ob_get_level();
+		try {
+			echo $this->settings_form($instance);
+		} catch ( \Throwable $e ) {
+			echo flexmls_settings_form_error_html( flexmls_recover_from_error( get_class( $this ) . ' widget settings', $e, $ob_level ) );
+		}
 		echo "</div>";
 	}
 
@@ -97,23 +108,32 @@ class fmcWidget extends WP_Widget {
 
 	function get_shortcode_string()
 	{
+			return self::build_shortcode_string( get_class( $this ), wp_unslash( $_REQUEST ) );
+	}
+
+	/**
+	 * @param string $widget_class Key in $fmc_widgets.
+	 * @param array  $params       Unslashed widget settings.
+	 */
+	static function build_shortcode_string( $widget_class, $params )
+	{
 			global $fmc_widgets;
 
-			$widget_info = $fmc_widgets[ get_class($this) ];
+			$widget_info = $fmc_widgets[ $widget_class ];
 
 			$shortcode = "[{$widget_info['shortcode']}";
 
 			$is_service_lacking_filter_support = false;
-			$shortcode_source = flexmlsConnect::wp_input_get_post('source');
+			$shortcode_source = isset( $params['source'] ) ? $params['source'] : null;
 			if ($shortcode_source != "location") {
 					$is_service_lacking_filter_support = true;
 			}
 			$is_slideshow_widget = ($widget_info['shortcode'] == "idx_slideshow") ? true : false;
 
-			$listing_summary_source = isset( $_REQUEST['source'] ) ? trim( (string) $_REQUEST['source'] ) : '';
+			$listing_summary_source = isset( $params['source'] ) ? trim( (string) $params['source'] ) : '';
 
-			foreach ($_REQUEST as $k => $v) {
-					if ( $k === 'action' || $k === 'nonce' || $k === 'fmc_render_token' || $k === 'agent_display' || $k === 'link_display' ) {
+			foreach ($params as $k => $v) {
+					if ( $k === 'action' || $k === 'nonce' || $k === 'agent_display' || $k === 'link_display' ) {
 							continue;
 					}
 
@@ -137,7 +157,7 @@ class fmcWidget extends WP_Widget {
 					}
 
 					if (!empty($v) && is_string( $v )) {
-							$v = htmlentities(stripslashes($v), ENT_QUOTES);
+							$v = htmlentities($v, ENT_QUOTES);
 							$shortcode .= " {$k}=\"{$v}\"";
 					}
 			}
@@ -557,6 +577,23 @@ class fmcWidget extends WP_Widget {
 	private function is_bool_field($field) {
 		$bool_fields = array("allow_sold_searching");
 		return in_array($field, $bool_fields);
+	}
+
+	/**
+	 * Displays the widget in a sidebar. If it throws, the widget shows the unavailable message
+	 * instead and the rest of the page still loads.
+	 */
+	public function display_callback( $args, $widget_args = 1 ) {
+		echo flexmls_render_safely(
+			get_class( $this ) . ' widget',
+			function () use ( $args, $widget_args ) {
+				ob_start();
+				parent::display_callback( $args, $widget_args );
+				return ob_get_clean();
+			},
+			isset( $args['before_widget'] ) ? $args['before_widget'] : '',
+			isset( $args['after_widget'] ) ? $args['after_widget'] : ''
+		);
 	}
 
 	function widget($args, $instance){
