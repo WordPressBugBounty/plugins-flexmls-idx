@@ -2,9 +2,9 @@
 Tags: flexmls, IDX, MLS search
 Contributors: flexmls
 Requires at least: 5.0
-Tested up to: 7.1
+Tested up to: 7.1.5
 Requires PHP: 7.4
-Stable tag: 4.2
+Stable tag: 4.2.1
 
 Add Flexmls® IDX listings, market statistics, IDX searches, and a contact form on your web site.
 
@@ -85,10 +85,16 @@ Please call FBS Broker Agent Services at 866-320-9977 or <a href="https://fbspro
 
 == Changelog ==
 
+= 4.2.1 =
+* IDX Slideshow listing links are now cleaner and more consistent with the rest of the site.
+* Contact Agent and Schedule a Showing forms have a refreshed, more responsive design.
+* Listing Detail shortcodes and widgets now stay on your custom page URLs instead of redirecting.
+* General stability and maintenance improvements under the hood.
+
 = 4.2 =
-Security & Stability:
-* Fixed a cross-site scripting (XSS) issue in the IDX Search widget. Thanks to Varvel for reporting it through Patchstack.
-* Fixed a malformed search link causing an error on pages with the IDX Search widget.
+Stability & Improvements:
+* Reliability improvements for the IDX Search widget.
+* Fixed a malformed search link that could cause an error on pages with the IDX Search widget.
 * Removed old plugin files that were no longer used.
 * When a Flexmls widget hits an error, it now shows "This widget is temporarily unavailable" instead of stopping the rest of the page from loading. The error is written to the PHP error log.
 * Flexmls blocks no longer make a second request back to your own site to render, which fixes "Error loading content" on sites where a firewall or password protection blocks those requests.

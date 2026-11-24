@@ -189,7 +189,7 @@ class flexmlsConnect {
     if (is_array($args)) {
       $return .= isset($args['before_widget']) ? $args['before_widget'] : '';
       $return .= isset($args['before_title']) ? $args['before_title'] : '';
-      $return .= isset($settings['title']) ? $settings['title'] : '';
+      $return .= isset($settings['title']) ? wp_kses_post( $settings['title'] ) : '';
       $return .= isset($args['after_title']) ? $args['after_title'] : '';
     }
 

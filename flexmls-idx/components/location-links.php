@@ -132,7 +132,8 @@ class fmcLocationLinks extends fmcWidget {
       }
 
 
-      $links_to_show .= "<li><a href=\"{$final_destination}\" title=\"{$my_link['Name']} - {$loc['l']}\"{$final_target}>{$loc['l']}</a></li>";
+      // $loc values come from the entity-decoded locations attribute, so they can carry markup.
+      $links_to_show .= "<li><a href=\"" . esc_url( $final_destination ) . "\" title=\"" . esc_attr( $my_link['Name'] . ' - ' . $loc['l'] ) . "\"{$final_target}>" . esc_html( $loc['l'] ) . "</a></li>";
     }
 
     if (empty($links_to_show)) {
@@ -143,7 +144,7 @@ class fmcLocationLinks extends fmcWidget {
 
     if ( !empty($title) ) {
       $return .= $before_title;
-      $return .= $title;
+      $return .= wp_kses_post( $title );
       $return .= $after_title;
     }
 

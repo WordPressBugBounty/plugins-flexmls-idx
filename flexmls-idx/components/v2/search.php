@@ -193,15 +193,15 @@ class fmcSearch extends fmcSearch_v1 {
 		// only include remote link information if necessary
 		if ($destination == "remote") {
 			$submit_return .= "<input type='hidden' name='fmc_do' value='fmc_search' />";
-			$submit_return .= "<input type='hidden' name='link' class='flexmls_connect__link' value='{$my_link}' />";
-			$submit_return .= "<input type='hidden' name='destlink' value='".flexmlsConnect::get_destination_link()."' />";
-			$submit_return .= "<input type='hidden' name='destination' value='{$destination}' />";
+			$submit_return .= "<input type='hidden' name='link' class='flexmls_connect__link' value='" . esc_attr( $my_link ) . "' />";
+			$submit_return .= "<input type='hidden' name='destlink' value='" . esc_url( flexmlsConnect::get_destination_link() ) . "' />";
+			$submit_return .= "<input type='hidden' name='destination' value='" . esc_attr( $destination ) . "' />";
 			$submit_return .= "<input type='hidden' name='query' value='' />";
 		} else {
 			// include the link if it's a Saved Search - added 1-29-2013 by Brandon Medenwald (WP-137)
 			if ( is_array($idx_link_details) && isset($idx_link_details['LinkType']) && $idx_link_details['LinkType'] == "SavedSearch") {
 				$submit_return .= "<input type='hidden' name='SavedSearch' class='flexmls_connect__link
-					flexmls_connect__search_v2_submit' value='{$idx_link_details['SearchId']}' />";
+					flexmls_connect__search_v2_submit' value='" . esc_attr( $idx_link_details['SearchId'] ) . "' />";
 			}
 		}
 
@@ -215,14 +215,14 @@ class fmcSearch extends fmcSearch_v1 {
 		if ( $use_compact_icon_submit ) {
 			$raw_btn = isset( $settings['buttontext'] ) ? trim( (string) $settings['buttontext'] ) : '';
 			$submit_aria = esc_attr( '' !== $raw_btn ? $raw_btn : 'Search' );
-			$submit_return .= '<button type="submit" class="flexmls_connect__search_v2_submit flexmls_connect__search_v2_submit--icon-only" style="' . $submit_button_css . '" aria-label="' . $submit_aria . '">';
+			$submit_return .= '<button type="submit" class="flexmls_connect__search_v2_submit flexmls_connect__search_v2_submit--icon-only" style="' . esc_attr( $submit_button_css ) . '" aria-label="' . $submit_aria . '">';
 			$submit_return .= '<span class="flexmls-icon-search flexmls_connect__search_v2_submit_icon" aria-hidden="true"></span>';
 			$submit_return .= '</button>';
 		} else {
-			$submit_return .= "<input class='flexmls_connect__search_v2_submit' type='submit' value='{$buttontext}' style='{$submit_button_css}' />";
+			$submit_return .= "<input class='flexmls_connect__search_v2_submit' type='submit' value='{$buttontext}' style='" . esc_attr( $submit_button_css ) . "' />";
 		}
 		if ($detailed_search == "on") {
-			$submit_return .= "<a href='{$detailed_search_url}' style='color:{$detailed_search_text_color};'{$this_target}>{$detailed_search_text}</a>";
+			$submit_return .= "<a href='" . esc_url( $detailed_search_url ) . "' style='color:" . esc_attr( $detailed_search_text_color ) . ";'{$this_target}>" . wp_kses_post( $detailed_search_text ) . "</a>";
 		}
 		$submit_return .= "</div>";
 

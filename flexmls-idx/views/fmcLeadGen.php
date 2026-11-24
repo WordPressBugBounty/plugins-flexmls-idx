@@ -3,12 +3,12 @@
 <?php 
   if ( !empty($title) ) {
     echo $before_title;
-    echo $title;
+    echo wp_kses_post( $title );
     echo $after_title;
   }
 
   if ( !empty($blurb) ) {
-    echo "<p>" . $blurb . "</p>";
+    echo "<p>" . wp_kses_post( $blurb ) . "</p>";
   }
 
 ?>
@@ -95,7 +95,7 @@
     </div>
   <?php } ?>
 
-  <input class="flexmls_connect__form_submit" type='submit' value='<?php echo $buttontext; ?>' />
+  <input class="flexmls_connect__form_submit" type='submit' value='<?php echo esc_attr( $buttontext ); ?>' />
 
 </form>
 

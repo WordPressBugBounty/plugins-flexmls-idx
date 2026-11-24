@@ -85,7 +85,7 @@ $my_links = ( ! empty( $settings['links'] ) ) ? trim( $settings['links'] ) : '';
 
     if ( !empty($title) ) {
       $return .= $before_title;
-      $return .= $title;
+      $return .= wp_kses_post( $title );
       $return .= $after_title;
       $return .= "\n";
     }

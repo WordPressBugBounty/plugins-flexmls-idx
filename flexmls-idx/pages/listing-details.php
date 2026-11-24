@@ -116,7 +116,7 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
     $this->listing_data = $listing;
 
     if ($listing != null) {
-      $this->maybe_redirect_to_canonical_listing_url( $tag, $listing );
+      $this->maybe_redirect_to_canonical_listing_url( $listing );
       $fmc_special_page_caught['page-title'] = flexmlsConnect::make_nice_address_title($listing);
       $fmc_special_page_caught['post-title'] = flexmlsConnect::make_nice_address_title($listing);
       $fmc_special_page_caught['page-url'] = flexmlsConnect::make_nice_address_url($listing);
@@ -134,11 +134,26 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
   }
 
   /**
-   * 301 to the canonical address URL when the requested slug doesn't match it
+   * 301 to the canonical address URL when the requested IDX slug doesn't match it
    * (any "*-mls_{id}" slug otherwise serves the listing).
+   *
+   * Only runs for real IDX listing URLs (fmc_tag / fmc_vow_tag). Shortcode and
+   * widget embeds call pre_tasks() with a synthetic "-mls_{id}" tag on normal
+   * WordPress pages; redirecting there blanks or leaves the custom page URL.
    */
-  private function maybe_redirect_to_canonical_listing_url( $tag, $listing ) {
+  private function maybe_redirect_to_canonical_listing_url( $listing ) {
     if ( ! flexmlsConnect::generate_nice_urls() || is_admin() || wp_doing_ajax() ) {
+      return;
+    }
+    if ( headers_sent() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+      return;
+    }
+    // Shortcode/widget embeds are not IDX permalink requests.
+    $idx_tag = get_query_var( 'fmc_tag' );
+    if ( ! $idx_tag ) {
+      $idx_tag = get_query_var( 'fmc_vow_tag' );
+    }
+    if ( ! $idx_tag ) {
       return;
     }
     if ( ! apply_filters( 'flexmls_redirect_listing_to_canonical_url', true, $listing ) ) {
@@ -149,7 +164,8 @@ class flexmlsConnectPageListingDetails extends flexmlsConnectPageCore {
       return;
     }
     $canonical_slug = basename( untrailingslashit( (string) wp_parse_url( $canonical_url, PHP_URL_PATH ) ) );
-    if ( '' === $canonical_slug || $canonical_slug === untrailingslashit( (string) $tag ) ) {
+    $request_slug   = untrailingslashit( (string) $idx_tag );
+    if ( '' === $canonical_slug || $canonical_slug === $request_slug ) {
       return;
     }
     $query = isset( $_SERVER['QUERY_STRING'] ) ? (string) wp_unslash( $_SERVER['QUERY_STRING'] ) : '';

@@ -29,7 +29,7 @@ class LeadGeneration {
         return $vars;
 	}
 
-	public static function shortcode( $atts, $content = null ){
+	public static function shortcode( $atts, $content = null, $tag = '' ){
 		$vars = self::integration_view_vars();
 
 		$atts = shortcode_atts( array(
@@ -44,6 +44,13 @@ class LeadGeneration {
 			'widget_id' => ''
 		), $atts, 'lead_generation' );
 
+		// The classic widget calls this without a tag and passes the theme's sidebar markup.
+		// From a shortcode, these are post content and can't be trusted.
+		if ( '' !== $tag ) {
+			$atts[ 'before_title' ] = wp_kses_post( $atts[ 'before_title' ] );
+			$atts[ 'after_title' ] = wp_kses_post( $atts[ 'after_title' ] );
+		}
+
 		global $wp;
 		$fmc_settings = get_option( 'fmc_settings' );
 		
@@ -51,7 +58,7 @@ class LeadGeneration {
 		if( empty( $fmc_settings[ 'api_key' ] ) || empty( $fmc_settings[ 'api_secret' ] ) ){
 			$html = '';
 			if( !empty( $atts[ 'title' ] ) ){
-				$html .= $atts[ 'before_title' ] . apply_filters( 'widget_title', $atts[ 'title' ] ) . $atts[ 'after_title' ];
+				$html .= $atts[ 'before_title' ] . wp_kses_post( apply_filters( 'widget_title', $atts[ 'title' ] ) ) . $atts[ 'after_title' ];
 			}
 			$html .= '<p>This widget is temporarily unavailable. Please refresh the page or try again later.</p>';
 			return $html;
@@ -71,7 +78,7 @@ class LeadGeneration {
 		if( $preferences === false || !is_array( $preferences ) ){
 			$html = '';
 			if( !empty( $atts[ 'title' ] ) ){
-				$html .= $atts[ 'before_title' ] . apply_filters( 'widget_title', $atts[ 'title' ] ) . $atts[ 'after_title' ];
+				$html .= $atts[ 'before_title' ] . wp_kses_post( apply_filters( 'widget_title', $atts[ 'title' ] ) ) . $atts[ 'after_title' ];
 			}
 			
 			// Use widget_not_available for consistent error messaging with error codes
@@ -97,18 +104,21 @@ class LeadGeneration {
 
 		$html  = '';
 		if( !empty( $atts[ 'title' ] ) ){
-			$html .= $atts[ 'before_title' ] . apply_filters( 'widget_title', $atts[ 'title' ] ) . $atts[ 'after_title' ];
+			$html .= $atts[ 'before_title' ] . wp_kses_post( apply_filters( 'widget_title', $atts[ 'title' ] ) ) . $atts[ 'after_title' ];
 		}
 		if( !empty( $atts[ 'blurb' ] ) ){
-			$html .= wpautop( $atts[ 'blurb' ] );
+			$html .= wpautop( wp_kses_post( $atts[ 'blurb' ] ) );
 		}
-		$label_id_prefix = !empty( $atts[ 'widget_id' ] ) ? $atts[ 'widget_id' ] . '-' : '';
-		$html .= '<form id="' . $label_id_prefix . $random_string . '">';
+		// Sanitize before HTML attribute use — Contributors can store quote-breakout payloads via shortcodes.
+		$safe_widget_id = sanitize_html_class( $atts[ 'widget_id' ] );
+		$label_id_prefix = !empty( $safe_widget_id ) ? $safe_widget_id . '-' : '';
+		$form_id = $label_id_prefix . $random_string;
+		$html .= '<form id="' . esc_attr( $form_id ) . '">';
 			$html .= '	<div class="flexmls_connect__form_row">
-							<input class="flexmls_connect__form_input" type="text" name="name" id="' . $label_id_prefix . 'name" placeholder="Your Name" aria-label="Your Name" required>
+							<input class="flexmls_connect__form_input" type="text" name="name" id="' . esc_attr( $label_id_prefix . 'name' ) . '" placeholder="Your Name" aria-label="Your Name" required>
 						</div>';
 			$html .= '	<div class="flexmls_connect__form_row">
-							<input class="flexmls_connect__form_input" type="email" name="email" id="' . $label_id_prefix . 'email" placeholder="Email Address" aria-label="Email Address" required>
+							<input class="flexmls_connect__form_input" type="email" name="email" id="' . esc_attr( $label_id_prefix . 'email' ) . '" placeholder="Email Address" aria-label="Email Address" required>
 						</div>';
 
 			// Check if RequiredFields exists and is an array before using in_array()
@@ -116,37 +126,38 @@ class LeadGeneration {
 
 			if( in_array( 'address', $required_fields ) ){
 				$html .= '	<div class="flexmls_connect__form_row">
-								<input class="flexmls_connect__form_input" type="text" name="address" id="' . $label_id_prefix . 'address" placeholder="Home Address" aria-label="Home Address" required>
+								<input class="flexmls_connect__form_input" type="text" name="address" id="' . esc_attr( $label_id_prefix . 'address' ) . '" placeholder="Home Address" aria-label="Home Address" required>
 							</div>
 							<div class="flexmls_connect__form_row">
-								<input class="flexmls_connect__form_input" type="text" name="city" id="' . $label_id_prefix . 'city" placeholder="City" aria-label="City" required>
+								<input class="flexmls_connect__form_input" type="text" name="city" id="' . esc_attr( $label_id_prefix . 'city' ) . '" placeholder="City" aria-label="City" required>
 							</div>
 							<div class="flexmls_connect__form_row">
-								<input class="flexmls_connect__form_input" type="text" name="state" id="' . $label_id_prefix . 'state" placeholder="State" aria-label="State" required>
+								<input class="flexmls_connect__form_input" type="text" name="state" id="' . esc_attr( $label_id_prefix . 'state' ) . '" placeholder="State" aria-label="State" required>
 							</div>
 							<div class="flexmls_connect__form_row">
-								<input class="flexmls_connect__form_input" type="text" name="zip" id="' . $label_id_prefix . 'zip" placeholder="ZIP Code" aria-label="ZIP Code" required>
+								<input class="flexmls_connect__form_input" type="text" name="zip" id="' . esc_attr( $label_id_prefix . 'zip' ) . '" placeholder="ZIP Code" aria-label="ZIP Code" required>
 							</div>';
 			}
 			if( in_array( 'phone', $required_fields ) ){
 				$html .= '	<div class="flexmls_connect__form_row">
-								<input class="flexmls_connect__form_input" type="tel" name="phone" id="' . $label_id_prefix . 'phone" placeholder="Phone Number" aria-label="Phone Number" required>
+								<input class="flexmls_connect__form_input" type="tel" name="phone" id="' . esc_attr( $label_id_prefix . 'phone' ) . '" placeholder="Phone Number" aria-label="Phone Number" required>
 							</div>';
 			}
 			$html .= '	<div class="flexmls_connect__form_row">
-							<textarea class="flexmls_connect__form_textarea" name="message_body" id="' . $label_id_prefix . 'message" rows="5" placeholder="Your Message" aria-label="Your Message"></textarea>
+							<textarea class="flexmls_connect__form_textarea" name="message_body" id="' . esc_attr( $label_id_prefix . 'message' ) . '" rows="5" placeholder="Your Message" aria-label="Your Message"></textarea>
 						</div>';
 			$FlexmlsConnectBase = new \flexmlsConnect();
 			$html .= (isset($fmc_settings['contact_disclaimer'])) ? "<small class='flexmls-text-small'>" . $FlexmlsConnectBase::get_contact_disclaimer() . "</small>" : '';
 			$html .= '	<div class="flexmls_connect__form_row flexmls_connect__form_row_color">
-							<label for="' . $random_string . '">' . $random_string . '</label>
-							<input type="text" name="color" id="' . $random_string . '" tabindex="-1">
+							<label for="' . esc_attr( $random_string ) . '">' . esc_html( $random_string ) . '</label>
+							<input type="text" name="color" id="' . esc_attr( $random_string ) . '" tabindex="-1">
 						</div>';
-			$html .= '	<input type="hidden" name="source" value="' . ( $wp->did_permalink ? home_url( add_query_arg( array(), $wp->request ) ) : home_url( '?' . $wp->query_string ) ) . '">';
+			$source_url = $wp->did_permalink ? home_url( add_query_arg( array(), $wp->request ) ) : home_url( '?' . $wp->query_string );
+			$html .= '	<input type="hidden" name="source" value="' . esc_url( $source_url ) . '">';
 			$html .= '	<input type="hidden" name="success" value="' . esc_attr( $atts[ 'success' ] ) . '">';
 			$html .= '	<div class="flexmls_connect__form_footer">
 							<span class="flexmls_loading_svg" style="display: none;">' . \FlexMLS\Admin\Utilities::get_loading_svg() . '</span>
-							<button class="flexmls_connect__form_submit flexmls_leadgen_button ' .  $flexmls_button_background_color .'" type="button" data-form="#' . $label_id_prefix . $random_string . '">' . $atts[ 'buttontext' ] . '</button>
+							<button class="flexmls_connect__form_submit flexmls_leadgen_button ' . esc_attr( $flexmls_button_background_color ) . '" type="button" data-form="#' . esc_attr( $form_id ) . '">' . wp_kses_post( $atts[ 'buttontext' ] ) . '</button>
 						</div>';
 		$html .= '</form>';
 

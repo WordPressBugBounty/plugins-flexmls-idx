@@ -145,7 +145,7 @@
 
             if ( !empty($title) ) {
                 $return .= $before_title;
-                $return .= $title;
+                $return .= wp_kses_post( $title );
                 $return .= $after_title;
             }
 
@@ -154,9 +154,13 @@
             //v1
             if ( self::market_stat_version() == 'v1' ) {
 
+                // Printed with a "px" suffix, so only numbers were ever valid CSS here.
+                $v1_width = is_numeric( $width ) ? $width : '';
+                $v1_height = is_numeric( $height ) ? $height : '';
+
                 $return .= '
-        <div class="flexmls_connect__market_stats_graph" style="max-width: ' . $width . 'px; height:' . $height . 'px;"></div>
-        <div class="flexmls_connect__market_stats_legend" style="max-width: ' . $width . 'px;"></div>
+        <div class="flexmls_connect__market_stats_graph" style="max-width: ' . $v1_width . 'px; height:' . $v1_height . 'px;"></div>
+        <div class="flexmls_connect__market_stats_legend" style="max-width: ' . $v1_width . 'px;"></div>
         <ul>';
             }
 
@@ -202,7 +206,8 @@
                 $sanitized_all_stat_types_index = esc_js($all_stat_types_index);
                 $sanitized_width = (int)$width;
                 $sanitized_height = (int)$height;
-                $sanitized_chart_type = esc_js($chart_type);
+                // Printed as a bare JS identifier (Chartkick.<name>), where esc_js() doesn't stop injected code.
+                $sanitized_chart_type = preg_match( '/^[A-Za-z]+$/', $chart_type ) ? $chart_type : 'LineChart';
 
                 // Prepare data for JavaScript
                 $chart_data = [];

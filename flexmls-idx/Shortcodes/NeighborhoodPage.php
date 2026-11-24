@@ -36,7 +36,8 @@ class NeighborhoodPage {
     // WP-636
     $location_return = str_replace('amp;', '', $location_return);
 
-		$page_content = str_replace( '{Location}', $location_return, $template_page->post_content );
+		// {Location} can sit in text or inside an attribute in the template.
+		$page_content = str_replace( '{Location}', esc_html( $location_return ), $template_page->post_content );
 
 		$locations = \FlexMLS\Admin\Formatter::parse_location_search_string( $location );
 

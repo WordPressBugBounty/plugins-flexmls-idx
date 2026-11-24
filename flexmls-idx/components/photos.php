@@ -428,6 +428,12 @@ class fmcPhotos extends fmcWidget {
 
     $rand = mt_rand();
 
+    // v1 listing details still use p/n plus the full criteria for prev/next browsing.
+    // v2 uses clean listing URLs (WP-1401 / WP-1421); only keep m when needed.
+    $use_clean_listing_urls = ( 'local' === $destination )
+      && class_exists( 'flexmlsConnectPageCore' )
+      && flexmlsConnectPageCore::is_v2_template_active();
+
     $total_listings = 0;
     $result_count = 0;
     if (count($api_listings)) {
@@ -435,11 +441,13 @@ class fmcPhotos extends fmcWidget {
         $result_count++;
 
         $this_result_overall_index = ($api_page_size * ($api_current_page - 1)) + $result_count;
-        // figure out if there's a previous listing
-        $hyperlink_conditions['p'] = ($this_result_overall_index != 1) ? 'y' : 'n';
+        if ( ! $use_clean_listing_urls ) {
+          // figure out if there's a previous listing
+          $hyperlink_conditions['p'] = ($this_result_overall_index != 1) ? 'y' : 'n';
 
-        // figure out if there's a next listing possible
-        $hyperlink_conditions['n'] = ( $this_result_overall_index < $api_last_count ) ? 'y' : 'n';
+          // figure out if there's a next listing possible
+          $hyperlink_conditions['n'] = ( $this_result_overall_index < $api_last_count ) ? 'y' : 'n';
+        }
 
         $total_listings++;
         $show_idx_badge = "";
@@ -447,7 +455,9 @@ class fmcPhotos extends fmcWidget {
         $listing = isset( $li['StandardFields'] ) && is_array( $li['StandardFields'] ) ? $li['StandardFields'] : array();
 
         //Get MlsId for MLS IDX Share Listings
-        $hyperlink_conditions['m'] = $listing['MlsId'] ?? '';
+        if ( ! $use_clean_listing_urls ) {
+          $hyperlink_conditions['m'] = $listing['MlsId'] ?? '';
+        }
 
         $listing_address = flexmlsConnect::format_listing_street_address($li);
         $first_line_address = $listing_address[0];
@@ -532,7 +542,13 @@ class fmcPhotos extends fmcWidget {
           $this_target = null;
 
           if ($destination == 'local') {
-            $this_link = flexmlsConnect::make_nice_address_url($li, $hyperlink_conditions);
+            if ( $use_clean_listing_urls ) {
+              // Match v2 search results: only the MLS id stays on the listing link.
+              $listing_link_params = ! empty( $listing['MlsId'] ) ? array( 'm' => $listing['MlsId'] ) : array();
+              $this_link = flexmlsConnect::make_nice_address_url( $li, $listing_link_params );
+            } else {
+              $this_link = flexmlsConnect::make_nice_address_url($li, $hyperlink_conditions);
+            }
           }
           else {
             $this_link = flexmlsConnect::make_destination_link("{$listing_destination_link}&start=details&start_id={$listing['ListingKey']}");
@@ -662,6 +678,11 @@ class fmcPhotos extends fmcWidget {
 
       $return .= "</div>";
       $return .= "</div>";
+
+      // Remember this page for v2 "Back to search" when listing links are clean (no search_referral_url).
+      if ( $use_clean_listing_urls ) {
+        $return .= "<script>try { window.sessionStorage.setItem( 'flexmls_search_referral_url', window.location.href ); } catch ( e ) {}</script>";
+      }
 
       if ($total_listings > 0) {
         $return .= "<div class='flexmls_connect__carousel_nav clearfix'>

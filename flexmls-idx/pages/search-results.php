@@ -806,7 +806,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 		$return = " <div class='flexmls_connect__sr_pagination'>";
 
 		if ($current_page != 1) {
-			$return .= "    <button href='". $this->make_pagination_link($current_page - 1) ."'>Previous</button>";
+			$return .= "    <button href='". esc_url( $this->make_pagination_link($current_page - 1) ) ."'>Previous</button>";
 		}
 
 		if ( ($current_page - $tolerance - 1) > 1 ) {
@@ -835,7 +835,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 				$return .= "    <span>{$i}</span> ";
 			}
 			else {
-				$return .= "    <a href='". $this->make_pagination_link($i) ."'>{$i}</a> ";
+				$return .= "    <a href='". esc_url( $this->make_pagination_link($i) ) ."'>{$i}</a> ";
 			}
 
 			if ($i == 1 and $jump_after_first) {
@@ -845,7 +845,7 @@ class flexmlsConnectPageSearchResults extends flexmlsConnectPageCore {
 		}
 
 		if ($current_page != $total_pages) {
-			$return .= "     <button href='". $this->make_pagination_link($current_page + 1) ."'>Next</button>";
+			$return .= "     <button href='". esc_url( $this->make_pagination_link($current_page + 1) ) ."'>Next</button>";
 		}
 		$return .= "  </div><!-- pagination -->";
 

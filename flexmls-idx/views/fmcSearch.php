@@ -11,11 +11,11 @@
 <?php if ( class_exists( 'flexmlsConnectPageCore' ) ) { flexmlsConnectPageCore::render_primary_color_styles_once(); } ?>
 
 <div class="flexmls_connect__search flexmls_connect__search_new
-  flexmls_connect__search_new_<?php echo $orientation; ?> <?php echo $box_shadow_class; ?>"
+  flexmls_connect__search_new_<?php echo esc_attr( $orientation ); ?> <?php echo esc_attr( $box_shadow_class ); ?>"
   style="
-    color: <?php echo $field_text_color; ?>;
+    color: <?php echo esc_attr( $field_text_color ); ?>;
     max-width: <?php echo esc_attr( $width ); ?>;
-    <?php echo $border_radius; ?>
+    <?php echo esc_attr( $border_radius ); ?>
     background-color: <?php echo esc_attr( $background_color ); ?>;
   ">
 
@@ -27,8 +27,8 @@
   <?php } ?>
 
     <?php // title ?>
-    <div class='flexmls_connect__search_new_title' style="color: <?php echo $title_text_color; ?>;">
-      <?php echo $title; ?>
+    <div class='flexmls_connect__search_new_title' style="color: <?php echo esc_attr( $title_text_color ); ?>;">
+      <?php echo wp_kses_post( (string) $title ); ?>
     </div>
 
     <?php

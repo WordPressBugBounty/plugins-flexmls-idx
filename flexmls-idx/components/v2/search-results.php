@@ -578,7 +578,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 		$return = " <div class='flexmls_connect__sr_pagination'>";
 
 		if ($current_page != 1) {
-			$return .= "    <a href='". $this->make_pagination_link($current_page - 1) ."'>Previous</a>";
+			$return .= "    <a href='". esc_url( $this->make_pagination_link($current_page - 1) ) ."'>Previous</a>";
 		}
 
 		if ( ($current_page - $tolerance - 1) > 1 ) {
@@ -607,7 +607,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 				$return .= "    <span>{$i}</span> ";
 			}
 			else {
-				$return .= "    <a href='". $this->make_pagination_link($i) ."'>{$i}</a> ";
+				$return .= "    <a href='". esc_url( $this->make_pagination_link($i) ) ."'>{$i}</a> ";
 			}
 
 			if ($i == 1 and $jump_after_first) {
@@ -617,7 +617,7 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 		}
 
 		if ($current_page != $total_pages) {
-			$return .= "     <a href='". $this->make_pagination_link($current_page + 1) ."'>Next</a>";
+			$return .= "     <a href='". esc_url( $this->make_pagination_link($current_page + 1) ) ."'>Next</a>";
 		}
 		$return .= "  </div><!-- pagination -->";
 
@@ -627,11 +627,17 @@ class fmcSearchResults extends fmcSearchResults_v1 {
 
 	function make_pagination_link( $page ) {
 		global $wp;
-		$current_url = home_url( add_query_arg( array( $_GET ), $wp->request ) );
-		$current_url = str_replace("\\", "", $current_url);
-		$paginated_url = add_query_arg( 'pg', $page, $current_url );
 
-		return $paginated_url;
+		// Preserve the current search/filter params, but encode BOTH keys and values.
+		// add_query_arg() only encodes values, so a crafted parameter NAME would
+		// otherwise pass through unencoded and break out of the single-quoted href
+		// in pagination(). http_build_query() percent-encodes keys and values.
+		$query_args = wp_unslash( (array) $_GET );
+		$query_args['pg'] = (int) $page;
+
+		$base_url = home_url( $wp->request );
+
+		return empty( $query_args ) ? $base_url : $base_url . '?' . http_build_query( $query_args );
 	}
 
 	function source_options() {

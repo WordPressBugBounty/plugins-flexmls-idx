@@ -11,11 +11,11 @@
 <?php if ( class_exists( 'flexmlsConnectPageCore' ) ) { flexmlsConnectPageCore::render_primary_color_styles_once(); } ?>
 
 <div class="flexmls_connect__search flexmls-v2-widget <?php echo esc_attr( $wrapper_class ); ?>
-  flexmls_connect__search_v2_<?php echo $orientation; ?> flexmls_connect__search_v2_instance_<?php echo esc_attr( (string) $rand ); ?>"
+  flexmls_connect__search_v2_<?php echo esc_attr( $orientation ); ?> flexmls_connect__search_v2_instance_<?php echo esc_attr( (string) $rand ); ?>"
   style="
-    color: <?php echo $field_text_color; ?>;
+    color: <?php echo esc_attr( $field_text_color ); ?>;
     max-width: <?php echo esc_attr( $width ); ?>;
-    <?php echo $border_radius; ?>
+    <?php echo esc_attr( $border_radius ); ?>
     background-color: <?php echo esc_attr( $background_color ); ?>;
     <?php if ( ! empty( $property_type_tab_background_color ) ) : ?>
     --flexmls-property-type-tab-active-bg: <?php echo esc_attr( $property_type_tab_background_color ); ?>;
@@ -31,8 +31,8 @@
   <?php } ?>
 
     <?php // title (above property type tabs when tabs are shown at top) ?>
-    <div class='flexmls_connect__search_v2_title' style="color: <?php echo $title_text_color; ?>;">
-      <?php echo $title; ?>
+    <div class='flexmls_connect__search_v2_title' style="color: <?php echo esc_attr( $title_text_color ); ?>;">
+      <?php echo wp_kses_post( (string) $title ); ?>
     </div>
 
     <?php if ( ! empty( $pt_render_top_horizontal ) ) : ?>
